@@ -1,0 +1,17 @@
+# IDE / Editor
+
+.vscode/
+*.swp
+*.swo
+
+# Temporary
+
+tmp/
+temp/
+scratch/
+artifacts/
+*.tmp
+
+# Build artifacts
+
+build/
