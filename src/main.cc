@@ -1,27 +1,28 @@
 #include <cstdlib>
-#include <iomanip>
-#include <iostream>
 #include <string>
 
+#include <Eigen/Dense>
 #include <libint2.hpp>
 
 #include "integrals.h"
 #include "loader.h"
 #include "rhf.h"
+#include "timer.h"
 #include "utils.h"
 
 int main(int argc, char* argv[]) {
     if (argc < 3 || argc > 5) {
-        std::cerr << "Usage: " << argv[0]
-                  << " <xyz-file> <basis> [max-iterations] [energy-tolerance]\n";
+        std::println("Usage: {} <xyz-file> <basis> [max-iterations] [energy-tolerance]", argv[0]);
         return EXIT_FAILURE;
     }
 
     const int max_iter = argc >= 4 ? std::stoi(argv[3]) : 100;
     const double e_conv = argc == 5 ? std::stod(argv[4]) : 1e-6;
 
-    libint2::initialize();
     try {
+        timing::Scoped _t("Total time", true);
+
+        libint2::initialize();
         const auto molecule = loader(argv[1], argv[2]);
         const auto& basis = molecule.obs;
 
@@ -33,24 +34,40 @@ int main(int argc, char* argv[]) {
                                        basis.max_nprim(), basis.max_l());
 
         nuclear_engine.set_params(make_point_charges(molecule.atoms));
+        
+        std::println("nbf: {}", basis.nbf());
 
-        auto S = build_one_center(overlap_engine, basis);
-        auto T = build_one_center(kinetic_engine, basis);
-        auto V = build_one_center(nuclear_engine, basis);
+        Eigen::MatrixXd S, T, V;
+        {
+            timing::Scoped _t("One-electron (S,T,V)");
+            S = build_one_center(overlap_engine, basis);
+            T = build_one_center(kinetic_engine, basis);
+            V = build_one_center(nuclear_engine, basis);
+        }
 
         libint2::Engine eri_engine(libint2::Operator::coulomb,
                                    basis.max_nprim(), basis.max_l());
-        auto eri = build_canonical_eris(eri_engine, basis);
-        const double energy = roothan_solve(
-            S, T, V, eri, compute_nuclear_repulsion(molecule.atoms),
-            molecule.ndocc, max_iter, e_conv);
+        std::vector<double> eri;
+        {
+            timing::Scoped _t("ERI build");
+            eri = build_canonical_eris(eri_engine, basis);
+        }
 
-        std::cout << std::setprecision(12) << "Final SCF energy: " << energy << '\n';
+        double energy;
+        {
+            timing::Scoped _t("SCF iterations");
+            energy = roothan_solve(
+                S, T, V, eri, compute_nuclear_repulsion(molecule.atoms),
+                molecule.ndocc, max_iter, e_conv);
+        }
+        std::println("Final SCF energy: {:.8f}", energy);
+
     } catch (const std::exception& error) {
-        std::cerr << "SCF error: " << error.what() << '\n';
+        std::println("SCF error: {}", error.what());
         libint2::finalize();
         return EXIT_FAILURE;
     }
+    timing::report();
 
     libint2::finalize();
     return EXIT_SUCCESS;

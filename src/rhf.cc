@@ -6,6 +6,7 @@
 #include "rhf.h"
 #include "build_JK.h"
 #include "diis.h"
+#include "timer.h"
 
 
 double roothan_solve(const Eigen::MatrixXd& S, const Eigen::MatrixXd& T,
@@ -28,7 +29,10 @@ double roothan_solve(const Eigen::MatrixXd& S, const Eigen::MatrixXd& T,
     for (int i = 0; i != max_iter; ++i) {
 
         Eigen::MatrixXd F_p = X.transpose() * F * X;
-        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(F_p);
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver;
+
+        solver.compute(F_p);
+
         auto& C_p = solver.eigenvectors();
 
         Eigen::MatrixXd C = X * C_p;
@@ -36,7 +40,12 @@ double roothan_solve(const Eigen::MatrixXd& S, const Eigen::MatrixXd& T,
 
         Eigen::MatrixXd D = C_docc * C_docc.transpose();
         
-		auto [J, K] = build_JK(ERI, D);
+        JK jk;
+        {
+            timing::Scoped _t("  build_JK");
+            jk = build_JK(ERI, D);
+        }
+        auto& [J, K] = jk;
         F = H + 2.0 * J - K;
 
         F_list.push_back(F);
