@@ -4,6 +4,11 @@
 *.swp
 *.swo
 
+# Virtual environments
+
+.env/
+.conda/
+
 # Temporary
 
 tmp/
@@ -15,3 +20,10 @@ artifacts/
 # Build artifacts
 
 build/
+
+# Psi4 outputs
+
+*.dat
+*.clean
+*.log
+*.out

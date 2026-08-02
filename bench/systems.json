@@ -1,0 +1,39 @@
+{
+  "h2o/sto-3g": {
+    "xyz": "input/h2o.xyz",
+    "basis": "sto-3g",
+    "tier": "tiny",
+    "run_by_default": true
+  },
+  "h2o/cc-pvdz": {
+    "xyz": "input/h2o.xyz",
+    "basis": "cc-pvdz",
+    "tier": "small",
+    "run_by_default": true
+  },
+  "fm/def2-svp": {
+    "xyz": "input/fm.xyz",
+    "basis": "def2-svp",
+    "tier": "small",
+    "run_by_default": true
+  },
+  "fm/def2-tzvp": {
+    "xyz": "input/fm.xyz",
+    "basis": "def2-tzvp",
+    "tier": "medium",
+    "run_by_default": true
+  },
+  "benzene/def2-svp": {
+    "xyz": "input/benzene.xyz",
+    "basis": "def2-svp",
+    "tier": "large",
+    "run_by_default": true
+  },
+  "benzene/def2-tzvp": {
+    "xyz": "input/benzene.xyz",
+    "basis": "def2-tzvp",
+    "tier": "large",
+    "run_by_default": false
+  }
+}
+

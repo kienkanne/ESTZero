@@ -59,7 +59,7 @@ double roothan_solve(const Eigen::MatrixXd& S, const Eigen::MatrixXd& T,
 		E0 = D.cwiseProduct(H + F).sum() + V_nn;
 		dE = E0 - E0_last;
 
-        std::println("Iter {:3} | E = {:.8f} | dE = {:.8f} | rms_E {:.8f}", i, E0, dE, rms_err);
+        std::println("Iter {:3} | E = {:.8f} | dE = {:.8f} | rms_E {:.8f}", i+1, E0, dE, rms_err);
     
 		if ((std::abs(dE) < tol) && (rms_err < tol)) {
             std::println("SCF converged!");
