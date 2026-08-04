@@ -38,15 +38,3 @@ Eigen::MatrixXd sym_ortho (const Eigen::MatrixXd &S, double tol = 1e-8) {
 
     return U * s.asDiagonal() * U.transpose();
 }
-
-
-int pair_index(int i, int j) {
-    return i >= j ? i * (i + 1) / 2 + j : j * (j + 1) / 2 + i;
-}
-
-
-int eri_index(int i, int j, int k, int l) {
-    int ij = pair_index(i, j);
-    int kl = pair_index(k, l);
-    return pair_index(ij, kl);
-}

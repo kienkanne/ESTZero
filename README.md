@@ -25,3 +25,4 @@ The test used to track through different versions is benzene/def2-svp (nbf=114),
 | version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | Note |
 |---|---|---|---|---|---|
 | v0.1.0 | 30.797 | 9.752 | 1313.2 | 15 | Baseline |
+| v0.1.1 | 22.379 | 9.564 | 799.2 | 16 | Moved eri index helpers defintion to header file to reduce overhead |

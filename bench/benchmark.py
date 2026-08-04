@@ -149,7 +149,6 @@ def main():
     OUTPUTS = ROOT / "bench" / "outputs"
     OUTPUTS.mkdir(parents=True, exist_ok=True)
 
-    OUTPUTS = ROOT / "bench" / "outputs"
     with open(OUTPUTS / f"{args.name}.json", "w") as fh:
         json.dump(outputs, fh, indent=2)
     
