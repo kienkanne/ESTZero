@@ -26,3 +26,4 @@ The test used to track through different versions is benzene/def2-svp (nbf=114),
 |---|---|---|---|---|---|
 | v0.1.0 | 30.797 | 9.752 | 1313.2 | 15 | Baseline |
 | v0.1.1 | 22.379 | 9.564 | 799.2 | 16 | Moved eri index helpers defintion to header file to reduce overhead |
+| v0.2.0 | 14.044 | 1.342 | 792.2 | 16 | Buld ERI now loops over shell quartets |
