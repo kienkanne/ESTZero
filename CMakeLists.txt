@@ -17,7 +17,6 @@ add_executable(SCF
     src/loader.cc
     src/rhf.cc
     src/utils.cc
-    src/diis.cc
 )
 
 # Specify header and library search paths for BOTH targets

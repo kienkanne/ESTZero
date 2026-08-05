@@ -5,7 +5,6 @@
 #include <print>
 #include "rhf.h"
 #include "build_JK.h"
-#include "diis.h"
 #include "timer.h"
 
 
