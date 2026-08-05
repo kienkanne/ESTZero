@@ -8,9 +8,9 @@
 #include "timer.h"
 
 
-double roothan_solve(const Eigen::MatrixXd& S, const Eigen::MatrixXd& T,
-                     const Eigen::MatrixXd& V, const std::vector<double>& ERI,
-                     double V_nn, int ndocc, int max_iter, double tol) {
+double get_rhf_energy(double tol, int max_iter, int verbose, double V_nn, int ndocc, 
+                    const Eigen::MatrixXd& S, const Eigen::MatrixXd& T,
+                    const Eigen::MatrixXd& V, const std::vector<double>& ERI) {
     int nbf = S.rows();
 
     Eigen::MatrixXd H = T + V;
@@ -58,10 +58,12 @@ double roothan_solve(const Eigen::MatrixXd& S, const Eigen::MatrixXd& T,
 		E0 = D.cwiseProduct(H + F).sum() + V_nn;
 		dE = E0 - E0_last;
 
-        std::println("Iter {:3} | E = {:.8f} | dE = {:.8f} | rms_E {:.8f}", i+1, E0, dE, rms_err);
-    
+        if (verbose >= 2) {
+        std::println("Iter {:3} | E = {:.8f} | dE = {:.3e} | rms_E {:.3e}", i+1, E0, dE, rms_err);
+        }
+
 		if ((std::abs(dE) < tol) && (rms_err < tol)) {
-            std::println("SCF converged!");
+            if (verbose >= 2) { std::println("SCF converged!"); }
 			return E0;
 		}
 

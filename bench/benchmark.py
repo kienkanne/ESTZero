@@ -52,7 +52,7 @@ def run_once(xyz, basis, maxiter, econv):
     xyz_path = os.path.join(ROOT, xyz)
     t0 = time.perf_counter()
     proc = subprocess.run(
-        [BINARY, xyz_path, basis, str(maxiter), str(econv)],
+        [BINARY, xyz_path, basis, str(econv), str(maxiter)],
         capture_output=True, text=True,
     )
     wall = time.perf_counter() - t0

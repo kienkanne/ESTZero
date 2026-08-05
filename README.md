@@ -28,3 +28,4 @@ The test used to track through different versions is benzene/def2-svp (nbf=114),
 | v0.1.1 | 22.379 | 9.564 | 799.2 | 16 | Moved eri index helpers defintion to header file to reduce overhead |
 | v0.2.0 | 14.044 | 1.342 | 792.2 | 16 | Build ERI now loops over shell quartets (~8x speed up) |
 | v0.3.0 | 7.822 | 1.390 | 400.3 | 16 | Added scattering for JK building (similar ERI looping, scatter J twice and K four times, and symmetry) |
+| v0.4.0 | 7.774 | 1.336 | 400.8 | 16 | Reorganize code around wavefunction object (no algorithm optimization) |

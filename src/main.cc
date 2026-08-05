@@ -4,63 +4,26 @@
 #include <Eigen/Dense>
 #include <libint2.hpp>
 
-#include "integrals.h"
-#include "loader.h"
-#include "rhf.h"
+#include "wfn.h"
 #include "timer.h"
-#include "utils.h"
 
 int main(int argc, char* argv[]) {
-    if (argc < 3 || argc > 5) {
-        std::println("Usage: {} <xyz-file> <basis> [max-iterations] [energy-tolerance]", argv[0]);
+    if (argc < 3 || argc > 6) {
+        std::println("Usage: {} <xyz-file> <basis> [energy-tolerance] [max-iterations] [verbose]", argv[0]);
         return EXIT_FAILURE;
     }
 
-    const int max_iter = argc >= 4 ? std::stoi(argv[3]) : 100;
-    const double e_conv = argc == 5 ? std::stod(argv[4]) : 1e-6;
+    const double e_conv = argc >= 4 ? std::stod(argv[3]) : 1e-6;
+    const int max_iter = argc >= 5 ? std::stoi(argv[4]) : 100;
+    const int verbose = argc >= 6 ? std::stoi(argv[5]) : 2;
 
     try {
         timing::Scoped _t("Total time", true);
+        auto wfn = WaveFunction(argv[1], argv[2]);
+        wfn.get_integrals();
+        double E0 = wfn.get_energy("rhf", e_conv, max_iter, verbose);
 
-        libint2::initialize();
-        const auto molecule = loader(argv[1], argv[2]);
-        const auto& basis = molecule.obs;
-
-        libint2::Engine overlap_engine(libint2::Operator::overlap,
-                                       basis.max_nprim(), basis.max_l());
-        libint2::Engine kinetic_engine(libint2::Operator::kinetic,
-                                       basis.max_nprim(), basis.max_l());
-        libint2::Engine nuclear_engine(libint2::Operator::nuclear, 
-                                       basis.max_nprim(), basis.max_l());
-
-        nuclear_engine.set_params(make_point_charges(molecule.atoms));
-        
-        std::println("nbf: {}", basis.nbf());
-
-        Eigen::MatrixXd S, T, V;
-        {
-            timing::Scoped _t("One-electron (S,T,V)");
-            S = build_one_center(overlap_engine, basis);
-            T = build_one_center(kinetic_engine, basis);
-            V = build_one_center(nuclear_engine, basis);
-        }
-
-        libint2::Engine eri_engine(libint2::Operator::coulomb,
-                                   basis.max_nprim(), basis.max_l());
-        std::vector<double> eri;
-        {
-            timing::Scoped _t("ERI build");
-            eri = build_canonical_eris(eri_engine, basis);
-        }
-
-        double energy;
-        {
-            timing::Scoped _t("SCF iterations");
-            energy = roothan_solve(
-                S, T, V, eri, compute_nuclear_repulsion(molecule.atoms),
-                molecule.ndocc, max_iter, e_conv);
-        }
-        std::println("Final SCF energy: {:.8f}", energy);
+        std::println("Final SCF energy: {:.8f}", E0);
 
     } catch (const std::exception& error) {
         std::println("SCF error: {}", error.what());

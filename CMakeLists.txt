@@ -14,7 +14,7 @@ add_executable(SCF
     src/main.cc
     src/build_JK.cc
     src/integrals.cc
-    src/loader.cc
+    src/wfn.cc
     src/rhf.cc
     src/utils.cc
 )
