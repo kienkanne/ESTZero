@@ -1,6 +1,9 @@
 #include <Eigen/Dense>
 #include <libint2.hpp>
 
+using Matrix = Eigen::MatrixXd;
+using Vector = Eigen::VectorXd;
+
 double compute_nuclear_repulsion(const std::vector<libint2::Atom>& atoms) {
     double vnn = 0.0;
     
@@ -20,9 +23,9 @@ double compute_nuclear_repulsion(const std::vector<libint2::Atom>& atoms) {
 }
 
 
-Eigen::MatrixXd sym_ortho (const Eigen::MatrixXd &S, double tol = 1e-8) {
+Matrix sym_ortho (const Matrix &S, double tol = 1e-8) {
     // This is for symmetric matrix; use EigenSolver for general case
-    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(S);
+    Eigen::SelfAdjointEigenSolver<Matrix> solver(S);
     auto s = solver.eigenvalues();
     auto U = solver.eigenvectors();
 
@@ -40,26 +43,26 @@ Eigen::MatrixXd sym_ortho (const Eigen::MatrixXd &S, double tol = 1e-8) {
 }
 
 
-Eigen::VectorXd diis(const std::vector<Eigen::MatrixXd>& err_list) {
+Vector diis(const std::vector<Matrix>& err_list) {
     int size = err_list.size();
 
-    Eigen::MatrixXd B = Eigen::MatrixXd::Constant(size + 1, size + 1, -1.0);
+    Matrix B = Matrix::Constant(size + 1, size + 1, -1.0);
     B(size, size) = 0.0;
 
     int n = err_list[0].size();
-    Eigen::MatrixXd E(size, n);
+    Matrix E(size, n);
 
     for(int i = 0; i != size; ++i) {
-        Eigen::Map<const Eigen::VectorXd> err_vec(err_list[i].data(), n); // n for vector size
+        Eigen::Map<const Vector> err_vec(err_list[i].data(), n); // n for vector size
         E.row(i) = err_vec;
     }
 
     B(Eigen::seq(0, size - 1), Eigen::seq(0, size - 1)) = E * E.transpose();
 
-    Eigen::VectorXd rhs = Eigen::VectorXd::Zero(size + 1);
+    Vector rhs = Vector::Zero(size + 1);
     rhs(size) = -1.0;
 
-    Eigen::VectorXd coeffs = B.colPivHouseholderQr().solve(rhs);
+    Vector coeffs = B.colPivHouseholderQr().solve(rhs);
 
     // Return only the coefficients (drop the final Lagrange multiplier element)
     return coeffs.head(size);

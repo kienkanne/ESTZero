@@ -70,7 +70,8 @@ void WaveFunction::get_integrals() {
 }
 
 
-double WaveFunction::get_energy(std::string type, double tol=1e-8, int max_iter=200, int verbose=2) {
+double WaveFunction::get_energy(const std::string type, const double tol=1e-8, 
+                                const int max_iter=200, const int verbose=2) {
     double E0;
     if (type == "rhf") {
         E0 = get_rhf_energy(tol, max_iter, verbose, compute_nuclear_repulsion(atoms),

@@ -7,49 +7,51 @@
 #include "build_JK.h"
 #include "timer.h"
 
+using Matrix = Eigen::MatrixXd;
+using Vector = Eigen::VectorXd;
 
 double get_rhf_energy(double tol, int max_iter, int verbose, double V_nn, int ndocc, 
-                    const Eigen::MatrixXd& S, const Eigen::MatrixXd& T,
-                    const Eigen::MatrixXd& V, const std::vector<double>& ERI) {
+                    const Matrix& S, const Matrix& T,
+                    const Matrix& V, const std::vector<double>& eri_vector) {
     int nbf = S.rows();
 
-    Eigen::MatrixXd H = T + V;
-    Eigen::MatrixXd F = H;
-	Eigen::MatrixXd X = sym_ortho(S);
-    
+    const Matrix H = T + V;
+	const Matrix X = sym_ortho(S);
+    Matrix F = H;
+
     double E0 = 0.0;
 	double E0_last = 1e2;
     double dE = E0 - E0_last;
     double rms_err = 1e2;
 
-    std::vector<Eigen::MatrixXd> F_list;
-    std::vector<Eigen::MatrixXd> err_list;
+    std::vector<Matrix> F_list;
+    std::vector<Matrix> err_list;
 					
     for (int i = 0; i != max_iter; ++i) {
 
-        Eigen::MatrixXd F_p = X.transpose() * F * X;
-        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver;
+        Matrix F_p = X.transpose() * F * X;
+        Eigen::SelfAdjointEigenSolver<Matrix> solver;
 
         solver.compute(F_p);
 
         auto& C_p = solver.eigenvectors();
 
-        Eigen::MatrixXd C = X * C_p;
-        Eigen::MatrixXd C_docc = C(Eigen::placeholders::all, Eigen::seq(0, ndocc - 1)); 
+        Matrix C = X * C_p;
+        Matrix C_docc  = C.leftCols(ndocc);
 
-        Eigen::MatrixXd D = C_docc * C_docc.transpose();
+        Matrix D = C_docc * C_docc.transpose();
         
         JK jk;
         {
             timing::Scoped _t("  build_JK");
-            jk = build_JK(ERI, D);
+            jk = build_JK(eri_vector, D);
         }
         auto& [J, K] = jk;
         F = H + 2.0 * J - K;
 
         F_list.push_back(F);
 
-        Eigen::MatrixXd err_vec = F * D * S - S * D * F;
+        Matrix err_vec = F * D * S - S * D * F;
         err_list.push_back(err_vec);
 
         // Frobenius norm, then divide to get mean
@@ -73,8 +75,8 @@ double get_rhf_energy(double tol, int max_iter, int verbose, double V_nn, int nd
             err_list.erase(err_list.begin());
             F_list.erase(F_list.begin());
 
-            Eigen::VectorXd coeffs = diis(err_list);
-            Eigen::MatrixXd F_diis = Eigen::MatrixXd::Zero(nbf, nbf);
+            Vector coeffs = diis(err_list);
+            Matrix F_diis = Matrix::Zero(nbf, nbf);
 
             for (std::size_t i = 0; i < err_list.size(); ++i) {
                 F_diis += coeffs[i] * F_list[i]; 

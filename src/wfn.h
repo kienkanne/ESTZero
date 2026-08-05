@@ -3,7 +3,6 @@
 
 #include <Eigen/Core>
 #include <vector>
-#include <string>
 #include <Eigen/Dense>
 #include <libint2.hpp>
 
@@ -20,12 +19,13 @@ private:
     void loader(const std::string xyz, const std::string basis);
     
 public:
-    explicit WaveFunction(std::string xyz, std::string basis) {
+    explicit WaveFunction(const std::string xyz, const std::string basis) {
         loader(xyz, basis);
     }
     
     void get_integrals();
-    double get_energy(std::string type, double tol, int max_iter, int verbose);
+    double get_energy(const std::string type, const double tol, 
+                      const int max_iter, const int verbose);
 };
 
 #endif

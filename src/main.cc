@@ -1,9 +1,3 @@
-#include <cstdlib>
-#include <string>
-
-#include <Eigen/Dense>
-#include <libint2.hpp>
-
 #include "wfn.h"
 #include "timer.h"
 
@@ -21,17 +15,15 @@ int main(int argc, char* argv[]) {
         timing::Scoped _t("Total time", true);
         auto wfn = WaveFunction(argv[1], argv[2]);
         wfn.get_integrals();
-        double E0 = wfn.get_energy("rhf", e_conv, max_iter, verbose);
+        const double E0 = wfn.get_energy("rhf", e_conv, max_iter, verbose);
 
         std::println("Final SCF energy: {:.8f}", E0);
 
     } catch (const std::exception& error) {
         std::println("SCF error: {}", error.what());
-        libint2::finalize();
         return EXIT_FAILURE;
     }
     timing::report();
 
-    libint2::finalize();
     return EXIT_SUCCESS;
 }

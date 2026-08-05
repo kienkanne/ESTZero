@@ -5,7 +5,7 @@
 #include "build_JK.h"
 
 
-JK build_JK (const std::vector<double> &ERI, const Eigen::MatrixXd &D) {
+JK build_JK (const std::vector<double> &eri_vector, const Eigen::MatrixXd &D) {
 	const int nbf = D.rows();
     
 	Eigen::MatrixXd J(nbf, nbf);
@@ -26,7 +26,7 @@ JK build_JK (const std::vector<double> &ERI, const Eigen::MatrixXd &D) {
 		if (k == l) {factor *= 0.5;}
 		if ((i == k) && (j == l)) {factor *= 0.5;}
 
-		double val {factor * ERI[eri_index(i, j, k, l)]};		
+		double val {factor * eri_vector[eri_index(i, j, k, l)]};		
 
 		// J scatter half as much as K
         J(i, j) += 2 * val * D(k, l);
