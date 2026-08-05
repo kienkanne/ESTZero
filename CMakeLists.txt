@@ -16,6 +16,7 @@ add_executable(SCF
     src/integrals.cc
     src/wfn.cc
     src/rhf.cc
+    src/mp2.cc
     src/utils.cc
 )
 

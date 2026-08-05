@@ -3,6 +3,7 @@
 #include <Eigen/Eigenvalues>
 #include <libint2.hpp>
 #include <print>
+
 #include "rhf.h"
 #include "build_JK.h"
 #include "timer.h"
@@ -10,9 +11,11 @@
 using Matrix = Eigen::MatrixXd;
 using Vector = Eigen::VectorXd;
 
-double get_rhf_energy(double tol, int max_iter, int verbose, double V_nn, int ndocc, 
+Result get_rhf_energy(double tol, int max_iter, int verbose, double V_nn, int ndocc, 
                     const Matrix& S, const Matrix& T,
                     const Matrix& V, const std::vector<double>& eri_vector) {
+    timing::Scoped _t("SCF Iterations");
+    
     int nbf = S.rows();
 
     const Matrix H = T + V;
@@ -66,7 +69,8 @@ double get_rhf_energy(double tol, int max_iter, int verbose, double V_nn, int nd
 
 		if ((std::abs(dE) < tol) && (rms_err < tol)) {
             if (verbose >= 2) { std::println("SCF converged!"); }
-			return E0;
+            auto eps = solver.eigenvalues();
+			return {E0, C, eps};
 		}
 
         // Use a slice of the history to limit DIIS memory
@@ -87,6 +91,5 @@ double get_rhf_energy(double tol, int max_iter, int verbose, double V_nn, int nd
         E0_last = E0;
     }
 
-    std::cout << "SCF failed to converge.\n";
-    return E0;
+    throw std::runtime_error("SCF failed to converge.\n");
 }

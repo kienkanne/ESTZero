@@ -1,6 +1,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <libint2.hpp>
+#include <stdexcept>
 
 #include "wfn.h"
 #include "libint2/basis.h"
@@ -8,6 +9,7 @@
 #include "libint2/initialize.h"
 #include "timer.h"
 #include "rhf.h"
+#include "mp2.h"
 #include "utils.h"
 
 
@@ -70,12 +72,24 @@ void WaveFunction::get_integrals() {
 }
 
 
-double WaveFunction::get_energy(const std::string type, const double tol=1e-8, 
+double WaveFunction::get_energy(const std::string method, const double tol=1e-8, 
                                 const int max_iter=200, const int verbose=2) {
     double E0;
-    if (type == "rhf") {
-        E0 = get_rhf_energy(tol, max_iter, verbose, compute_nuclear_repulsion(atoms),
+    if (method == "rhf") {
+        auto result = get_rhf_energy(tol, max_iter, verbose, compute_nuclear_repulsion(atoms),
                             this->ndocc, this->S, this->T, this->V, this->eri_vector);
+        E0 = result.E0;
+    }
+    
+    else if (method == "mp2") {
+        auto result = get_rhf_energy(tol, max_iter, verbose, compute_nuclear_repulsion(atoms),
+                            this->ndocc, this->S, this->T, this->V, this->eri_vector);
+        auto I_mo = transform_MO(this->eri_vector, result.C, this->ndocc);
+        E0 = calc_MP2_E(I_mo, this->ndocc, result.eps, result.E0);
+    }
+
+    else {
+        throw std::runtime_error("Unknown method");
     }
     return E0;
 }
