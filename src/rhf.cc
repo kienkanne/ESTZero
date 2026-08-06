@@ -11,9 +11,9 @@
 using Matrix = Eigen::MatrixXd;
 using Vector = Eigen::VectorXd;
 
-Result get_rhf_energy(double tol, int max_iter, int verbose, double V_nn, int ndocc, 
-                    const Matrix& S, const Matrix& T,
-                    const Matrix& V, const std::vector<double>& eri_vector) {
+Result rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndocc, 
+                const Matrix& S, const Matrix& T,
+                const Matrix& V, const std::vector<double>& eri_vector) {
     timing::Scoped _t("SCF Iterations");
     
     int nbf = S.rows();
@@ -29,19 +29,16 @@ Result get_rhf_energy(double tol, int max_iter, int verbose, double V_nn, int nd
 
     std::vector<Matrix> F_list;
     std::vector<Matrix> err_list;
-					
-    for (int i = 0; i != max_iter; ++i) {
 
+    Eigen::SelfAdjointEigenSolver<Matrix> solver;                       
+    for (int i = 0; i != max_iter; ++i) {
         Matrix F_p = X.transpose() * F * X;
-        Eigen::SelfAdjointEigenSolver<Matrix> solver;
 
         solver.compute(F_p);
-
         auto& C_p = solver.eigenvectors();
 
         Matrix C = X * C_p;
         Matrix C_docc  = C.leftCols(ndocc);
-
         Matrix D = C_docc * C_docc.transpose();
         
         JK jk;
@@ -67,10 +64,10 @@ Result get_rhf_energy(double tol, int max_iter, int verbose, double V_nn, int nd
         std::println("Iter {:3} | E = {:.8f} | dE = {:.3e} | rms_E {:.3e}", i+1, E0, dE, rms_err);
         }
 
-		if ((std::abs(dE) < tol) && (rms_err < tol)) {
+		if ((std::abs(dE) < econv) && (rms_err < econv)) {
             if (verbose >= 2) { std::println("SCF converged!"); }
-            auto eps = solver.eigenvalues();
-			return {E0, C, eps};
+            Vector eps = solver.eigenvalues();
+			return {E0, C, C, eps, eps};
 		}
 
         // Use a slice of the history to limit DIIS memory
@@ -80,13 +77,11 @@ Result get_rhf_energy(double tol, int max_iter, int verbose, double V_nn, int nd
             F_list.erase(F_list.begin());
 
             Vector coeffs = diis(err_list);
-            Matrix F_diis = Matrix::Zero(nbf, nbf);
+            F.setZero();
 
             for (std::size_t i = 0; i < err_list.size(); ++i) {
-                F_diis += coeffs[i] * F_list[i]; 
+                F += coeffs[i] * F_list[i]; 
             }
-            // Damped DIIS
-            F = 1.0 * F_diis + 0.0 * F;
         }
         E0_last = E0;
     }

@@ -53,7 +53,7 @@ def run_once(xyz, basis, method, maxiter, econv):
     t0   = time.perf_counter()
     proc = subprocess.run(
         [BINARY, os.path.join(ROOT, xyz), basis,
-         "--method", method, "--max-iter", str(maxiter), "--tolerance", str(econv)],
+         "--method", method, "--max-iter", str(maxiter), "--tol", str(econv)],
         capture_output=True, text=True,
     )
     wall = time.perf_counter() - t0
@@ -80,24 +80,24 @@ def nan_to_null(obj):
     return obj
 
 
-def _print_rhf(collected, logger: logging.Logger):
+def _print_scf(collected, logger: logging.Logger):
     hdr = (f"{'system':<20} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
            f" {'psi4(s)':>8} {'wall(s)':>8} {'ERI(s)':>7} {'JK/it(ms)':>10}"
            f" {'iters':>6} {'RSS(MB)':>8}")
-    logger.info(f"\n── RHF {'─' * (len(hdr) - 6)}")
+    logger.info(f"\n── SCF {'─' * (len(hdr) - 6)}")
     logger.info(hdr)
     logger.info("─" * len(hdr))
     for label, sys_data in collected.items():
-        if "rhf" not in sys_data:
+        if "scf" not in sys_data:
             continue
-        d = sys_data["rhf"]
+        d = sys_data["scf"]
         logger.info(f"{label:<20} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
               f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f} {fmt(d['eri_s'],'7.3f'):>7}"
               f" {fmt(d['jk_ms'],'10.1f'):>10}"
               f" {d['n_iter']:>6} {fmt(d['peak_rss'],'8.1f'):>8}")
     logger.info("─" * len(hdr))
 
-def _json_rhf(d):
+def _json_scf(d):
     return {"wall(s)": d["wall"], "eri(s)": d["eri_s"], "jk(ms)": d["jk_ms"]}
 
 
@@ -126,7 +126,7 @@ def _json_mp2(d):
 
 
 METHOD_SPECS = {
-    "rhf": {"printer": _print_rhf, "to_json": _json_rhf},
+    "scf": {"printer": _print_scf, "to_json": _json_scf},
     "mp2": {"printer": _print_mp2, "to_json": _json_mp2},
 }
 
@@ -173,7 +173,7 @@ def main():
     outputs   = {}  # label -> {nbf, method -> slim metrics}  (for JSON)
 
     for label, system in systems.items():
-        methods = system.get("methods", ["rhf"])
+        methods = system.get("methods", ["scf"])
         if args.method:
             methods = [m for m in methods if m in args.method]
 

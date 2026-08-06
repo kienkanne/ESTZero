@@ -4,18 +4,25 @@
 int main(int argc, char* argv[]) {
     std::string xyz_file;
     std::string basis;
-    std::string method = "rhf";
-    double e_conv = 1e-6;
+
+    std::string reference = "rhf";
+    std::string method = "scf";
+    int mult = 1;
+    int charge = 0;
+    double econv = 1e-6;
     int max_iter = 100;
     int verbose = 2;
 
     for (int i = 1; i < argc; ++i) {
         std::string_view arg = argv[i];
-
-        if ((arg == "--method" || arg == "-m") && i + 1 < argc) { method = argv[++i]; } 
-        else if ((arg == "--tolerance" || arg == "-t") && i + 1 < argc) { e_conv = std::stod(argv[++i]); } 
-        else if ((arg == "--max-iter" || arg == "-i") && i + 1 < argc) { max_iter = std::stoi(argv[++i]); } 
-        else if ((arg == "--verbose" || arg == "-v") && i + 1 < argc) { verbose = std::stoi(argv[++i]); }  
+        
+        if ((arg == "--reference") && i + 1 < argc) { reference = argv[++i]; } 
+        else if ((arg == "--method") && i + 1 < argc) { method = argv[++i]; } 
+        else if ((arg == "--mult") && i + 1 < argc) { mult = std::stoi(argv[++i]); } 
+        else if ((arg == "--charge") && i + 1 < argc) { charge = std::stoi(argv[++i]); }  
+        else if ((arg == "--econv") && i + 1 < argc) { econv = std::stod(argv[++i]); } 
+        else if ((arg == "--max-iter") && i + 1 < argc) { max_iter = std::stoi(argv[++i]); } 
+        else if ((arg == "--verbose") && i + 1 < argc) { verbose = std::stoi(argv[++i]); }  
         else if (xyz_file.empty()) { xyz_file = argv[i]; } 
         else if (basis.empty()) { basis = argv[i]; } 
         else {
@@ -26,17 +33,17 @@ int main(int argc, char* argv[]) {
 
     // Validate required arguments
     if (xyz_file.empty() || basis.empty()) {
-        std::println("Usage: {} <xyz-file> <basis> [--method <val>] [--tolerance <val>] [--max-iter <val>] [--verbose <val>]", argv[0]);
+        std::println("Usage: {} <xyz-file> <basis> [--reference <val>] [--method <val>] [--mult <val>] [--charge <val>] [--econv <val>] [--max-iter <val>] [--verbose <val>]", argv[0]);
         return EXIT_FAILURE;
     }
 
     try {
         timing::Scoped _t("Total time", true);
-        auto wfn = WaveFunction(xyz_file, basis);
+        auto wfn = WaveFunction(xyz_file, basis, mult, charge);
         wfn.get_integrals();
         double E0;
 
-        E0 = wfn.get_energy(method, e_conv, max_iter, verbose);
+        E0 = wfn.get_energy(reference, method, econv, max_iter, verbose);
 
         std::println("Final SCF energy: {:.8f}", E0);
 

@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <libint2.hpp>
 #include <stdexcept>
+#include <format>
 
 #include "wfn.h"
 #include "libint2/basis.h"
@@ -9,11 +10,13 @@
 #include "libint2/initialize.h"
 #include "timer.h"
 #include "rhf.h"
+#include "uhf.h"
 #include "mp2.h"
 #include "utils.h"
 
 
-void WaveFunction::loader(const std::string xyz, const std::string basis) {
+void WaveFunction::loader(const std::string xyz, const std::string basis, 
+                          const int mult, const int charge) {
     std::ifstream infile(xyz);
     if (!infile) {
         throw std::runtime_error("Could not open XYZ file: " + xyz);
@@ -24,17 +27,24 @@ void WaveFunction::loader(const std::string xyz, const std::string basis) {
         throw std::runtime_error("XYZ file contains no atoms: " + xyz);
     }
 
-    int nelectron = 0;
-    for (const auto& atom : atoms) {
-        nelectron += atom.atomic_number;
-    }
-    if (nelectron % 2 != 0) {
-        throw std::runtime_error("RHF requires an even number of electrons");
-    }
-    
     this->obs = libint2::BasisSet(basis, atoms);
     this->atoms = atoms;
-    this->ndocc = nelectron / 2;
+
+    int n_electron = 0;
+    for (const auto& atom : atoms) {
+        n_electron += atom.atomic_number;
+    }
+
+    n_electron -= charge;
+    int n_unpaired = mult - 1;
+    if ((n_electron - n_unpaired) % 2 != 0) {
+        throw std::runtime_error(std::format(
+            "Invalid charge and multiplicity. Molecule has {} electrons and {} multiplicity", n_electron, mult));
+    };
+
+    this->n_docc = (n_electron - n_unpaired) / 2;
+    this->n_alpha = n_docc + n_unpaired;
+    this->n_beta = this->n_docc;
 }
 
 
@@ -72,24 +82,43 @@ void WaveFunction::get_integrals() {
 }
 
 
-double WaveFunction::get_energy(const std::string method, const double tol=1e-8, 
-                                const int max_iter=200, const int verbose=2) {
+double WaveFunction::get_energy(const std::string reference, const std::string method, 
+                                const double econv=1e-8, const int max_iter=200, const int verbose=2) {
     double E0;
-    if (method == "rhf") {
-        auto result = get_rhf_energy(tol, max_iter, verbose, compute_nuclear_repulsion(atoms),
-                            this->ndocc, this->S, this->T, this->V, this->eri_vector);
+    Result result;
+
+    if (reference == "rhf") {
+        if (this->n_docc != this-> n_alpha) {
+            throw std::runtime_error("Cannot use RHF with multiplicity other than 1!");
+        }
+
+        result = rhf_scf(econv, max_iter, verbose, compute_nuclear_repulsion(atoms), this->n_docc, 
+                        this->S, this->T, this->V, this->eri_vector);
         E0 = result.E0;
     }
-    
-    else if (method == "mp2") {
-        auto result = get_rhf_energy(tol, max_iter, verbose, compute_nuclear_repulsion(atoms),
-                            this->ndocc, this->S, this->T, this->V, this->eri_vector);
-        auto I_mo = transform_MO(this->eri_vector, result.C, this->ndocc);
-        E0 = calc_MP2_E(I_mo, this->ndocc, result.eps, result.E0);
+
+    else if (reference == "uhf") {
+        result = uhf_scf(econv, max_iter, verbose, compute_nuclear_repulsion(atoms), this->n_alpha, this->n_beta, 
+                        this->S, this->T, this->V, this->eri_vector);
+        E0 = result.E0;
     }
 
     else {
-        throw std::runtime_error("Unknown method");
+        throw std::runtime_error(std::format("Unknown reference: {}", reference));
     }
-    return E0;
+
+    if (method == "scf") {
+        return E0;
+    }
+
+    else if (method == "mp2") {
+        if (reference == "uhf") {throw std::runtime_error("UHF MP2 not yet supported!");}
+
+        auto I_mo = transform_MO(this->eri_vector, result.Ca, this->n_docc);
+        return calc_MP2_E(I_mo, this->n_docc, result.epsa, result.E0);
+    }
+
+    else {
+        throw std::runtime_error(std::format("Unknown method: {}", method));
+    }
 }
