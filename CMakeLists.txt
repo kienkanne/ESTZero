@@ -18,6 +18,7 @@ add_executable(SCF
     src/rhf.cc
     src/uhf.cc
     src/mp2.cc
+    src/transmo.cc
     src/utils.cc
 )
 

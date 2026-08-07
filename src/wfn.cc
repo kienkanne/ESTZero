@@ -12,6 +12,7 @@
 #include "rhf.h"
 #include "uhf.h"
 #include "mp2.h"
+#include "transmo.h"
 #include "utils.h"
 
 
@@ -112,13 +113,21 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
     }
 
     else if (method == "mp2") {
-        if (reference == "uhf") {throw std::runtime_error("UHF MP2 not yet supported!");}
-
-        auto I_mo = transform_MO(this->eri_vector, result.Ca, this->n_docc);
-        return calc_MP2_E(I_mo, this->n_docc, result.epsa, result.E0);
+        if (reference == "rhf") {
+            const auto& I_mo = transform_rhf_MO(this->eri_vector, result.Ca, this->n_docc);
+            return calc_rhf_MP2_E(I_mo, result.epsa, this->n_docc, result.E0);
+        }
+        else if (reference == "uhf") {
+            const auto& [Iaa_mo, Ibb_mo, Iab_mo] =
+                transform_uhf_MO(this->eri_vector, result.Ca,
+                        this->n_alpha, result.Cb, this->n_beta);
+            return calc_uhf_MP2_E(Iaa_mo, Ibb_mo, Iab_mo, result.epsa, result.epsb,
+                        this->n_alpha, this->n_beta, E0);
+        }
     }
 
     else {
         throw std::runtime_error(std::format("Unknown method: {}", method));
+        
     }
 }

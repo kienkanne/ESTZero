@@ -67,7 +67,7 @@
     "reference": "rhf",
     "mult": 1,
     "charge": 0,
-    "methods": ["scf"]
+    "methods": ["scf", "mp2"]
   },
   "o2/sto-3g": {
     "xyz": "input/o2.xyz",
@@ -77,26 +77,26 @@
     "reference": "uhf",
     "mult": 3,
     "charge": 0,
-    "methods": ["scf"]
+    "methods": ["scf", "mp2"]
   },
-  "o2/cc-pvdz": {
+  "o2/def2-tzvppd": {
     "xyz": "input/o2.xyz",
-    "basis": "cc-pvdz",
-    "tier": "small",
+    "basis": "def2-tzvppd",
+    "tier": "medium",
     "run_by_default": true,
     "reference": "uhf",
     "mult": 3,
     "charge": 0,
-    "methods": ["scf"]
+    "methods": ["scf", "mp2"]
   },
-  "no/cc-pvdz": {
-    "xyz": "input/no.xyz",
-    "basis": "cc-pvdz",
-    "tier": "small",
+  "ch3/aug-cc-pvtz": {
+    "xyz": "input/ch3.xyz",
+    "basis": "aug-cc-pvtz",
+    "tier": "large",
     "run_by_default": true,
     "reference": "uhf",
     "mult": 2,
     "charge": 0,
-    "methods": ["scf"]
+    "methods": ["scf", "mp2"]
   }
 }
