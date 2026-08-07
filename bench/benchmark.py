@@ -24,7 +24,6 @@ RSS_RE    = re.compile(r"peak RSS:\s*(\d+(?:\.\d+)?)\s*MB")
 PHASE_RE  = re.compile(r"^\s*(.*?)\s+(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+(?:\.\d+)?)\s*$")
 
 
-
 def parse_output(text):
     energy = nbf = None
     rss_mb = math.nan
@@ -49,11 +48,13 @@ def parse_output(text):
     return energy, nbf, phases, rss_mb, n_iter
 
 
-def run_once(xyz, basis, method, maxiter, econv):
+def run_once(xyz, basis, method, reference, mult, charge, maxiter, econv):
     t0   = time.perf_counter()
     proc = subprocess.run(
         [BINARY, os.path.join(ROOT, xyz), basis,
-         "--method", method, "--max-iter", str(maxiter), "--tol", str(econv)],
+         "--reference", reference, "--method", method,
+         "--mult", str(mult), "--charge", str(charge),
+         "--max-iter", str(maxiter), "--econv", str(econv)],
         capture_output=True, text=True,
     )
     wall = time.perf_counter() - t0
@@ -81,7 +82,7 @@ def nan_to_null(obj):
 
 
 def _print_scf(collected, logger: logging.Logger):
-    hdr = (f"{'system':<20} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
+    hdr = (f"{'system':<20} {'ref':>3} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
            f" {'psi4(s)':>8} {'wall(s)':>8} {'ERI(s)':>7} {'JK/it(ms)':>10}"
            f" {'iters':>6} {'RSS(MB)':>8}")
     logger.info(f"\n── SCF {'─' * (len(hdr) - 6)}")
@@ -91,7 +92,7 @@ def _print_scf(collected, logger: logging.Logger):
         if "scf" not in sys_data:
             continue
         d = sys_data["scf"]
-        logger.info(f"{label:<20} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
+        logger.info(f"{label:<20} {d['reference']:>3} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
               f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f} {fmt(d['eri_s'],'7.3f'):>7}"
               f" {fmt(d['jk_ms'],'10.1f'):>10}"
               f" {d['n_iter']:>6} {fmt(d['peak_rss'],'8.1f'):>8}")
@@ -102,7 +103,7 @@ def _json_scf(d):
 
 
 def _print_mp2(collected, logger: logging.Logger):
-    hdr = (f"{'system':<20} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
+    hdr = (f"{'system':<20} {'ref':>3} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
            f" {'psi4(s)':>8} {'wall(s)':>8} {'ERI(s)':>7} {'JK/it(ms)':>10}"
            f" {'MO(s)':>7} {'MP2(ms)':>8}"
            f" {'iters':>6} {'RSS(MB)':>8}")
@@ -113,7 +114,7 @@ def _print_mp2(collected, logger: logging.Logger):
         if "mp2" not in sys_data:
             continue
         d = sys_data["mp2"]
-        logger.info(f"{label:<20} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
+        logger.info(f"{label:<20} {d['reference']:>3} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
               f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f} {fmt(d['eri_s'],'7.3f'):>7}"
               f" {fmt(d['jk_ms'],'10.1f'):>10}"
               f" {fmt(d['mo_s'],'7.3f'):>7} {fmt(d['mp2_ms'],'8.1f'):>8}"
@@ -179,7 +180,7 @@ def main():
 
         sys_ref = references.get(label, {})
         collected[label] = {}
-        outputs[label]   = {"nbf": sys_ref.get("nbf")}
+        outputs[label] = {"nbf": sys_ref.get("nbf"), "reference": system.get("reference", "rhf")}
 
         for method in methods:
             print(f"[mySCF/{method}] {label} ...")
@@ -189,7 +190,11 @@ def main():
 
             for _ in range(args.repeats):
                 wall, energy, nbf, phases, rss_mb, n_iter = run_once(
-                    system["xyz"], system["basis"], method, args.maxiter, args.econv)
+                    system["xyz"], system["basis"], method,
+                    system.get("reference", "rhf"),
+                    system.get("mult", 1),
+                    system.get("charge", 0),
+                    args.maxiter, args.econv)
                 if best is None or wall < best[0]:
                     best = (wall, energy, nbf, phases, n_iter)
                 if math.isnan(peak_rss) or rss_mb > peak_rss:
@@ -209,14 +214,22 @@ def main():
                 status   = "PASS" if ok else "FAIL"
 
             eri_s  = phases.get("ERI build",             {}).get("seconds", math.nan)
-            jk_ms  = phases.get("build_JK",              {}).get("avg_ms",  math.nan)
             mo_s   = phases.get("MO Transformation",     {}).get("seconds", math.nan)
             mp2_ms = phases.get("MP2 Energy Calculation",{}).get("avg_ms",  math.nan)
+
+            jk_phase = phases.get("build_JK")
+            if jk_phase:
+                jk_ms = jk_phase["avg_ms"]
+            else:
+                jka = phases.get("build_JKa", {}).get("avg_ms", 0.0)
+                jkb = phases.get("build_JKb", {}).get("avg_ms", 0.0)
+                jk_ms = (jka + jkb) if (jka or jkb) else math.nan
 
             result = {
                 "nbf": nbf, "wall": wall, "n_iter": n_iter, "peak_rss": peak_rss,
                 "dE": dE, "ref_wall": ref_wall, "status": status,
                 "eri_s": eri_s, "jk_ms": jk_ms, "mo_s": mo_s, "mp2_ms": mp2_ms,
+                "reference": system.get("reference", "rhf"),
             }
             collected[label][method] = result
             outputs[label][method]   = METHOD_SPECS[method]["to_json"](result)

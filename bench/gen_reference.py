@@ -21,27 +21,29 @@ def main():
     psi4.set_memory("16 GB")
     psi4.core.be_quiet()
 
-
     ref_path = ROOT / "bench" / "reference.json"
     references = {}
 
     for label, system in systems.items():
-        xyz_path = os.path.join(ROOT, system["xyz"])
-        basis    = system["basis"]
-        methods  = system.get("methods", ["rhf"])
+        xyz_path  = os.path.join(ROOT, system["xyz"])
+        basis     = system["basis"]
+        methods   = system.get("methods", ["scf"])
+        reference = system.get("reference", "rhf")
+        mult      = system.get("mult", 1)
+        charge    = system.get("charge", 0)
 
         atom_lines = read_xyz_body(xyz_path)
-        geom = "\n".join(atom_lines) + "\nsymmetry c1\nno_reorient\nno_com"
+        geom = f"{charge} {mult}\n" + "\n".join(atom_lines) + "\nsymmetry c1\nno_reorient\nno_com"
 
         entry = references.setdefault(label, {})
 
         for method in methods:
-            print(f"[psi4/{method}] {label} ...")
+            print(f"[psi4/{reference}/{method}] {label} ...")
 
             psi4.set_options({
                 "basis":         basis,
                 "scf_type":      "pk",
-                "reference":     "rhf",
+                "reference":     reference,
                 "e_convergence": 1e-8,
                 "d_convergence": 1e-8,
                 "maxiter":       200,
@@ -52,7 +54,7 @@ def main():
 
             mol = psi4.geometry(geom)
             t0 = time.perf_counter()
-            psi4_method = "hf" if method == "rhf" else method
+            psi4_method = "hf" if method == "scf" else method
             energy, wfn = psi4.energy(psi4_method, molecule=mol, return_wfn=True)
             wall = time.perf_counter() - t0
 
