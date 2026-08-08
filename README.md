@@ -2,7 +2,19 @@
 
 An optimized restricted Hartree-Fock (RHF) Self-Consistent-Field (SCF) engine, built using C++. The integrals are evaluated using `libint2`, and the linear algebra library used is `Eigen`.
 
-The test used to evaluate the performance of the engine is formaldehyde at the def2-tzvp basis set. The accuracy and performance is benchmarked against Psi4. `{scf_type: pk}` is used (no density-fitting).
+The test used to evaluate the performance of the engine is formaldehyde at the def2-tzvp basis set. The accuracy and performance is benchmarked against Psi4. 
+
+Psi4 options:
+```bash
+e_convergence 1e-8
+d_convergence 1e-8
+maxiter 200
+scf_type pk # no density-fitting
+guess core
+
+mp2_type conv
+freeze_core false
+```
 
 ## Benchmarking
 
@@ -16,9 +28,9 @@ python bench/gen_reference.py
 python3 bench/benchmark.py
 ```
 
-## Feature log
+## Performance log
 
-This log tracks the update in features and their performance in the most computationally costly steps.
+This log tracks the update in features and their performance in the most computationally costly steps. Versions without algorithm update for each section is not documented. See `bench/outputs` for full version peformance logs.
 
 ### RHF
 
@@ -40,11 +52,10 @@ The peak memory usage (peak resident set size) in MB for all versions here is ab
 
 Version v1.0.0 now includes MP2 for RHF. The baseline is the 4 step MO transformation written via explicit loops ~ O(N^5). The calculation runs a base SCF first, so ERI build and JK build performance is similar to versions above.
 
-| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) |  N_SCF_iter | MO transform(s) | MP2 energy (ms) | Note |
-|---|---|---|---|---|---|---|---|
-| v1.0.0 | 29.570| 1.346 | 407.7 | 16 | 21.666 | 6.9 | MP2 Baseline |
-
-The peak memory usage (peak resident set size) in MB for all versions here is about 607MB.
+| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) |  N_SCF_iter | MO transform(s) | MP2 energy (ms) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|
+| v1.0.0 | 29.570| 1.346 | 407.7 | 16 | 21.666 | 6.9 | 607.4 | MP2 Baseline |
+| v1.2.0 | 30.093 | 1.350 | 400.5 | 16 | 22.287 | 20.6 | 4279.4 | MO transform rewired through a from-scratch `einsum` (CCSD prep). Peak RSS ~7x (see `CHANGELOG.md`) |
 
 ### UHF
 
@@ -64,10 +75,9 @@ The peak memory usage (peak resident set size) in MB for all versions here is ab
 
 UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alpha-alpha, beta-beta, and alpha-beta MO integral tensors. Baseline version (v1.1.0): the index transform function used is similar to the one used for RHF MP2 to build alpha-alpha and beta-beta tensors; the alpha-beta block is built from the intermediate tensor after index 2 transformation of the alpha-alpha tensor
 
-| version | Total wall (s) | ERI build (s) | JK build** (per iter) (ms) |  N_SCF_iter | MO transform*** (s) | MP2 energy (ms) | Note |
-|---|---|---|---|---|---|---|---|
-| v1.1.0 | 21.285| 1.024 | 905.5 | 15 | 6.635 | 0.8 | UHF MP2 Baseline |
+| version | Total wall (s) | ERI build (s) | JK build** (per iter) (ms) |  N_SCF_iter | MO transform*** (s) | MP2 energy (ms) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|
+| v1.1.0 | 21.285 | 1.024 | 905.5 | 15 | 6.635 | 0.8 | 393.1 | UHF MP2 Baseline |
+| v1.2.0 | 28.646 | 1.036 | 839.4 | 15 | 14.976 | 2.1 | 4255.5 | Same `einsum` rewrite as RHF MP2 above. Peak RSS ~11x (see `CHANGELOG.md`) |
 
 ***Total time of alpha-alpha, beta-beta, and alpha-beta integrals building.
-
-The peak memory usage (peak resident set size) in MB for all versions here is about 393MB.
