@@ -30,7 +30,6 @@ target_compile_definitions(scf_tests PRIVATE
 # PCH would pre-empt.
 target_precompile_headers(scf_tests PRIVATE
     <Eigen/Dense>
-    <unsupported/Eigen/CXX11/Tensor>
     <libint2.hpp>
 )
 

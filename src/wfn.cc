@@ -127,7 +127,6 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
     }
 
     else {
-        throw std::runtime_error(std::format("Unknown method: {}", method));
-        
+        throw std::runtime_error(std::format("Unknown method: {}", method));  
     }
 }

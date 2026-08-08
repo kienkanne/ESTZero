@@ -20,6 +20,7 @@ add_library(scf_core STATIC
     src/uhf.cc
     src/mp2.cc
     src/transmo.cc
+    src/einsum.cc
     src/utils.cc
 )
 

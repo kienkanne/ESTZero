@@ -128,7 +128,7 @@ int main() {
                 Matrix C_occ = r.Ca.leftCols(n_docc);
                 Matrix D = C_occ * C_occ.transpose();
                 JK jk = build_JK(eri, D);
-                Tensor4D I_mo = transform_rhf_MO(eri, r.Ca, n_docc);
+                Tensor I_mo = transform_rhf_MO(eri, r.Ca, n_docc);
                 double E_mp2 = calc_rhf_MP2_E(I_mo, r.epsa, n_docc, r.E0);
 
                 check_oracle(sys.label, "scf", r.E0, psi4_scf);

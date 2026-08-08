@@ -1,27 +1,21 @@
 #include "doctest.h"
 #include <Eigen/Dense>
-#include <unsupported/Eigen/CXX11/Tensor>
 
 #include "utils.h"
 #include "transmo.h"
 #include "golden_io.h"
 
 using golden::Matrix;
-using Tensor4D = Eigen::Tensor<double, 4>;
 
 namespace {
 
-// doctest has no Eigen::Tensor comparison; compare element-wise.
-void check_tensor_approx(const Tensor4D& a, const Tensor4D& b, double eps) {
-    REQUIRE(a.dimension(0) == b.dimension(0));
-    REQUIRE(a.dimension(1) == b.dimension(1));
-    REQUIRE(a.dimension(2) == b.dimension(2));
-    REQUIRE(a.dimension(3) == b.dimension(3));
-    for (int i = 0; i < a.dimension(0); ++i)
-    for (int j = 0; j < a.dimension(1); ++j)
-    for (int k = 0; k < a.dimension(2); ++k)
-    for (int l = 0; l < a.dimension(3); ++l)
-        CHECK(a(i, j, k, l) == doctest::Approx(b(i, j, k, l)).epsilon(eps));
+// doctest has no Tensor comparison; compare element-wise over the flat storage.
+void check_tensor_approx(const Tensor& a, const Tensor& b, double eps) {
+    REQUIRE(a.shape == b.shape);
+    int count = 1;
+    for (int d : a.shape) count *= d;
+    for (int i = 0; i < count; ++i)
+        CHECK(a.flat_index(i) == doctest::Approx(b.flat_index(i)).epsilon(eps));
 }
 
 } // namespace
@@ -38,7 +32,7 @@ TEST_CASE("transform_rhf_MO: identity C reproduces AO integrals unchanged") {
     const int nbf = g.nbf, n_occ = g.n_docc;
     Matrix C = Matrix::Identity(nbf, nbf);
 
-    Tensor4D I_mo = transform_rhf_MO(eri, C, n_occ);
+    Tensor I_mo = transform_rhf_MO(eri, C, n_occ);
     for (int i = 0; i < n_occ; ++i)
     for (int a = 0; a < nbf - n_occ; ++a)
     for (int j = 0; j < n_occ; ++j)
@@ -85,7 +79,7 @@ TEST_CASE("transform_uhf_MO: reduces to transform_rhf_MO when Ca=Cb, n_alpha=n_b
     const Matrix C = g.mat("C");
     const int n_occ = g.n_docc;
 
-    Tensor4D I_mo = transform_rhf_MO(eri, C, n_occ);
+    Tensor I_mo = transform_rhf_MO(eri, C, n_occ);
     SpinMO mo = transform_uhf_MO(eri, C, n_occ, C, n_occ);
 
     check_tensor_approx(mo.Iaa_mo, I_mo, 1e-10);
@@ -105,7 +99,7 @@ TEST_CASE("transform: reproduces golden MO integrals from golden orbitals") {
         const std::vector<double> eri = g.list("eri");
 
         if (g.reference == "rhf") {
-            Tensor4D I_mo = transform_rhf_MO(eri, g.mat("C"), g.n_docc);
+            Tensor I_mo = transform_rhf_MO(eri, g.mat("C"), g.n_docc);
             check_tensor_approx(I_mo, g.tensor("I_mo"), 1e-12);
         } else {
             SpinMO mo = transform_uhf_MO(eri, g.mat("Ca"), g.n_alpha, g.mat("Cb"), g.n_beta);

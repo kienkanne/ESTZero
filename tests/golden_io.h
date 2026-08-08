@@ -27,13 +27,12 @@
 #include <stdexcept>
 #include <cstdio>
 #include <Eigen/Dense>
-#include <unsupported/Eigen/CXX11/Tensor>
+#include "einsum.h"
 
 namespace golden {
 
 using Matrix = Eigen::MatrixXd;
 using Vector = Eigen::VectorXd;
-using Tensor4D = Eigen::Tensor<double, 4>;
 
 // Single source of truth for the golden systems
 struct GoldenSystem {
@@ -104,22 +103,16 @@ inline void write_list(std::ostream& os, const std::string& name, const std::vec
     os << "\n";
 }
 
-inline void write_tensor4(std::ostream& os, const std::string& name, const Tensor4D& t) {
-    const int d0 = static_cast<int>(t.dimension(0));
-    const int d1 = static_cast<int>(t.dimension(1));
-    const int d2 = static_cast<int>(t.dimension(2));
-    const int d3 = static_cast<int>(t.dimension(3));
-    os << "tensor4 " << name << " " << d0 << " " << d1 << " " << d2 << " " << d3 << "\n";
-    bool first = true;
-    for (int i = 0; i < d0; ++i)
-    for (int j = 0; j < d1; ++j)
-    for (int k = 0; k < d2; ++k)
-    for (int l = 0; l < d3; ++l) {
-        if (!first) os << " ";
-
-        // Prints all out in a single line
-        write_num(os, t(i, j, k, l));
-        first = false;
+inline void write_tensor4(std::ostream& os, const std::string& name, const Tensor& t) {
+    os << "tensor4 " << name;
+    for (int d : t.shape) os << " " << d;
+    os << "\n";
+    int count = 1;
+    for (int d : t.shape) count *= d;
+    // Tensor is row-major, so flat order is already i,j,k,l (last axis fastest).
+    for (int i = 0; i < count; ++i) {
+        if (i) os << " ";
+        write_num(os, t.flat_index(i));
     }
     os << "\n";
 }
@@ -157,16 +150,11 @@ public:
         return get_entry(lists_, name).data;
     }
 
-    Tensor4D tensor(const std::string& name) const {
+    Tensor tensor(const std::string& name) const {
+        // The file stores values row-major (i,j,k,l), matching Tensor's layout,
+        // so the flat data maps in directly.
         const Entry& e = get_entry(tensors_, name);
-        Tensor4D t(e.dims[0], e.dims[1], e.dims[2], e.dims[3]);
-        int idx = 0;
-        for (int i = 0; i < e.dims[0]; ++i)
-        for (int j = 0; j < e.dims[1]; ++j)
-        for (int k = 0; k < e.dims[2]; ++k)
-        for (int l = 0; l < e.dims[3]; ++l)
-            t(i, j, k, l) = e.data[idx++];
-            return t;
+        return Tensor(e.dims, e.data);
     }
 
     bool has_scalar(const std::string& name) const { return scalars_.count(name) > 0; }

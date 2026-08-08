@@ -1,6 +1,5 @@
 #include "doctest.h"
 #include <Eigen/Dense>
-#include <unsupported/Eigen/CXX11/Tensor>
 
 #include "mp2.h"
 #include "transmo.h"
@@ -8,7 +7,6 @@
 
 using golden::Matrix;
 using Vector = Eigen::VectorXd;
-using Tensor4D = Eigen::Tensor<double, 4>;
 
 // ── Property: UHF MP2 reduces to RHF MP2 on a closed shell ──────────────────
 // With Ca=Cb and n_alpha=n_beta the two spin channels are identical, so
@@ -25,7 +23,7 @@ TEST_CASE("calc_uhf_MP2_E: reduces to calc_rhf_MP2_E for a real closed-shell cas
     const int n_occ = g.n_docc;
     const double E0 = g.scalar("E_scf");
 
-    Tensor4D I_mo = transform_rhf_MO(eri, C, n_occ);
+    Tensor I_mo = transform_rhf_MO(eri, C, n_occ);
     SpinMO mo = transform_uhf_MO(eri, C, n_occ, C, n_occ);
 
     double rhf = calc_rhf_MP2_E(I_mo, eps, n_occ, E0);
