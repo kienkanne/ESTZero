@@ -30,6 +30,8 @@
 
 using golden::Matrix;
 
+double compute_nuclear_repulsion(const std::vector<libint2::Atom>& atoms);
+
 namespace {
 
 constexpr double ORACLE_TOL = 1e-6;

@@ -1,6 +1,6 @@
-# Self-Consistent-Field engine using C++
+# ESTZero: Electronic Structure Theory implementations from scratch
 
-An optimized restricted Hartree-Fock (RHF) Self-Consistent-Field (SCF) engine, built using C++. The integrals are evaluated using `libint2`, and the linear algebra library used is `Eigen`.
+An electronic structure engine built using C++ that is optimized over time. The current repository supports RHF/UHF references and SCF/MP2 methods. Some supplemental methods are also implemented, including `einsum` and `diis`. The integrals are evaluated using `libint2`, and the linear algebra library used is `Eigen`.
 
 The test used to evaluate the performance of the engine is formaldehyde at the def2-tzvp basis set. The accuracy and performance is benchmarked against Psi4. 
 

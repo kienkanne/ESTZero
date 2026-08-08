@@ -3,7 +3,6 @@
 #include <Eigen/Eigenvalues>
 
 #include "wfn.h"
-#include "utils.h"
 #include "golden_io.h"
 
 using golden::Matrix;

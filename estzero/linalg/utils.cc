@@ -4,24 +4,6 @@
 using Matrix = Eigen::MatrixXd;
 using Vector = Eigen::VectorXd;
 
-double compute_nuclear_repulsion(const std::vector<libint2::Atom>& atoms) {
-    double vnn = 0.0;
-    
-    for (size_t i = 0; i < atoms.size(); ++i) {
-        for (size_t j = 0; j < i; ++j) {
-            double dx = atoms[i].x - atoms[j].x;
-            double dy = atoms[i].y - atoms[j].y;
-            double dz = atoms[i].z - atoms[j].z;
-            double r_ab = std::sqrt(dx * dx + dy * dy + dz * dz);
-            
-            // r_ab is in Bohr already
-            vnn += (atoms[i].atomic_number * atoms[j].atomic_number) / r_ab;
-        }
-    }
-    
-    return vnn;
-}
-
 
 Matrix sym_ortho (const Matrix &S, double tol = 1e-8) {
     // This is for symmetric matrix; use EigenSolver for general case

@@ -1,7 +1,8 @@
 #include <vector>
 #include <Eigen/Dense>
 #include <libint2.hpp>
-#include <utils.h>
+
+#include "integrals.h"
 #include "build_JK.h"
 
 

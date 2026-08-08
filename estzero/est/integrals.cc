@@ -1,7 +1,8 @@
 #include <vector>
 #include <Eigen/Dense>
 #include <libint2.hpp>
-#include <utils.h>
+
+#include "integrals.h"
 
 Eigen::MatrixXd build_one_center(libint2::Engine& engine, const libint2::BasisSet& obs) {
     Eigen::MatrixXd mat (obs.nbf(), obs.nbf());

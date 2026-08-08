@@ -1,5 +1,5 @@
 #include <Eigen/Dense>
-#include "utils.h"
+#include "integrals.h"
 #include "transmo.h"
 #include "einsum.h"
 #include "timer.h"

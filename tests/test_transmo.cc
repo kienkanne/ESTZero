@@ -1,7 +1,7 @@
 #include "doctest.h"
 #include <Eigen/Dense>
 
-#include "utils.h"
+#include "integrals.h"
 #include "transmo.h"
 #include "golden_io.h"
 

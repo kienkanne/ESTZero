@@ -83,6 +83,24 @@ void WaveFunction::get_integrals() {
 }
 
 
+double compute_nuclear_repulsion(const std::vector<libint2::Atom>& atoms) {
+    double vnn = 0.0;
+    
+    for (size_t i = 0; i < atoms.size(); ++i) {
+        for (size_t j = 0; j < i; ++j) {
+            double dx = atoms[i].x - atoms[j].x;
+            double dy = atoms[i].y - atoms[j].y;
+            double dz = atoms[i].z - atoms[j].z;
+            double r_ab = std::sqrt(dx * dx + dy * dy + dz * dz);
+            
+            // r_ab is in Bohr already
+            vnn += (atoms[i].atomic_number * atoms[j].atomic_number) / r_ab;
+        }
+    }
+    
+    return vnn;
+}
+
 double WaveFunction::get_energy(const std::string reference, const std::string method, 
                                 const double econv=1e-8, const int max_iter=200, const int verbose=2) {
     double E0;
@@ -104,13 +122,10 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
         E0 = result.E0;
     }
 
-    else {
-        throw std::runtime_error(std::format("Unknown reference: {}", reference));
-    }
+    else { throw std::runtime_error(std::format("Unknown reference: {}", reference)); }
 
-    if (method == "scf") {
-        return E0;
-    }
+
+    if (method == "scf") { return E0; }
 
     else if (method == "mp2") {
         if (reference == "rhf") {
@@ -126,7 +141,5 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
         }
     }
 
-    else {
-        throw std::runtime_error(std::format("Unknown method: {}", method));  
-    }
+    else { throw std::runtime_error(std::format("Unknown method: {}", method)); }
 }

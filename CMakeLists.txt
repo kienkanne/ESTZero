@@ -13,20 +13,22 @@ set(LIBINT_ROOT "/localscratch/kbui/CPP/libint_install")
 option(SCF_BUILD_TESTS "Build unit tests" ON)
 
 add_library(scf_core STATIC
-    src/build_JK.cc
-    src/integrals.cc
-    src/wfn.cc
-    src/rhf.cc
-    src/uhf.cc
-    src/mp2.cc
-    src/transmo.cc
-    src/einsum.cc
-    src/utils.cc
+    estzero/est/build_JK.cc
+    estzero/est/integrals.cc
+    estzero/est/wfn.cc
+    estzero/est/rhf.cc
+    estzero/est/uhf.cc
+    estzero/est/mp2.cc
+    estzero/est/transmo.cc
+    estzero/linalg/einsum.cc
+    estzero/linalg/utils.cc
 )
 
 target_include_directories(scf_core PUBLIC
     ${LIBINT_ROOT}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/estzero/est
+    ${CMAKE_CURRENT_SOURCE_DIR}/estzero/linalg
+    ${CMAKE_CURRENT_SOURCE_DIR}/estzero/utils
 )
 target_link_directories(scf_core PUBLIC ${LIBINT_ROOT}/lib)
 target_link_libraries(scf_core PUBLIC Eigen3::Eigen int2)
@@ -37,7 +39,7 @@ target_compile_options(scf_core PUBLIC
     -fno-omit-frame-pointer
 )
 
-add_executable(SCF src/main.cc)
+add_executable(SCF estzero/est/main.cc)
 target_link_libraries(SCF PRIVATE scf_core)
 
 if(SCF_BUILD_TESTS)

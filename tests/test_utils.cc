@@ -2,7 +2,10 @@
 #include <Eigen/Dense>
 #include <libint2.hpp>
 
+#include "integrals.h"
 #include "utils.h"
+
+double compute_nuclear_repulsion(const std::vector<libint2::Atom>& atoms);
 
 using Matrix = Eigen::MatrixXd;
 using Vector = Eigen::VectorXd;
