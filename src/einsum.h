@@ -41,27 +41,54 @@ public:
     double& operator()(Idx... idx) {
         int ind[] = { idx... };
         size_t flat = 0, stride = 1;
-        for (int i = ndim() - 1; i >= 0; --i) { flat += static_cast<size_t>(ind[i]) * stride; stride *= static_cast<size_t>(shape[i]); }
+        for (int i = ndim() - 1; i >= 0; --i) { 
+            flat += static_cast<size_t>(ind[i]) * stride; stride *= static_cast<size_t>(shape[i]); }
         return data[flat];
     }
     template <typename... Idx>
     double operator()(Idx... idx) const {
         int ind[] = { idx... };
         size_t flat = 0, stride = 1;
-        for (int i = ndim() - 1; i >= 0; --i) { flat += static_cast<size_t>(ind[i]) * stride; stride *= static_cast<size_t>(shape[i]); }
+        for (int i = ndim() - 1; i >= 0; --i) { 
+            flat += static_cast<size_t>(ind[i]) * stride; stride *= static_cast<size_t>(shape[i]); }
         return data[flat];
     }
 
     double flat_index(size_t index) const { return data[index]; }
     double& flat_index(size_t index) { return data[index]; }
 
+    // Access raw data pointer, used by TensorView
+    const double* data_ptr() const { return data.data(); }
 };
 
-Tensor einsum(const std::string& subscripts, const std::vector<Tensor>& operands);
 
+// Fix `einsum` memory bug
+class TensorView {
+    const double* data_ptr;
+public:
+    std::vector<int> shape; // Lightweight so just let it copies
+    // Constructor: Takes in the `Tensor` class
+    TensorView(const Tensor& t) : data_ptr(t.data_ptr()), shape(t.shape) {}
+
+    int ndim() const { return static_cast<int>(shape.size()); }
+
+    // Tensor VIEW, so no non-const overload (reference to data) methods
+    double flat_index(size_t index) const { return data_ptr[index]; }
+
+    template <typename... Idx>
+    double operator()(Idx... idx) const {
+        int ind[] = { idx... };
+        size_t flat = 0, stride = 1;
+        for (int i = ndim() - 1; i >= 0; --i) { 
+            flat += static_cast<size_t>(ind[i]) * stride; stride *= static_cast<size_t>(shape[i]); }
+        return data_ptr[flat];
+    }
+};
+
+Tensor einsum(const std::string& subscripts, const std::vector<TensorView>& operands);
 
 // Copy an (rows x cols) MO-coefficient block into a row-major Tensor.
-// Called by transmo.cc, very inefficient as for now (TODO)
+// Called by transmo.cc, inefficient as for now (TODO)
 inline static Tensor mat_to_tensor(const Matrix& M) {
     const int rows = static_cast<int>(M.rows());
     const int cols = static_cast<int>(M.cols());

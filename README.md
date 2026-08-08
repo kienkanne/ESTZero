@@ -56,6 +56,7 @@ Version v1.0.0 now includes MP2 for RHF. The baseline is the 4 step MO transform
 |---|---|---|---|---|---|---|---|---|
 | v1.0.0 | 29.570| 1.346 | 407.7 | 16 | 21.666 | 6.9 | 607.4 | MP2 Baseline |
 | v1.2.0 | 30.093 | 1.350 | 400.5 | 16 | 22.287 | 20.6 | 4279.4 | MO transform rewired through a from-scratch `einsum` (CCSD prep). Peak RSS ~7x (see `CHANGELOG.md`) |
+| v1.2.1 | 31.412 | 1.375 | 449.5 | 16 | 22.797 | 21.3 | 2753.1 | Fix `einsum` memory bug (see `CHANGELOG.md`) |
 
 ### UHF
 
@@ -79,5 +80,6 @@ UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alp
 |---|---|---|---|---|---|---|---|---|
 | v1.1.0 | 21.285 | 1.024 | 905.5 | 15 | 6.635 | 0.8 | 393.1 | UHF MP2 Baseline |
 | v1.2.0 | 28.646 | 1.036 | 839.4 | 15 | 14.976 | 2.1 | 4255.5 | Same `einsum` rewrite as RHF MP2 above. Peak RSS ~11x (see `CHANGELOG.md`) |
+| v1.2.1 | 29.826 | 1.043 | 939.0 | 15 | 14.655 | 2.3 | 2857.3 | Fixed `einsum` memory bug (see `CHANGELOG.md`) |
 
 ***Total time of alpha-alpha, beta-beta, and alpha-beta integrals building.
