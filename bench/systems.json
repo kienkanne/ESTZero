@@ -98,5 +98,25 @@
     "mult": 2,
     "charge": 0,
     "methods": ["scf", "mp2"]
+  },
+  "ch3/sto-3g": {
+    "xyz": "input/ch3.xyz",
+    "basis": "sto-3g",
+    "tier": "tiny",
+    "run_by_default": true,
+    "reference": "uhf",
+    "mult": 2,
+    "charge": 0,
+    "methods": ["scf", "mp2"]
+  },
+  "h2_stretched/sto-3g": {
+    "xyz": "input/h2_stretched.xyz",
+    "basis": "sto-3g",
+    "tier": "tiny",
+    "run_by_default": true,
+    "reference": "rhf",
+    "mult": 1,
+    "charge": 0,
+    "methods": ["scf", "mp2"]
   }
 }

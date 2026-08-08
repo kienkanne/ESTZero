@@ -32,10 +32,7 @@ double calc_rhf_MP2_E(const Tensor4D& I_mo, const Vector& eps, int n_occ, double
 
         os_E += direct * direct * denominator;
         ss_E += direct * (direct - exchange) * denominator;
-    }
-    }
-    }
-    }
+    }}}}
 
     return E0 + os_E + ss_E;
 }
@@ -69,10 +66,7 @@ double calc_uhf_MP2_E(const Tensor4D& Iaa_mo, const Tensor4D& Ibb_mo, const Tens
         const double exchange = Iaa_mo(i, b, j, a);
 
         E_aa += 0.25 * (direct - exchange) * (direct - exchange) * denominator;
-    }
-    }
-    }
-    }
+    }}}}
 
     for (int i = 0; i < n_beta; ++i) {
     for (int a = 0; a < n_bvirt; ++a) {
@@ -85,10 +79,7 @@ double calc_uhf_MP2_E(const Tensor4D& Iaa_mo, const Tensor4D& Ibb_mo, const Tens
         const double exchange = Ibb_mo(i, b, j, a);
 
         E_bb += 0.25 * (direct - exchange) * (direct - exchange) * denominator;
-    }
-    }
-    }
-    }
+    }}}}
 
     for (int i = 0; i < n_alpha; ++i) {
     for (int a = 0; a < n_avirt; ++a) {
@@ -100,10 +91,7 @@ double calc_uhf_MP2_E(const Tensor4D& Iaa_mo, const Tensor4D& Ibb_mo, const Tens
         const double direct = Iab_mo(i, a, j, b);
 
         E_ab += direct * direct * denominator;
-    }
-    }
-    }
-    }
+    }}}}
 
     return E0 + E_aa + E_bb + E_ab;
 }

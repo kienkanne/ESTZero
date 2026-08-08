@@ -45,10 +45,7 @@ JK build_JK (const std::vector<double> &eri_vector, const Eigen::MatrixXd &D) {
         K(l, i) += val * D(j, k);
         K(k, j) += val * D(i, l);
         K(l, j) += val * D(i, k);
-	}
-	}
-	}
-	}
+	}}}}
 
 	return {J, K};
 }

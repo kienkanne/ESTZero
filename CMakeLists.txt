@@ -10,8 +10,9 @@ find_package(Eigen3 REQUIRED)
 
 set(LIBINT_ROOT "/localscratch/kbui/CPP/libint_install")
 
-add_executable(SCF
-    src/main.cc
+option(SCF_BUILD_TESTS "Build unit tests" ON)
+
+add_library(scf_core STATIC
     src/build_JK.cc
     src/integrals.cc
     src/wfn.cc
@@ -22,16 +23,23 @@ add_executable(SCF
     src/utils.cc
 )
 
-# Specify header and library search paths for BOTH targets
-target_include_directories(SCF PRIVATE ${LIBINT_ROOT}/include)
-target_include_directories(SCF PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(scf_core PUBLIC
+    ${LIBINT_ROOT}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+target_link_directories(scf_core PUBLIC ${LIBINT_ROOT}/lib)
+target_link_libraries(scf_core PUBLIC Eigen3::Eigen int2)
 
-target_link_directories(SCF PRIVATE ${LIBINT_ROOT}/lib)
-target_link_libraries(SCF PRIVATE Eigen3::Eigen int2)
-
-# Add profiling and debug flags
-target_compile_options(SCF PRIVATE 
-    -O3 
-    -g 
+target_compile_options(scf_core PUBLIC
+    -O3
+    -g
     -fno-omit-frame-pointer
 )
+
+add_executable(SCF src/main.cc)
+target_link_libraries(SCF PRIVATE scf_core)
+
+if(SCF_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

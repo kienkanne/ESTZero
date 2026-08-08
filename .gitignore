@@ -20,6 +20,7 @@ artifacts/
 # Build artifacts
 
 build/
+thirdparty/
 
 # Psi4 outputs
 

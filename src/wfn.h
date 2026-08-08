@@ -27,8 +27,20 @@ public:
     }
     
     void get_integrals();
-    double get_energy(const std::string reference, const std::string method, 
+    double get_energy(const std::string reference, const std::string method,
                       const double econv, const int max_iter, const int verbose);
+
+    // Read-only accessors for tests: expose the AO integrals and electron
+    // counts computed by loader()/get_integrals() without duplicating the
+    // libint2 setup logic in test fixtures.
+    const Eigen::MatrixXd& get_S() const { return S; }
+    const Eigen::MatrixXd& get_T() const { return T; }
+    const Eigen::MatrixXd& get_V() const { return V; }
+    const std::vector<double>& get_eri_vector() const { return eri_vector; }
+    const std::vector<libint2::Atom>& get_atoms() const { return atoms; }
+    int get_n_docc() const { return n_docc; }
+    int get_n_alpha() const { return n_alpha; }
+    int get_n_beta() const { return n_beta; }
 };
 
 #endif

@@ -29,10 +29,8 @@ Eigen::MatrixXd build_one_center(libint2::Engine& engine, const libint2::BasisSe
         for(auto f2=0; f2!=n2; ++f2) {
             mat(bf1+f1, bf2+f2) = ints[f1*n2+f2];
             if (bf1+f1 != bf2+f2) { mat(bf2+f2, bf1+f1) = ints[f1*n2+f2]; }
-        }
-        }
-    }
-    }
+        }}
+    }}
 
     return mat;
 }
