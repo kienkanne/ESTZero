@@ -46,3 +46,8 @@ if(SCF_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+option(SCF_BUILD_LEGACY "Build legacy benchmarks" OFF)
+if(SCF_BUILD_LEGACY)
+    add_subdirectory(legacy)
+endif()
