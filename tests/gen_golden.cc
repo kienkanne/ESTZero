@@ -69,7 +69,7 @@ void check_oracle(const std::string& label, const std::string& method,
 } // namespace
 
 int main() {
-    const std::string repo = SCF_REPO_ROOT;
+    const std::string repo = EST_REPO_ROOT;
 
     // Load the Psi4 oracle once.
     std::ifstream ref_in(repo + "/bench/reference.json");

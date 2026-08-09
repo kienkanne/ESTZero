@@ -17,7 +17,7 @@ TEST_CASE("WaveFunction: end-to-end scf/mp2 energies match golden and Psi4") {
         CAPTURE(sys.label);
         golden::Golden g = golden::load_golden(sys.name);
 
-        WaveFunction wfn(std::string(SCF_REPO_ROOT) + "/" + sys.xyz, sys.basis, sys.mult, sys.charge);
+        WaveFunction wfn(std::string(EST_REPO_ROOT) + "/" + sys.xyz, sys.basis, sys.mult, sys.charge);
         wfn.get_integrals();
 
         double e_scf = wfn.get_energy(sys.reference, "scf", 1e-10, 200, 0);
@@ -34,7 +34,7 @@ TEST_CASE("WaveFunction: end-to-end scf/mp2 energies match golden and Psi4") {
 
 TEST_CASE("WaveFunction: throws on a missing xyz file") {
     CHECK_THROWS_AS(
-        WaveFunction(std::string(SCF_REPO_ROOT) + "/input/does_not_exist.xyz", "sto-3g", 1, 0),
+        WaveFunction(std::string(EST_REPO_ROOT) + "/input/does_not_exist.xyz", "sto-3g", 1, 0),
         std::runtime_error);
 }
 
@@ -42,24 +42,24 @@ TEST_CASE("WaveFunction: throws on charge/multiplicity parity mismatch") {
     // h2o has 10 electrons; mult=2 implies 1 unpaired electron, and (10 - 1) is
     // odd -> invalid parity.
     CHECK_THROWS_AS(
-        WaveFunction(std::string(SCF_REPO_ROOT) + "/input/h2o.xyz", "sto-3g", 2, 0),
+        WaveFunction(std::string(EST_REPO_ROOT) + "/input/h2o.xyz", "sto-3g", 2, 0),
         std::runtime_error);
 }
 
 TEST_CASE("WaveFunction: get_energy throws when reference=rhf but multiplicity != 1") {
-    WaveFunction wfn(std::string(SCF_REPO_ROOT) + "/input/h2o.xyz", "sto-3g", 3, 0);
+    WaveFunction wfn(std::string(EST_REPO_ROOT) + "/input/h2o.xyz", "sto-3g", 3, 0);
     wfn.get_integrals();
     CHECK_THROWS_AS(wfn.get_energy("rhf", "scf", 1e-10, 200, 0), std::runtime_error);
 }
 
 TEST_CASE("WaveFunction: get_energy throws on an unknown reference string") {
-    WaveFunction wfn(std::string(SCF_REPO_ROOT) + "/input/h2o.xyz", "sto-3g", 1, 0);
+    WaveFunction wfn(std::string(EST_REPO_ROOT) + "/input/h2o.xyz", "sto-3g", 1, 0);
     wfn.get_integrals();
     CHECK_THROWS_AS(wfn.get_energy("xhf", "scf", 1e-10, 200, 0), std::runtime_error);
 }
 
 TEST_CASE("WaveFunction: get_energy throws on an unknown method string") {
-    WaveFunction wfn(std::string(SCF_REPO_ROOT) + "/input/h2o.xyz", "sto-3g", 1, 0);
+    WaveFunction wfn(std::string(EST_REPO_ROOT) + "/input/h2o.xyz", "sto-3g", 1, 0);
     wfn.get_integrals();
     CHECK_THROWS_AS(wfn.get_energy("rhf", "ccsd", 1e-10, 200, 0), std::runtime_error);
 }

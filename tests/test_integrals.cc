@@ -13,7 +13,7 @@ using golden::Matrix;
 // molecule/basis, needing no reference values. Exercised on the smallest system.
 
 TEST_CASE("integrals: overlap S is symmetric, positive-definite, unit-diagonal") {
-    WaveFunction wfn(std::string(SCF_REPO_ROOT) + "/input/h2o.xyz", "sto-3g", 1, 0);
+    WaveFunction wfn(std::string(EST_REPO_ROOT) + "/input/h2o.xyz", "sto-3g", 1, 0);
     wfn.get_integrals();
     const Matrix& S = wfn.get_S();
 
@@ -28,7 +28,7 @@ TEST_CASE("integrals: overlap S is symmetric, positive-definite, unit-diagonal")
 }
 
 TEST_CASE("integrals: T symmetric PSD, V symmetric") {
-    WaveFunction wfn(std::string(SCF_REPO_ROOT) + "/input/h2o.xyz", "sto-3g", 1, 0);
+    WaveFunction wfn(std::string(EST_REPO_ROOT) + "/input/h2o.xyz", "sto-3g", 1, 0);
     wfn.get_integrals();
 
     CHECK(wfn.get_T().isApprox(wfn.get_T().transpose(), 1e-12));
@@ -49,7 +49,7 @@ TEST_CASE("integrals: S/T/V/ERI match golden") {
         CAPTURE(sys.label);
         golden::Golden g = golden::load_golden(sys.name);
 
-        WaveFunction wfn(std::string(SCF_REPO_ROOT) + "/" + sys.xyz, sys.basis, sys.mult, sys.charge);
+        WaveFunction wfn(std::string(EST_REPO_ROOT) + "/" + sys.xyz, sys.basis, sys.mult, sys.charge);
         wfn.get_integrals();
 
         CHECK(wfn.get_S().isApprox(g.mat("S"), 1e-12));

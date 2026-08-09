@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(MySCF LANGUAGES CXX)
+project(ESTZero LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -10,9 +10,9 @@ find_package(Eigen3 REQUIRED)
 
 set(LIBINT_ROOT "/localscratch/kbui/CPP/libint_install")
 
-option(SCF_BUILD_TESTS "Build unit tests" ON)
+option(EST_BUILD_TESTS "Build unit tests" ON)
 
-add_library(scf_core STATIC
+add_library(est_core STATIC
     estzero/est/build_JK.cc
     estzero/est/integrals.cc
     estzero/est/wfn.cc
@@ -24,30 +24,30 @@ add_library(scf_core STATIC
     estzero/linalg/utils.cc
 )
 
-target_include_directories(scf_core PUBLIC
+target_include_directories(est_core PUBLIC
     ${LIBINT_ROOT}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/est
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/linalg
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/utils
 )
-target_link_directories(scf_core PUBLIC ${LIBINT_ROOT}/lib)
-target_link_libraries(scf_core PUBLIC Eigen3::Eigen int2)
+target_link_directories(est_core PUBLIC ${LIBINT_ROOT}/lib)
+target_link_libraries(est_core PUBLIC Eigen3::Eigen int2)
 
-target_compile_options(scf_core PUBLIC
+target_compile_options(est_core PUBLIC
     -O3
     -g
     -fno-omit-frame-pointer
 )
 
-add_executable(SCF estzero/est/main.cc)
-target_link_libraries(SCF PRIVATE scf_core)
+add_executable(ESTZero estzero/est/main.cc)
+target_link_libraries(ESTZero PRIVATE est_core)
 
-if(SCF_BUILD_TESTS)
+if(EST_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
 
-option(SCF_BUILD_LEGACY "Build legacy benchmarks" OFF)
-if(SCF_BUILD_LEGACY)
+option(EST_BUILD_LEGACY "Build legacy benchmarks" OFF)
+if(EST_BUILD_LEGACY)
     add_subdirectory(legacy)
 endif()

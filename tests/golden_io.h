@@ -56,7 +56,7 @@ inline const std::vector<GoldenSystem>& golden_systems() {
 }
 
 inline std::string data_path(const std::string& name) {
-    return std::string(SCF_REPO_ROOT) + "/tests/golden/data/" + name + ".golden";
+    return std::string(EST_REPO_ROOT) + "/tests/golden/data/" + name + ".golden";
 }
 
 // Writers (used by gen_golden)

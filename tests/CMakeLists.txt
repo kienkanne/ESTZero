@@ -1,7 +1,7 @@
 add_library(doctest INTERFACE)
 target_include_directories(doctest INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty)
 
-add_executable(scf_tests
+add_executable(est_tests
     main_test.cc
     test_utils.cc
     test_build_jk.cc
@@ -14,13 +14,13 @@ add_executable(scf_tests
     test_einsum.cc
 )
 
-target_link_libraries(scf_tests PRIVATE scf_core doctest)
-target_include_directories(scf_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(est_tests PRIVATE est_core doctest)
+target_include_directories(est_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Tests/generator resolve input/*.xyz, bench/reference.json and the golden data
 # files relative to the repo root, not the build dir.
-target_compile_definitions(scf_tests PRIVATE
-    SCF_REPO_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/.."
+target_compile_definitions(est_tests PRIVATE
+    EST_REPO_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/.."
 )
 
 # Precompile the heavy third-party headers (Eigen + libint2) that dominate each
@@ -29,20 +29,20 @@ target_compile_definitions(scf_tests PRIVATE
 # doctest.h is deliberately NOT here: main_test.cc must #define
 # DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN *before* including it, which a force-included
 # PCH would pre-empt.
-target_precompile_headers(scf_tests PRIVATE
+target_precompile_headers(est_tests PRIVATE
     <Eigen/Dense>
     <libint2.hpp>
 )
 
-add_test(NAME scf_tests COMMAND scf_tests)
+add_test(NAME est_tests COMMAND est_tests)
 
 # Developer tool (not a test): regenerates the frozen golden data from the
 # current, benchmark-confirmed code. Run manually, then commit tests/golden/data.
 add_executable(gen_golden gen_golden.cc)
-target_link_libraries(gen_golden PRIVATE scf_core)
+target_link_libraries(gen_golden PRIVATE est_core)
 target_include_directories(gen_golden PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(gen_golden PRIVATE
-    SCF_REPO_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/.."
+    EST_REPO_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/.."
 )
 # Reuse the test PCH rather than compiling a second identical one.
-target_precompile_headers(gen_golden REUSE_FROM scf_tests)
+target_precompile_headers(gen_golden REUSE_FROM est_tests)
