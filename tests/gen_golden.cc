@@ -30,8 +30,6 @@
 
 using golden::Matrix;
 
-double compute_nuclear_repulsion(const std::vector<libint2::Atom>& atoms);
-
 namespace {
 
 constexpr double ORACLE_TOL = 1e-6;
@@ -97,7 +95,7 @@ int main() {
             const Matrix& T = wfn.get_T();
             const Matrix& V = wfn.get_V();
             const std::vector<double>& eri = wfn.get_eri_vector();
-            const double V_nn = compute_nuclear_repulsion(wfn.get_atoms());
+            const double V_nn = wfn.get_Vnn();
             const int n_docc  = wfn.get_n_docc();
             const int n_alpha = wfn.get_n_alpha();
             const int n_beta  = wfn.get_n_beta();

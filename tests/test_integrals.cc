@@ -2,6 +2,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
 
+#include "integrals.h"
 #include "wfn.h"
 #include "golden_io.h"
 
@@ -61,4 +62,72 @@ TEST_CASE("integrals: S/T/V/ERI match golden") {
         for (size_t i = 0; i < eri.size(); ++i)
             CHECK(eri[i] == doctest::Approx(eri_golden[i]).epsilon(1e-12));
     }
+}
+
+
+// ── pair_index / eri_index ──────────────────────────────────────────────────
+// Analytical tests: pure integer arithmetic, hand-checkable.
+
+TEST_CASE("pair_index: exact hand-checked values") {
+    CHECK(pair_index(0, 0) == 0);
+    CHECK(pair_index(1, 0) == 1);
+    CHECK(pair_index(0, 1) == 1); // symmetric in its arguments
+    CHECK(pair_index(1, 1) == 2);
+    CHECK(pair_index(2, 0) == 3);
+    CHECK(pair_index(2, 1) == 4);
+    CHECK(pair_index(2, 2) == 5);
+}
+
+TEST_CASE("pair_index: symmetric in its two arguments (property)") {
+    for (int i = 0; i < 6; ++i) {
+        for (int j = 0; j < 6; ++j) {
+            CHECK(pair_index(i, j) == pair_index(j, i));
+        }
+    }
+}
+
+TEST_CASE("pair_index: distinct pairs map to distinct indices (property)") {
+    // A canonical index must be injective over the triangular domain i>=j,
+    // otherwise eri_index would silently collide two different integrals.
+    std::vector<std::pair<int,int>> seen_pairs;
+    std::vector<int> seen_idx;
+    for (int i = 0; i < 6; ++i) {
+        for (int j = 0; j <= i; ++j) {
+            int idx = pair_index(i, j);
+            for (size_t k = 0; k < seen_idx.size(); ++k) {
+                CHECK(seen_idx[k] != idx);
+            }
+            seen_idx.push_back(idx);
+            seen_pairs.push_back({i, j});
+        }
+    }
+}
+
+TEST_CASE("eri_index: 8-fold permutational symmetry (property)") {
+    // (pq|rs) = (qp|rs) = (pq|sr) = (qp|sr) = (rs|pq) = ... all 8 permutations
+    // must land on the same canonical index. This is the invariant the whole
+    // in-core ERI storage scheme depends on.
+    for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+    for (int k = 0; k < 4; ++k) {
+    for (int l = 0; l < 4; ++l) {
+        int base = eri_index(i, j, k, l);
+        CHECK(eri_index(j, i, k, l) == base);
+        CHECK(eri_index(i, j, l, k) == base);
+        CHECK(eri_index(j, i, l, k) == base);
+        CHECK(eri_index(k, l, i, j) == base);
+        CHECK(eri_index(l, k, i, j) == base);
+        CHECK(eri_index(k, l, j, i) == base);
+        CHECK(eri_index(l, k, j, i) == base);
+    }
+    }
+    }
+    }
+}
+
+TEST_CASE("eri_index: exact hand-checked value") {
+    // eri_index(0,1,0,0): pair_index(0,1)=1, pair_index(0,0)=0,
+    // pair_index(1,0)=1.
+    CHECK(eri_index(0, 1, 0, 0) == 1);
+    CHECK(eri_index(0, 0, 0, 0) == 0);
 }

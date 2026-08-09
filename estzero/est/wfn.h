@@ -27,6 +27,7 @@ public:
     }
     
     void get_integrals();
+    double get_Vnn();
     double get_energy(const std::string reference, const std::string method,
                       const double econv, const int max_iter, const int verbose);
 

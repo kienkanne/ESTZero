@@ -83,7 +83,9 @@ void WaveFunction::get_integrals() {
 }
 
 
-double compute_nuclear_repulsion(const std::vector<libint2::Atom>& atoms) {
+
+double WaveFunction::get_Vnn() {
+    auto &atoms = this->atoms;
     double vnn = 0.0;
     
     for (size_t i = 0; i < atoms.size(); ++i) {
@@ -111,13 +113,13 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
             throw std::runtime_error("Cannot use RHF with multiplicity other than 1!");
         }
 
-        result = rhf_scf(econv, max_iter, verbose, compute_nuclear_repulsion(atoms), this->n_docc, 
+        result = rhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_docc, 
                         this->S, this->T, this->V, this->eri_vector);
         E0 = result.E0;
     }
 
     else if (reference == "uhf") {
-        result = uhf_scf(econv, max_iter, verbose, compute_nuclear_repulsion(atoms), this->n_alpha, this->n_beta, 
+        result = uhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_alpha, this->n_beta, 
                         this->S, this->T, this->V, this->eri_vector);
         E0 = result.E0;
     }
