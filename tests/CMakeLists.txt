@@ -11,6 +11,7 @@ add_executable(scf_tests
     test_integrals.cc
     test_wfn.cc
     test_timer.cc
+    test_einsum.cc
 )
 
 target_link_libraries(scf_tests PRIVATE scf_core doctest)
