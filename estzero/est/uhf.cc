@@ -11,11 +11,12 @@
 using Matrix = Eigen::MatrixXd;
 using Vector = Eigen::VectorXd;
 
+template <typename ERI>
 Result uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_alpha, int n_beta,
                 const Matrix& S, const Matrix& T,
-                const Matrix& V, const std::vector<double>& eri_vector) {
+                const Matrix& V, const ERI& eri) {
     timing::Scoped _t("SCF Iterations");
-    
+
     int nbf = S.rows();
 
     const Matrix H = T + V;
@@ -31,8 +32,8 @@ Result uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_alpha
     std::vector<Matrix> Fa_list;
     std::vector<Matrix> Fb_list;
     std::vector<Matrix> err_list;
-					
-    Eigen::SelfAdjointEigenSolver<Matrix> solver;                       
+
+    Eigen::SelfAdjointEigenSolver<Matrix> solver;
     for (int i = 0; i != max_iter; ++i) {
         Matrix Fa_p = X.transpose() * Fa * X;
         Matrix Fb_p = X.transpose() * Fb * X;
@@ -55,12 +56,12 @@ Result uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_alpha
 
         JK jka;
         {timing::Scoped _t("  build_JKa");
-            jka = build_JK(eri_vector, Da);}
+            jka = build_JK(eri, Da);}
         auto& [Ja, Ka] = jka;
 
         JK jkb;
         {timing::Scoped _t("  build_JKb");
-            jkb = build_JK(eri_vector, Db);}
+            jkb = build_JK(eri, Db);}
         auto& [Jb, Kb] = jkb;
 
         Fa = H + Ja + Jb - Ka;
@@ -71,7 +72,7 @@ Result uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_alpha
 
         Matrix erra_vec = Fa * Da * S - S * Da * Fa;
         Matrix errb_vec = Fb * Db * S - S * Db * Fb;
-        
+
         // Concatenate the error vectors
         Matrix err_vec(erra_vec.rows() + errb_vec.rows(), erra_vec.cols());
         err_vec << erra_vec, errb_vec;
@@ -108,7 +109,7 @@ Result uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_alpha
 
             for (std::size_t i = 0; i < err_list.size(); ++i) {
                 Fa += coeffs[i] * Fa_list[i];
-                Fb += coeffs[i] * Fb_list[i]; 
+                Fb += coeffs[i] * Fb_list[i];
             }
         }
         E0_last = E0;
@@ -116,3 +117,10 @@ Result uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_alpha
 
     throw std::runtime_error("SCF failed to converge.\n");
 }
+
+template Result uhf_scf<std::vector<double>>(double, int, int, double, int, int,
+                                             const Matrix&, const Matrix&,
+                                             const Matrix&, const std::vector<double>&);
+template Result uhf_scf<Tensor>(double, int, int, double, int, int,
+                                const Matrix&, const Matrix&, const Matrix&,
+                                const Tensor&);

@@ -1,11 +1,16 @@
 #ifndef BUILD_JK
 #define BUILD_JK
 
-#include <vector>
+#include <integrals.h>
 #include <Eigen/Dense>
 #include <libint2.hpp>
+#include "einsum.h"
 
-struct JK {Eigen::MatrixXd J; Eigen::MatrixXd K;};
-JK build_JK(const std::vector<double>& eri_vector, const Eigen::MatrixXd& D);
+using Matrix = Eigen::MatrixXd;
+
+struct JK {Matrix J; Matrix K;};
+
+template <typename ERI>
+JK build_JK(const ERI &eri, const Matrix &D);
 
 #endif

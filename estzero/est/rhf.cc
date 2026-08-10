@@ -7,15 +7,17 @@
 #include "rhf.h"
 #include "build_JK.h"
 #include "timer.h"
+#include "einsum.h"
 
 using Matrix = Eigen::MatrixXd;
 using Vector = Eigen::VectorXd;
 
-Result rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndocc, 
+template <typename ERI>
+Result rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndocc,
                 const Matrix& S, const Matrix& T,
-                const Matrix& V, const std::vector<double>& eri_vector) {
+                const Matrix& V, const ERI& eri) {
     timing::Scoped _t("SCF Iterations");
-    
+
     int nbf = S.rows();
 
     const Matrix H = T + V;
@@ -30,7 +32,7 @@ Result rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndocc,
     std::vector<Matrix> F_list;
     std::vector<Matrix> err_list;
 
-    Eigen::SelfAdjointEigenSolver<Matrix> solver;                       
+    Eigen::SelfAdjointEigenSolver<Matrix> solver;
     for (int i = 0; i != max_iter; ++i) {
         Matrix F_p = X.transpose() * F * X;
 
@@ -40,11 +42,11 @@ Result rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndocc,
         Matrix C = X * C_p;
         Matrix C_docc  = C.leftCols(ndocc);
         Matrix D = C_docc * C_docc.transpose();
-        
+
         JK jk;
         {
             timing::Scoped _t("  build_JK");
-            jk = build_JK(eri_vector, D);
+            jk = build_JK(eri, D);
         }
         auto& [J, K] = jk;
         F = H + 2.0 * J - K;
@@ -80,7 +82,7 @@ Result rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndocc,
             F.setZero();
 
             for (std::size_t i = 0; i < err_list.size(); ++i) {
-                F += coeffs[i] * F_list[i]; 
+                F += coeffs[i] * F_list[i];
             }
         }
         E0_last = E0;
@@ -88,3 +90,10 @@ Result rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndocc,
 
     throw std::runtime_error("SCF failed to converge.\n");
 }
+
+template Result rhf_scf<std::vector<double>>(double, int, int, double, int,
+                                             const Matrix&, const Matrix&,
+                                             const Matrix&, const std::vector<double>&);
+template Result rhf_scf<Tensor>(double, int, int, double, int,
+                                const Matrix&, const Matrix&, const Matrix&,
+                                const Tensor&);

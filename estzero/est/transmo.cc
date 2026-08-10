@@ -13,9 +13,6 @@ using Matrix = Eigen::MatrixXd;
 
 namespace {
 
-// Dense row-major AO ERI tensor (nbf^4) unpacked from the 8-fold canonical
-// vector, so the generic contractor can index it directly. TODO: ERI should
-// just be a tensor as well.
 Tensor build_ao_tensor(const std::vector<double>& eri_vector, int nbf) {
     std::vector<double> data(static_cast<size_t>(nbf) * nbf * nbf * nbf);
     size_t idx = 0;
@@ -75,6 +72,44 @@ SpinMO transform_uhf_MO(const std::vector<double>& eri_vector,
     Tensor Iaa = transform_eri(ao, Cocc_a, Cvirt_a, Cocc_a, Cvirt_a);
     Tensor Ibb = transform_eri(ao, Cocc_b, Cvirt_b, Cocc_b, Cvirt_b);
     Tensor Iab = transform_eri(ao, Cocc_a, Cvirt_a, Cocc_b, Cvirt_b);
+
+    return {Iaa, Ibb, Iab};
+}
+
+
+// Tensor-scheme overloads: `eri` is already the dense AO tensor built directly
+// by build_eri_tensor(), so the vector->tensor unpack (build_ao_tensor) is
+// skipped entirely and it is fed straight into transform_eri.
+
+Tensor transform_rhf_MO(const Tensor& eri_tensor, const Matrix& C, int n_occ) {
+    timing::Scoped _t("MO Transformation");
+
+    const int nbf    = static_cast<int>(C.rows());
+    const int n_virt = nbf - n_occ;
+
+    Tensor Cocc  = mat_to_tensor(C.leftCols(n_occ));
+    Tensor Cvirt = mat_to_tensor(C.rightCols(n_virt));
+
+    return transform_eri(eri_tensor, Cocc, Cvirt, Cocc, Cvirt);
+}
+
+
+SpinMO transform_uhf_MO(const Tensor& eri_tensor,
+                          const Matrix& Ca, int n_alpha, const Matrix& Cb, int n_beta) {
+    timing::Scoped _t("MO Transformation");
+
+    const int nbf     = static_cast<int>(Ca.rows());
+    const int n_avirt = nbf - n_alpha;
+    const int n_bvirt = nbf - n_beta;
+
+    Tensor Cocc_a  = mat_to_tensor(Ca.leftCols(n_alpha));
+    Tensor Cvirt_a = mat_to_tensor(Ca.rightCols(n_avirt));
+    Tensor Cocc_b  = mat_to_tensor(Cb.leftCols(n_beta));
+    Tensor Cvirt_b = mat_to_tensor(Cb.rightCols(n_bvirt));
+
+    Tensor Iaa = transform_eri(eri_tensor, Cocc_a, Cvirt_a, Cocc_a, Cvirt_a);
+    Tensor Ibb = transform_eri(eri_tensor, Cocc_b, Cvirt_b, Cocc_b, Cvirt_b);
+    Tensor Iab = transform_eri(eri_tensor, Cocc_a, Cvirt_a, Cocc_b, Cvirt_b);
 
     return {Iaa, Ibb, Iab};
 }

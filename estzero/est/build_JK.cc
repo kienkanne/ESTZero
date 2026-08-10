@@ -2,15 +2,23 @@
 #include <Eigen/Dense>
 #include <libint2.hpp>
 
-#include "integrals.h"
 #include "build_JK.h"
+#include "einsum.h"
+#include "integrals.h"
 
 
-JK build_JK (const std::vector<double> &eri_vector, const Eigen::MatrixXd &D) {
+inline double eri_at(const Tensor& eri, int i, int j, int k, int l) { return eri(i, j, k, l); }
+inline double eri_at(const std::vector<double>& eri, int i, int j, int k, int l) {
+    return eri[eri_index(i, j, k, l)];
+}
+
+
+template <typename ERI>
+JK build_JK(const ERI &eri, const Matrix &D) {
 	const int nbf = D.rows();
-    
-	Eigen::MatrixXd J(nbf, nbf);
-	Eigen::MatrixXd K(nbf, nbf);
+
+	Matrix J(nbf, nbf);
+	Matrix K(nbf, nbf);
 
     J.setZero();
     K.setZero();
@@ -27,7 +35,7 @@ JK build_JK (const std::vector<double> &eri_vector, const Eigen::MatrixXd &D) {
 		if (k == l) {factor *= 0.5;}
 		if ((i == k) && (j == l)) {factor *= 0.5;}
 
-		double val {factor * eri_vector[eri_index(i, j, k, l)]};		
+		double val {factor * eri_at(eri, i, j, k, l)};
 
 		// J scatter half as much as K
         J(i, j) += 2 * val * D(k, l);
@@ -50,3 +58,6 @@ JK build_JK (const std::vector<double> &eri_vector, const Eigen::MatrixXd &D) {
 
 	return {J, K};
 }
+
+template JK build_JK<std::vector<double>>(const std::vector<double>&, const Matrix&);
+template JK build_JK<Tensor>(const Tensor&, const Matrix&);

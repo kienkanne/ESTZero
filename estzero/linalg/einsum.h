@@ -19,13 +19,15 @@ class Tensor {
 public:
     std::vector<int> shape;
 
+    Tensor() = default;
+
     explicit Tensor(const std::vector<int>& shape_) : shape(shape_) {
         size_t total_size = 1;
         for (int dim : shape) total_size *= static_cast<size_t>(dim);
         data.resize(total_size);
     }
 
-    Tensor(const std::vector<int>& shape_, const std::vector<double>& values)
+    explicit Tensor(const std::vector<int>& shape_, const std::vector<double>& values)
         : data(values), shape(shape_) {
         size_t total_size = 1;
         for (int dim : shape) total_size *= static_cast<size_t>(dim);
@@ -34,12 +36,14 @@ public:
         }
     }
 
+    void fill(double value) { std::fill(data.begin(), data.end(), value); }
+
     int ndim() const { return static_cast<int>(shape.size()); }
 
     // The number of indices must match ndim()
     template <typename... Idx>
     double& operator()(Idx... idx) {
-        int ind[] = { idx... };
+        size_t ind[] = { static_cast<size_t>(idx)... };
         size_t flat = 0, stride = 1;
         for (int i = ndim() - 1; i >= 0; --i) { 
             flat += static_cast<size_t>(ind[i]) * stride; stride *= static_cast<size_t>(shape[i]); }
@@ -47,7 +51,7 @@ public:
     }
     template <typename... Idx>
     double operator()(Idx... idx) const {
-        int ind[] = { idx... };
+        size_t ind[] = { static_cast<size_t>(idx)... };
         size_t flat = 0, stride = 1;
         for (int i = ndim() - 1; i >= 0; --i) { 
             flat += static_cast<size_t>(ind[i]) * stride; stride *= static_cast<size_t>(shape[i]); }
@@ -77,7 +81,7 @@ public:
 
     template <typename... Idx>
     double operator()(Idx... idx) const {
-        int ind[] = { idx... };
+        size_t ind[] = { static_cast<size_t>(idx)... };
         size_t flat = 0, stride = 1;
         for (int i = ndim() - 1; i >= 0; --i) { 
             flat += static_cast<size_t>(ind[i]) * stride; stride *= static_cast<size_t>(shape[i]); }

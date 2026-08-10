@@ -5,6 +5,10 @@
 #include <vector>
 #include <Eigen/Dense>
 #include <libint2.hpp>
+#include <einsum.h>
+#include "integrals.h"
+
+using Matrix = Eigen::MatrixXd;
 
 
 class WaveFunction {
@@ -15,18 +19,20 @@ private:
     int n_alpha{};
     int n_beta{};
 
-    Eigen::MatrixXd S; Eigen::MatrixXd T; Eigen::MatrixXd V;
+    Matrix S, T, V;
+    Tensor eri_tensor;
     std::vector<double> eri_vector;
+    ERIScheme eri_scheme_{ERIScheme::Vector};
 
     void loader(const std::string xyz, const std::string basis,
                 const int mult, const int charge);
-    
+
 public:
     explicit WaveFunction(const std::string xyz, const std::string basis, const int mult, const int charge) {
         loader(xyz, basis, mult, charge);
     }
-    
-    void get_integrals();
+
+    void get_integrals(std::string eri_scheme_str = "vector");
     double get_Vnn();
     double get_energy(const std::string reference, const std::string method,
                       const double econv, const int max_iter, const int verbose);
@@ -34,10 +40,11 @@ public:
     // Read-only accessors for tests: expose the AO integrals and electron
     // counts computed by loader()/get_integrals() without duplicating the
     // libint2 setup logic in test fixtures.
-    const Eigen::MatrixXd& get_S() const { return S; }
-    const Eigen::MatrixXd& get_T() const { return T; }
-    const Eigen::MatrixXd& get_V() const { return V; }
+    const Matrix& get_S() const { return S; }
+    const Matrix& get_T() const { return T; }
+    const Matrix& get_V() const { return V; }
     const std::vector<double>& get_eri_vector() const { return eri_vector; }
+    const Tensor& get_eri() const { return eri_tensor; }
     const std::vector<libint2::Atom>& get_atoms() const { return atoms; }
     int get_n_docc() const { return n_docc; }
     int get_n_alpha() const { return n_alpha; }

@@ -11,6 +11,7 @@
 #include "timer.h"
 #include "rhf.h"
 #include "uhf.h"
+#include "einsum.h"
 #include "mp2.h"
 #include "transmo.h"
 #include "utils.h"
@@ -49,7 +50,16 @@ void WaveFunction::loader(const std::string xyz, const std::string basis,
 }
 
 
-void WaveFunction::get_integrals() {
+ERIScheme parse_eri_scheme(const std::string& s) {
+    if (s == "vector") return ERIScheme::Vector;
+    if (s == "tensor") return ERIScheme::Tensor;
+    throw std::runtime_error("Unknown eri-scheme: " + s);
+}
+
+
+void WaveFunction::get_integrals(std::string eri_scheme_str) {
+    this->eri_scheme_ = parse_eri_scheme(eri_scheme_str);
+
     auto& obs = this->obs;
     auto& atoms = this->atoms;
 
@@ -73,10 +83,13 @@ void WaveFunction::get_integrals() {
 
     libint2::Engine eri_engine(libint2::Operator::coulomb,
                                 obs.max_nprim(), obs.max_l());
-    std::vector<double> eri;
-    {
+    
+    if (this->eri_scheme_ == ERIScheme::Tensor) {
         timing::Scoped _t("ERI build");
-        this->eri_vector = build_canonical_eris(eri_engine, obs);
+        this->eri_tensor = build_eri_tensor(eri_engine, obs);
+    } else {
+        timing::Scoped _t("ERI build");
+        this->eri_vector = build_eri_vector(eri_engine, obs);
     }
 
     libint2::finalize();
@@ -113,14 +126,20 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
             throw std::runtime_error("Cannot use RHF with multiplicity other than 1!");
         }
 
-        result = rhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_docc, 
-                        this->S, this->T, this->V, this->eri_vector);
+        result = (this->eri_scheme_ == ERIScheme::Tensor)
+            ? rhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_docc,
+                    this->S, this->T, this->V, this->eri_tensor)
+            : rhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_docc,
+                    this->S, this->T, this->V, this->eri_vector);
         E0 = result.E0;
     }
 
     else if (reference == "uhf") {
-        result = uhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_alpha, this->n_beta, 
-                        this->S, this->T, this->V, this->eri_vector);
+        result = (this->eri_scheme_ == ERIScheme::Tensor)
+            ? uhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_alpha, this->n_beta,
+                    this->S, this->T, this->V, this->eri_tensor)
+            : uhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_alpha, this->n_beta,
+                    this->S, this->T, this->V, this->eri_vector);
         E0 = result.E0;
     }
 
@@ -131,13 +150,16 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
 
     else if (method == "mp2") {
         if (reference == "rhf") {
-            const auto& I_mo = transform_rhf_MO(this->eri_vector, result.Ca, this->n_docc);
+            const Tensor I_mo = (this->eri_scheme_ == ERIScheme::Tensor)
+                ? transform_rhf_MO(this->eri_tensor, result.Ca, this->n_docc)
+                : transform_rhf_MO(this->eri_vector, result.Ca, this->n_docc);
             return calc_rhf_MP2_E(I_mo, result.epsa, this->n_docc, result.E0);
         }
         else if (reference == "uhf") {
-            const auto& [Iaa_mo, Ibb_mo, Iab_mo] =
-                transform_uhf_MO(this->eri_vector, result.Ca,
-                        this->n_alpha, result.Cb, this->n_beta);
+            const SpinMO mo = (this->eri_scheme_ == ERIScheme::Tensor)
+                ? transform_uhf_MO(this->eri_tensor, result.Ca, this->n_alpha, result.Cb, this->n_beta)
+                : transform_uhf_MO(this->eri_vector, result.Ca, this->n_alpha, result.Cb, this->n_beta);
+            const auto& [Iaa_mo, Ibb_mo, Iab_mo] = mo;
             return calc_uhf_MP2_E(Iaa_mo, Ibb_mo, Iab_mo, result.epsa, result.epsb,
                         this->n_alpha, this->n_beta, E0);
         }
