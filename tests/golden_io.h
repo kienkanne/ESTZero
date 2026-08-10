@@ -31,8 +31,6 @@
 
 namespace golden {
 
-using Matrix = Eigen::MatrixXd;
-using Vector = Eigen::VectorXd;
 
 // Single source of truth for the golden systems
 struct GoldenSystem {

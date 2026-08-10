@@ -32,7 +32,7 @@ python3 bench/benchmark.py
 
 This log tracks the update in features and their performance in the most computationally costly steps. Versions without algorithm update for each section is not documented. See `bench/outputs` for full version peformance logs.
 
-> v1.5.0 added the ERI tensor building scheme alongside the original ERI vector building, so for this version both schemes are shown for direct comparison
+> v1.5.0 added the ERI tensor building scheme alongside the original ERI vector building, so for this version both schemes are shown for direct comparison. From this version onward, only ERI tensor performance is shown.
 
 ### RHF
 
@@ -83,7 +83,10 @@ UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alp
 | version | Total wall (s) | ERI build (s) | JK build* (per iter) (ms) |  N_SCF_iter | MO transform* (s) | MP2 energy (ms) | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|
 | v1.1.0 | 21.285 | 1.024 | 905.5 | 15 | 6.635 | 0.8 | 393.1 | UHF MP2 Baseline |
-| v1.3.0 | 28.646 | 1.036 | 839.4 | 15 | 14.976 | 2.1 | 4255.5 | Same `einsum` rewrite as RHF MP2 above. Peak RSS ~11x (see `CHANGELOG.md`) |
-| v1.3.1 | 29.826 | 1.043 | 939.0 | 15 | 14.655 | 2.3 | 2857.3 | Fixed `einsum` memory bug (see `CHANGELOG.md`) |
+| v1.3.0 | 28.646 | 1.036 | 839.4 | 15 | 14.976** | 2.1 | 4255.5 | Same `einsum` rewrite as RHF MP2 above. Peak RSS ~11x. |
+| v1.3.1 | 29.826 | 1.043 | 939.0 | 15 | 14.655 | 2.3 | 2857.3 | Fixed `einsum` memory bug |
 | v1.5.0 (vector) | 31.203 | 1.032 | 972.4 | 15 | 15.542 | 2.2 | 2856.6 | Similar to v1.3.1 |
 | v1.5.0 (tensor) | 22.084 | 2.213 | 378.6 | 15 | 14.099 | 2.0 | 1471.4 | Similar improvement to RHF MP2 |
+| v1.5.1 | 17.049 | 2.077 | 375.0 | 15 | 9.293** | 2.1 | 1466.4 | Fix: Use intermediate 2 of Iaa to build Iab directly |
+
+> **v1.3.0-v1.5.0 didn't use intermediate 2 of Iaa to build Iab when using the new `einsum`, so performance was heavily impacted. This is fixed in v1.5.1

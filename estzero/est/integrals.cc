@@ -5,8 +5,8 @@
 #include "integrals.h"
 #include "einsum.h"
 
-Eigen::MatrixXd build_one_center(libint2::Engine& engine, const libint2::BasisSet& obs) {
-    Eigen::MatrixXd mat (obs.nbf(), obs.nbf());
+Matrix build_one_center(libint2::Engine& engine, const libint2::BasisSet& obs) {
+    Matrix mat (obs.nbf(), obs.nbf());
     mat.setZero();
 
     auto shell2bf = obs.shell2bf(); // maps shell index to basis function index

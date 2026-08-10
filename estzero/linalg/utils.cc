@@ -1,11 +1,8 @@
 #include <Eigen/Dense>
 #include <libint2.hpp>
+#include <utils.h>
 
-using Matrix = Eigen::MatrixXd;
-using Vector = Eigen::VectorXd;
-
-
-Matrix sym_ortho (const Matrix &S, double tol = 1e-8) {
+Matrix sym_ortho (const Matrix &S, double tol) {
     // This is for symmetric matrix; use EigenSolver for general case
     Eigen::SelfAdjointEigenSolver<Matrix> solver(S);
     auto s = solver.eigenvalues();

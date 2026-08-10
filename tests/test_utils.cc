@@ -4,9 +4,6 @@
 
 #include "utils.h"
 
-using Matrix = Eigen::MatrixXd;
-using Vector = Eigen::VectorXd;
-
 
 // ── sym_ortho ────────────────────────────────────────────────────────────
 // Property test: for any symmetric positive-definite S, X = sym_ortho(S)

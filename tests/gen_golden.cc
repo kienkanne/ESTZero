@@ -28,7 +28,6 @@
 #include "mp2.h"
 #include "golden_io.h"
 
-using golden::Matrix;
 
 namespace {
 

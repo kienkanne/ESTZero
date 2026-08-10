@@ -5,9 +5,6 @@
 #include "transmo.h"
 #include "golden_io.h"
 
-using golden::Matrix;
-using Vector = Eigen::VectorXd;
-
 // ── Property: UHF MP2 reduces to RHF MP2 on a closed shell ──────────────────
 // With Ca=Cb and n_alpha=n_beta the two spin channels are identical, so
 // calc_uhf_MP2_E must equal calc_rhf_MP2_E on the same data. This is the exact

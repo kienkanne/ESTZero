@@ -6,7 +6,6 @@
 #include "wfn.h"
 #include "golden_io.h"
 
-using golden::Matrix;
 
 // ── Property tests ──────────────────────────────────────────────────────────
 // Structural facts about the AO integrals that must hold for any valid

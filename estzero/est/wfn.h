@@ -8,8 +8,6 @@
 #include <einsum.h>
 #include "integrals.h"
 
-using Matrix = Eigen::MatrixXd;
-
 
 class WaveFunction {
 private:

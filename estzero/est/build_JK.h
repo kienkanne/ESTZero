@@ -6,8 +6,6 @@
 #include <libint2.hpp>
 #include "einsum.h"
 
-using Matrix = Eigen::MatrixXd;
-
 struct JK {Matrix J; Matrix K;};
 
 template <typename ERI>

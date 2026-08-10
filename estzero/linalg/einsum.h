@@ -7,7 +7,10 @@
 #include <stdexcept>
 #include <Eigen/Dense>
 
-using Matrix = Eigen::MatrixXd;
+// Use row major Eigen Matrix for easy parsing to Tensor row major
+// All other files should reference this Matrix alias
+using Matrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+using Vector = Eigen::VectorXd;
 
 // General-purpose einsum, implemented from scratch (no Eigen math). The Tensor
 // below is a plain row-major dense container. Previously Eigen's Tensor was only used
@@ -37,6 +40,7 @@ public:
     }
 
     void fill(double value) { std::fill(data.begin(), data.end(), value); }
+    void clear() { data.clear(); data.shrink_to_fit(); }
 
     int ndim() const { return static_cast<int>(shape.size()); }
 
@@ -91,18 +95,13 @@ public:
 
 Tensor einsum(const std::string& subscripts, const std::vector<TensorView>& operands);
 
-// Copy an (rows x cols) MO-coefficient block into a row-major Tensor.
-// Called by transmo.cc, inefficient as for now (TODO)
-inline static Tensor mat_to_tensor(const Matrix& M) {
+// Copy a row-major Eigen Matrix into an owning row-major Tensor.
+inline Tensor mat_to_tensor(const Matrix& M) {
     const int rows = static_cast<int>(M.rows());
     const int cols = static_cast<int>(M.cols());
-    std::vector<double> data(static_cast<size_t>(rows) * cols);
-    size_t idx = 0;
-    for (int i = 0; i < rows; ++i) {
-    for (int j = 0; j < cols; ++j) {
-        data[idx++] = M(i, j);
-    }}
-    return Tensor({rows, cols}, data);
+
+    return Tensor({rows, cols}, 
+        std::vector<double>(M.data(), M.data() + rows * cols));
 }
 
 #endif

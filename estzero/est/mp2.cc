@@ -1,11 +1,7 @@
 #include <Eigen/Dense>
-#include "utils.h"
 #include "mp2.h"
 #include "einsum.h"
 #include "timer.h"
-
-
-using Vector = Eigen::VectorXd;
 
 
 double calc_rhf_MP2_E(const Tensor& I_mo, const Vector& eps, int n_occ, double E0) {

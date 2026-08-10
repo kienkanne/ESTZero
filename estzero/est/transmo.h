@@ -5,7 +5,6 @@
 #include <Eigen/Dense>
 #include "einsum.h"
 
-using Matrix = Eigen::MatrixXd;
 
 struct SpinMO {
     Tensor Iaa_mo; Tensor Ibb_mo; Tensor Iab_mo;

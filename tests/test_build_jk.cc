@@ -4,7 +4,6 @@
 #include "build_JK.h"
 #include "golden_io.h"
 
-using golden::Matrix;
 
 // ── Property test ───────────────────────────────────────────────────────────
 // J and K must be symmetric whenever D is symmetric. This is a mathematical

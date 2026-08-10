@@ -3,10 +3,7 @@
 
 #include <Eigen/Dense>
 #include <libint2.hpp>
-#include <vector>
-
-using Matrix = Eigen::MatrixXd;
-using Vector = Eigen::VectorXd;
+#include <einsum.h>
 
 struct Result {
     double E0;
@@ -18,6 +15,5 @@ struct Result {
 
 Matrix sym_ortho(const Matrix& S, double tol = 1e-8);
 Vector diis(const std::vector<Matrix>& err_list);
-
 
 #endif

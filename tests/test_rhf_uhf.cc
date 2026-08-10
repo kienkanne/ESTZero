@@ -6,7 +6,6 @@
 #include "uhf.h"
 #include "golden_io.h"
 
-using golden::Matrix;
 
 // ── Property tests ──────────────────────────────────────────────────────────
 

@@ -5,8 +5,6 @@
 #include "transmo.h"
 #include "golden_io.h"
 
-using golden::Matrix;
-
 namespace {
 
 // doctest has no Tensor comparison; compare element-wise over the flat storage.

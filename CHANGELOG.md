@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions live in `README.md`.
 
+## [v1.5.1] Readded build `Iab` directly from intermediate 2 of `Iaa`
+
+- When `einsum` was introduced in `v1.3.0`, it built `Iab` explictly from `eri_tensor` unlike the previous scheme, affecting UHF MP2 performance substantially. It is recovered here, and performance increased.
+- Unify alias for `Eigen::MatrixXd`, and now row-major is explicitly used so it can be copied easily into a `Tensor`.
+
 ## [v1.5.0] Added option to build `eri_tensor`
 
 - ERI can now be directly built as a dense tensor instead of a compressed vector with smart canonical indexing that exploited the 8-fold symmetry to save memory. Both options are kept because while the tensor is much less memory efficient, it's more friendly for cache and dense matrix multiplications, which are future optimization targets. Due to the eri vector indexing look up every iteration, it's much less vectorizable and suffer from cache misses.

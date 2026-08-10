@@ -14,7 +14,7 @@ inline int eri_index(int i, int j, int k, int l) { return pair_index(pair_index(
 // nbf^4, DGEMM-ready) for benchmarking wall time and cache behavior.
 enum class ERIScheme { Vector, Tensor };
 
-Eigen::MatrixXd build_one_center(libint2::Engine& engine, const libint2::BasisSet& obs);
+Matrix build_one_center(libint2::Engine& engine, const libint2::BasisSet& obs);
 Tensor build_eri_tensor(libint2::Engine& engine, const libint2::BasisSet& obs);
 std::vector<double> build_eri_vector(libint2::Engine& engine, const libint2::BasisSet& obs);
 
