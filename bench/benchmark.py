@@ -48,13 +48,13 @@ def parse_output(text):
     return energy, nbf, phases, rss_mb, n_iter
 
 
-def run_once(xyz, basis, method, reference, mult, charge, maxiter, econv):
+def run_once(xyz, basis, method, reference, mult, charge, maxiter, econv, scheme):
     t0   = time.perf_counter()
     proc = subprocess.run(
         [BINARY, os.path.join(ROOT, xyz), basis,
          "--reference", reference, "--method", method,
          "--mult", str(mult), "--charge", str(charge),
-         "--max-iter", str(maxiter), "--econv", str(econv)],
+         "--max-iter", str(maxiter), "--econv", str(econv), "--eri-scheme", scheme],
         capture_output=True, text=True,
     )
     wall = time.perf_counter() - t0
@@ -145,6 +145,8 @@ def main():
     ap.add_argument("--tol", type=float, default=1e-6)
     ap.add_argument("--maxiter", type=int, default=200)
     ap.add_argument("--econv", type=float, default=1e-8)
+    ap.add_argument("--scheme", choices=["vector", "tensor"], default="vector",
+                    help="ERI storage scheme (default: vector)")
     args = ap.parse_args()
 
     with open(ROOT / "bench" / "systems.json") as fh:
@@ -194,7 +196,7 @@ def main():
                     system.get("reference", "rhf"),
                     system.get("mult", 1),
                     system.get("charge", 0),
-                    args.maxiter, args.econv)
+                    args.maxiter, args.econv, args.scheme)
                 if best is None or wall < best[0]:
                     best = (wall, energy, nbf, phases, n_iter)
                 if math.isnan(peak_rss) or rss_mb > peak_rss:

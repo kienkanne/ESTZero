@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions live in `README.md`.
 
+## [v1.5.0] Added option to build `eri_tensor`
+
+- ERI can now be directly built as a dense tensor instead of a compressed vector with smart canonical indexing that exploited the 8-fold symmetry to save memory. Both options are kept because while the tensor is much less memory efficient, it's more friendly for cache and dense matrix multiplications, which are future optimization targets. Due to the eri vector indexing look up every iteration, it's much less vectorizable and suffer from cache misses.
+- For post-SCF methods (MP2/CCSD), the dense ERI tensor is needed anyways, so using the tensor actually saves memory to avoid conversion of the vector to the tensor (see `README.md`)
+
 ## [v1.4.1]: Added unit tests for einsum
 
 - Added `tests/test_einsum.cc` covering `einsum` in isolation, on top of the existing golden/property coverage.
