@@ -98,7 +98,7 @@ public:
         return data->at(flat);
     }
 
-    Tensor swapaxes(size_t ax1, size_t ax2) {
+    Tensor swapaxes(size_t ax1, size_t ax2) const {
         auto new_shape = shape;
         auto new_strides = strides;
         std::swap(new_shape[ax1], new_shape[ax2]);
@@ -107,7 +107,7 @@ public:
     }
 
     template <typename... Slices>
-    Tensor slice(Slices... slices) {
+    Tensor slice(Slices... slices) const {
         if (sizeof...(slices) != ndim()) {
             throw std::invalid_argument("Number of slices must be equal to ndim");
         }

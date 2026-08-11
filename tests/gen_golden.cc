@@ -88,7 +88,9 @@ int main() {
             std::cout << "[gen_golden] " << sys.label << " (" << sys.reference << ")\n";
 
             WaveFunction wfn(repo + "/" + sys.xyz, sys.basis, sys.mult, sys.charge);
-            wfn.get_integrals();
+            // Golden data freezes the ERI vector path explicitly, regardless of
+            // WaveFunction's own default -- see get_eri_vector() below.
+            wfn.get_integrals("vector");
 
             const Matrix& S = wfn.get_S();
             const Matrix& T = wfn.get_T();

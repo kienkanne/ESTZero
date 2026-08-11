@@ -8,7 +8,7 @@ int main(int argc, char* argv[]) {
 
     std::string reference = "rhf";
     std::string method = "scf";
-    std::string eri_scheme_str = "vector";
+    std::string eri_scheme_str = "tensor";
     int mult = 1;
     int charge = 0;
     double econv = 1e-6;

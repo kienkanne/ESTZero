@@ -20,7 +20,7 @@ private:
     Matrix S, T, V;
     Tensor eri_tensor;
     std::vector<double> eri_vector;
-    ERIScheme eri_scheme_{ERIScheme::Vector};
+    ERIScheme eri_scheme_{ERIScheme::Tensor};
 
     void loader(const std::string xyz, const std::string basis,
                 const int mult, const int charge);
@@ -30,7 +30,7 @@ public:
         loader(xyz, basis, mult, charge);
     }
 
-    void get_integrals(std::string eri_scheme_str = "vector");
+    void get_integrals(std::string eri_scheme_str = "tensor");
     double get_Vnn();
     double get_energy(const std::string reference, const std::string method,
                       const double econv, const int max_iter, const int verbose);

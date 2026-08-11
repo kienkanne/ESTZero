@@ -145,8 +145,8 @@ def main():
     ap.add_argument("--tol", type=float, default=1e-6)
     ap.add_argument("--maxiter", type=int, default=200)
     ap.add_argument("--econv", type=float, default=1e-8)
-    ap.add_argument("--scheme", choices=["vector", "tensor"], default="vector",
-                    help="ERI storage scheme (default: vector)")
+    ap.add_argument("--scheme", choices=["vector", "tensor"], default="tensor",
+                    help="ERI storage scheme (default: tensor)")
     args = ap.parse_args()
 
     with open(ROOT / "bench" / "systems.json") as fh:

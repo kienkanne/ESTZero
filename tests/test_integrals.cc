@@ -43,13 +43,13 @@ TEST_CASE("integrals: T symmetric PSD, V symmetric") {
 // driven by WaveFunction::get_integrals) and compare to the frozen, oracle-
 // certified values. Runs for every golden system.
 
-TEST_CASE("integrals: S/T/V/ERI match golden") {
+TEST_CASE("integrals: S/T/V/ERI vector match golden") {
     for (const auto& sys : golden::golden_systems()) {
         CAPTURE(sys.label);
         golden::Golden g = golden::load_golden(sys.name);
 
         WaveFunction wfn(std::string(EST_REPO_ROOT) + "/" + sys.xyz, sys.basis, sys.mult, sys.charge);
-        wfn.get_integrals();
+        wfn.get_integrals("vector");
 
         CHECK(wfn.get_S().isApprox(g.mat("S"), 1e-12));
         CHECK(wfn.get_T().isApprox(g.mat("T"), 1e-12));
@@ -60,6 +60,59 @@ TEST_CASE("integrals: S/T/V/ERI match golden") {
         REQUIRE(eri.size() == eri_golden.size());
         for (size_t i = 0; i < eri.size(); ++i)
             CHECK(eri[i] == doctest::Approx(eri_golden[i]).epsilon(1e-12));
+    }
+}
+
+TEST_CASE("integrals: ERI tensor matches golden") {
+    // Same oracle-golden check as the vector ERI above, but for the tensor
+    // build path, unpacked through the canonical eri_index into the same
+    // frozen flat "eri" list -- independently ties build_eri_tensor to the
+    // Psi4-certified oracle, not just to build_eri_vector.
+    for (const auto& sys : golden::golden_systems()) {
+        CAPTURE(sys.label);
+        golden::Golden g = golden::load_golden(sys.name);
+
+        WaveFunction wfn(std::string(EST_REPO_ROOT) + "/" + sys.xyz, sys.basis, sys.mult, sys.charge);
+        wfn.get_integrals("tensor");
+
+        const Tensor& eri_tensor = wfn.get_eri();
+        const std::vector<double> eri_golden = g.list("eri");
+        const int nbf = g.nbf;
+
+        for (int i = 0; i < nbf; ++i)
+        for (int j = 0; j < nbf; ++j)
+        for (int k = 0; k < nbf; ++k)
+        for (int l = 0; l < nbf; ++l)
+            CHECK(eri_tensor(i, j, k, l) ==
+                  doctest::Approx(eri_golden[static_cast<size_t>(eri_index(i, j, k, l))]).epsilon(1e-12));
+    }
+}
+
+// ── ERI vector vs tensor equivalence ─────────────────────────────────────────
+// Oracle-free: the two in-core ERI representations (compact canonical-index
+// vector vs. dense nbf^4 tensor) must agree element-for-element on the same
+// molecule, independent of whichever is frozen as golden data.
+
+TEST_CASE("integrals: ERI tensor and ERI vector agree on the same molecule") {
+    for (const auto& sys : golden::golden_systems()) {
+        CAPTURE(sys.label);
+        const std::string xyz = std::string(EST_REPO_ROOT) + "/" + sys.xyz;
+
+        WaveFunction wfn_vec(xyz, sys.basis, sys.mult, sys.charge);
+        wfn_vec.get_integrals("vector");
+        const std::vector<double>& eri_vector = wfn_vec.get_eri_vector();
+
+        WaveFunction wfn_tensor(xyz, sys.basis, sys.mult, sys.charge);
+        wfn_tensor.get_integrals("tensor");
+        const Tensor& eri_tensor = wfn_tensor.get_eri();
+
+        const int nbf = wfn_tensor.get_S().rows();
+        for (int i = 0; i < nbf; ++i)
+        for (int j = 0; j < nbf; ++j)
+        for (int k = 0; k < nbf; ++k)
+        for (int l = 0; l < nbf; ++l)
+            CHECK(eri_tensor(i, j, k, l) ==
+                  doctest::Approx(eri_vector[static_cast<size_t>(eri_index(i, j, k, l))]));
     }
 }
 
