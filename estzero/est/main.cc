@@ -1,3 +1,4 @@
+#include "libint2/initialize.h"
 #include "wfn.h"
 #include "timer.h"
 
@@ -43,13 +44,16 @@ int main(int argc, char* argv[]) {
 
     try {
         timing::Scoped _t("Total time", true);
+        libint2::initialize();
+
         auto wfn = WaveFunction(xyz_file, basis, mult, charge);
         wfn.get_integrals(eri_scheme_str);
+        
         double E0;
-
         E0 = wfn.get_energy(reference, method, econv, max_iter, verbose);
-
         std::println("Final SCF energy: {:.8f}", E0);
+        
+        libint2::finalize();
 
     } catch (const std::exception& error) {
         std::println("SCF error: {}", error.what());

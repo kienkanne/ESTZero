@@ -4,6 +4,18 @@
 #include "timer.h"
 
 
+double get_rhf_MP2_E(const Tensor& I_mo, const Vector& eps, int n_occ, double E0) {
+    timing::Scoped _t("MP2 Energy Calculation");
+
+    const int nbf = eps.size();
+    const int n_virt = nbf - n_occ;
+
+    Tensor eps_occ = mat_to_tensor(eps.head(n_occ));
+    Tensor eps_virt = mat_to_tensor(eps.tail(n_virt));
+
+    return 0;
+}
+
 double calc_rhf_MP2_E(const Tensor& I_mo, const Vector& eps, int n_occ, double E0) {
     timing::Scoped _t("MP2 Energy Calculation");
 

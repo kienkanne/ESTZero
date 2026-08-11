@@ -38,7 +38,7 @@ std::string remove_spaces(const std::string& str) {
     return result;
 }
 
-ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::vector<TensorView>& operands) {
+ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::vector<Tensor>& operands) {
     std::string subscripts = remove_spaces(raw_subscripts);
 
     // Gate 1: Exactly one arrow check
@@ -157,7 +157,7 @@ void move_idx(
 }
 
 
-Tensor einsum(const std::string& subscripts, const std::vector<TensorView>& operands) {
+Tensor einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
     auto [terms, char_to_dim] = parse_subscripts(subscripts, operands);
 
     std::vector<int> result_shape;

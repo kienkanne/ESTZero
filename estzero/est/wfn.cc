@@ -7,7 +7,6 @@
 #include "wfn.h"
 #include "libint2/basis.h"
 #include "integrals.h"
-#include "libint2/initialize.h"
 #include "timer.h"
 #include "rhf.h"
 #include "uhf.h"
@@ -60,10 +59,10 @@ ERIScheme parse_eri_scheme(const std::string& s) {
 void WaveFunction::get_integrals(std::string eri_scheme_str) {
     this->eri_scheme_ = parse_eri_scheme(eri_scheme_str);
 
+    if (!libint2::initialized()) { libint2::initialize(); }
+
     auto& obs = this->obs;
     auto& atoms = this->atoms;
-
-    libint2::initialize();
 
     libint2::Engine overlap_engine(libint2::Operator::overlap, obs.max_nprim(), obs.max_l());
     libint2::Engine kinetic_engine(libint2::Operator::kinetic, obs.max_nprim(), obs.max_l());
@@ -92,7 +91,6 @@ void WaveFunction::get_integrals(std::string eri_scheme_str) {
         this->eri_vector = build_eri_vector(eri_engine, obs);
     }
 
-    libint2::finalize();
 }
 
 
