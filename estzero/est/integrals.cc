@@ -3,7 +3,7 @@
 #include <libint2.hpp>
 
 #include "integrals.h"
-#include "einsum.h"
+#include "tensor.h"
 
 Matrix build_one_center(libint2::Engine& engine, const libint2::BasisSet& obs) {
     Matrix mat (obs.nbf(), obs.nbf());

@@ -27,7 +27,7 @@
 #include <stdexcept>
 #include <cstdio>
 #include <Eigen/Dense>
-#include "einsum.h"
+#include "tensor.h"
 
 namespace golden {
 

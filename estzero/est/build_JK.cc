@@ -3,7 +3,7 @@
 #include <libint2.hpp>
 
 #include "build_JK.h"
-#include "einsum.h"
+#include "tensor.h"
 #include "integrals.h"
 
 

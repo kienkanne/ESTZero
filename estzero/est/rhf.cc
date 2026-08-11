@@ -7,7 +7,7 @@
 #include "rhf.h"
 #include "build_JK.h"
 #include "timer.h"
-#include "einsum.h"
+#include "tensor.h"
 
 
 template <typename ERI>

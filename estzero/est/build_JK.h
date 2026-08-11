@@ -4,7 +4,7 @@
 #include <integrals.h>
 #include <Eigen/Dense>
 #include <libint2.hpp>
-#include "einsum.h"
+#include "tensor.h"
 
 struct JK {Matrix J; Matrix K;};
 

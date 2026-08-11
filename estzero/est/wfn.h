@@ -5,7 +5,7 @@
 #include <vector>
 #include <Eigen/Dense>
 #include <libint2.hpp>
-#include <einsum.h>
+#include <tensor.h>
 #include "integrals.h"
 
 

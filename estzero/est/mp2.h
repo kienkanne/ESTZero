@@ -2,7 +2,7 @@
 #define MP2
 
 #include <Eigen/Dense>
-#include "einsum.h"
+#include "tensor.h"
 
 
 double calc_rhf_MP2_E(const Tensor& I_mo, const Vector& eps, int n_occ, double E0);

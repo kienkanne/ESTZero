@@ -11,6 +11,7 @@ add_executable(est_tests
     test_integrals.cc
     test_wfn.cc
     test_timer.cc
+    test_tensor.cc
     test_einsum.cc
 )
 

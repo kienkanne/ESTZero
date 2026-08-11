@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <Eigen/Dense>
-#include "einsum.h"
+#include "tensor.h"
 
 
 struct SpinMO {

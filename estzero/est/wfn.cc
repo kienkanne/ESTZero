@@ -10,7 +10,7 @@
 #include "timer.h"
 #include "rhf.h"
 #include "uhf.h"
-#include "einsum.h"
+#include "tensor.h"
 #include "mp2.h"
 #include "transmo.h"
 #include "utils.h"

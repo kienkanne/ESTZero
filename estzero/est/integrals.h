@@ -4,7 +4,7 @@
 #include <vector>
 #include <Eigen/Dense>
 #include <libint2.hpp>
-#include "einsum.h"
+#include "tensor.h"
 
 inline int pair_index(int i, int j) { return i >= j ? i*(i+1)/2 + j : j*(j+1)/2 + i; }
 inline int eri_index(int i, int j, int k, int l) { return pair_index(pair_index(i,j), pair_index(k,l)); }

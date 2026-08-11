@@ -3,7 +3,7 @@
 
 #include <Eigen/Dense>
 #include <libint2.hpp>
-#include <einsum.h>
+#include <tensor.h>
 
 struct Result {
     double E0;

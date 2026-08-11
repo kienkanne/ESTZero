@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions live in `README.md`.
 
+## [v1.5.2] `Tensor` now uses `std::shared_ptr` for underlying data
+
+- `std::shared_ptr` allows for methods involving zero-copy views like slicing or swap axes (added in this patch). This is another preparation for the tensor manipulations in CCSD.
+- `TensorView` is no longer needed because the the shared pointer is copied into the temporary vector, not the entire data vector in the original bug.
+- Separated `tensor.h` from `einsum.h` for consistency.
+
 ## [v1.5.1] Readded build `Iab` directly from intermediate 2 of `Iaa`
 
 - When `einsum` was introduced in `v1.3.0`, it built `Iab` explictly from `eri_tensor` unlike the previous scheme, affecting UHF MP2 performance substantially. It is recovered here, and performance increased.

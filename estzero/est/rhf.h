@@ -3,7 +3,7 @@
 
 #include <Eigen/Dense>
 #include <utils.h>
-#include <einsum.h>
+#include <tensor.h>
 
 
 template <typename ERI>
