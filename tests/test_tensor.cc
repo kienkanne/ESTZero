@@ -239,3 +239,216 @@ TEST_CASE("Tensor: flat_index on a swapaxes view walks the shared buffer, not th
     for (size_t k = 0; k < 6; ++k)
         CHECK(t.flat_index(k) == doctest::Approx(m.flat_index(k)));
 }
+
+// ── arithmetic ───────────────────────────────────────────────────────────────
+
+TEST_CASE("Tensor: addition works for owning tensors") {
+    Tensor a({2, 3}, {1, 2, 3, 4, 5, 6});
+    Tensor b({2, 3}, {6, 5, 4, 3, 2, 1});
+
+    Tensor sum = a + b;
+    check_tensor(sum, {2, 3}, {7, 7, 7, 7, 7, 7});
+    CHECK(sum.strides == std::vector<int>{3, 1});
+}
+
+TEST_CASE("Tensor: addition follows slice strides and offsets") {
+    Tensor a({2, 6}, {1, 2, 3, 4, 5, 6,
+                       7, 8, 9, 10, 11, 12});
+    Tensor b({2, 6}, {12, 11, 10, 9, 8, 7,
+                       6, 5, 4, 3, 2, 1});
+
+    Tensor sum = a.slice(Sli{0, 2, 1}, Sli{1, 6, 2})
+               + b.slice(Sli{0, 2, 1}, Sli{1, 6, 2});
+    check_tensor(sum, {2, 3}, {13, 13, 13, 13, 13, 13});
+}
+
+TEST_CASE("Tensor: addition follows swapped-axis view order") {
+    Tensor a({2, 3}, {1, 2, 3, 4, 5, 6});
+    Tensor b({2, 3}, {10, 20, 30, 40, 50, 60});
+
+    Tensor sum = a.swapaxes(0, 1) + b.swapaxes(0, 1);
+    check_tensor(sum, {3, 2}, {11, 44, 22, 55, 33, 66});
+}
+
+TEST_CASE("Tensor: addition rejects mismatched shapes") {
+    Tensor a({2, 3});
+    Tensor b({3, 2});
+    CHECK_THROWS_AS((void)(a + b), std::invalid_argument);
+}
+
+TEST_CASE("Tensor: addition works when only one operand is a view") {
+    // "a" is a plain contiguous tensor; view_b is a non-contiguous strided
+    // slice of a larger tensor with the same {2,3} logical shape -- forces
+    // _match_check's fast path off even though one side IS contiguous.
+    Tensor a({2, 3}, {1, 2, 3, 4, 5, 6});
+    Tensor big({2, 6}, {10, 20, 30, 40, 50, 60,
+                        70, 80, 90, 100, 110, 120});
+    Tensor view_b = big.slice(Sli{0, 2, 1}, Sli{0, 6, 2}); // columns 0,2,4: {10,30,50 / 70,90,110}
+
+    Tensor sum = a + view_b;
+    check_tensor(sum, {2, 3}, {11, 32, 53, 74, 95, 116});
+}
+
+TEST_CASE("Tensor: addition works at rank 4") {
+    // The shape CCSD intermediates actually need -- the odometer/strides
+    // machinery is rank-agnostic, but every prior arithmetic test was rank 2.
+    Tensor a({2, 2, 2, 2}, {
+        1, 2, 3, 4,     5, 6, 7, 8,
+        9, 10, 11, 12,  13, 14, 15, 16
+    });
+    Tensor b({2, 2, 2, 2}, {
+        16, 15, 14, 13,  12, 11, 10, 9,
+        8, 7, 6, 5,      4, 3, 2, 1
+    });
+    check_tensor(a + b, {2, 2, 2, 2}, std::vector<double>(16, 17.0));
+}
+
+TEST_CASE("Tensor: subtraction works for owning tensors") {
+    Tensor a({2, 3}, {7, 8, 9, 10, 11, 12});
+    Tensor b({2, 3}, {1, 2, 3, 4, 5, 6});
+
+    check_tensor(a - b, {2, 3}, {6, 6, 6, 6, 6, 6});
+}
+
+TEST_CASE("Tensor: subtraction follows view strides") {
+    Tensor a({2, 6}, {12, 11, 10, 9, 8, 7,
+                       6, 5, 4, 3, 2, 1});
+    Tensor b({2, 6}, {1, 2, 3, 4, 5, 6,
+                       7, 8, 9, 10, 11, 12});
+
+    Tensor difference = a.slice(Sli{0, 2, 1}, Sli{1, 6, 2})
+                      - b.slice(Sli{0, 2, 1}, Sli{1, 6, 2});
+    check_tensor(difference, {2, 3}, {9, 5, 1, -3, -7, -11});
+}
+
+TEST_CASE("Tensor: subtraction rejects mismatched shapes") {
+    Tensor a({2, 3});
+    Tensor b({3, 2});
+    CHECK_THROWS_AS((void)(a - b), std::invalid_argument);
+}
+
+TEST_CASE("Tensor: compound addition updates the left tensor") {
+    Tensor a({2, 2}, {1, 2, 3, 4});
+    Tensor b({2, 2}, {5, 6, 7, 8});
+
+    Tensor& result = (a += b);
+    CHECK(&result == &a);
+    check_tensor(a, {2, 2}, {6, 8, 10, 12});
+}
+
+TEST_CASE("Tensor: compound addition through a view mutates the source") {
+    // The mirror of the subtraction case below: += taking the general
+    // (non-contiguous) path, rather than +='s fast path above.
+    Tensor a({2, 3}, {10, 20, 30, 40, 50, 60});
+    Tensor b({3, 2}, {1, 2, 3, 4, 5, 6});
+    Tensor view = a.swapaxes(0, 1);
+
+    view += b;
+    check_tensor(a, {2, 3}, {11, 23, 35, 42, 54, 66});
+}
+
+TEST_CASE("Tensor: compound subtraction updates the left tensor (fast path)") {
+    // The mirror of the view case above: -= taking the fast (contiguous)
+    // path, rather than -='s general path below.
+    Tensor a({2, 2}, {10, 20, 30, 40});
+    Tensor b({2, 2}, {1, 2, 3, 4});
+
+    Tensor& result = (a -= b);
+    CHECK(&result == &a);
+    check_tensor(a, {2, 2}, {9, 18, 27, 36});
+}
+
+TEST_CASE("Tensor: compound subtraction updates a view in logical order") {
+    Tensor a({2, 3}, {10, 20, 30, 40, 50, 60});
+    Tensor b({3, 2}, {1, 2, 3, 4, 5, 6});
+    Tensor view = a.swapaxes(0, 1);
+
+    view -= b;
+    check_tensor(a, {2, 3}, {9, 17, 25, 38, 46, 54});
+}
+
+TEST_CASE("Tensor: compound addition rejects mismatched shapes") {
+    Tensor a({2, 3});
+    Tensor b({3, 2});
+    CHECK_THROWS_AS(a += b, std::invalid_argument);
+}
+
+TEST_CASE("Tensor: compound subtraction rejects mismatched shapes") {
+    Tensor a({2, 3});
+    Tensor b({3, 2});
+    CHECK_THROWS_AS(a -= b, std::invalid_argument);
+}
+
+TEST_CASE("Tensor: scalar multiplication works in both operand orders") {
+    Tensor a({2, 3}, {1, 2, 3, 4, 5, 6});
+
+    check_tensor(a * 2.5, {2, 3}, {2.5, 5, 7.5, 10, 12.5, 15});
+    check_tensor(2.5 * a, {2, 3}, {2.5, 5, 7.5, 10, 12.5, 15});
+}
+
+TEST_CASE("Tensor: scalar multiplication follows view strides") {
+    Tensor a({2, 6}, {1, 2, 3, 4, 5, 6,
+                       7, 8, 9, 10, 11, 12});
+    Tensor scaled = a.slice(Sli{0, 2, 1}, Sli{1, 6, 2}) * -2.0;
+
+    check_tensor(scaled, {2, 3}, {-4, -8, -12, -16, -20, -24});
+}
+
+TEST_CASE("Tensor: compound scalar multiplication updates the tensor in place") {
+    Tensor a({2, 2}, {1, 2, 3, 4});
+
+    Tensor& result = (a *= 2.0);
+    CHECK(&result == &a);
+    check_tensor(a, {2, 2}, {2, 4, 6, 8});
+}
+
+TEST_CASE("Tensor: compound scalar multiplication through a view mutates the source") {
+    Tensor a({2, 3}, {1, 2, 3, 4, 5, 6});
+    Tensor view = a.swapaxes(0, 1);
+
+    view *= 10.0;
+    check_tensor(a, {2, 3}, {10, 20, 30, 40, 50, 60});
+}
+
+TEST_CASE("Tensor: compound scalar multiplication respects a slice's offset and stride") {
+    Tensor v({6}, {1, 2, 3, 4, 5, 6});
+    Tensor s = v.slice(Sli{1, 6, 2}); // view onto elements at flat 1,3,5: {2,4,6}
+
+    s *= 100.0;
+    check_tensor(v, {6}, {1, 200, 3, 400, 5, 600});
+}
+
+// ── copy: materializing a view into an independent, contiguous tensor ───────
+
+TEST_CASE("Tensor: copy materializes a swapaxes view into a contiguous tensor") {
+    Tensor m({2, 3}, {1, 2, 3, 4, 5, 6});
+    Tensor view = m.swapaxes(0, 1);
+    Tensor c = view.copy();
+
+    check_tensor(c, {3, 2}, {1, 4, 2, 5, 3, 6});
+    CHECK(c.strides == std::vector<int>{2, 1}); // now naturally contiguous
+}
+
+TEST_CASE("Tensor: copy of a strided slice is contiguous and independent") {
+    Tensor v({6}, {0, 1, 2, 3, 4, 5});
+    Tensor s = v.slice(Sli{0, 6, 2}); // view onto {0, 2, 4}
+    Tensor c = s.copy();
+
+    check_tensor(c, {3}, {0, 2, 4});
+    CHECK(c.strides == std::vector<int>{1});
+
+    c(0) = -1.0;
+    CHECK(v(0) == doctest::Approx(0.0)); // source untouched
+}
+
+TEST_CASE("Tensor: copy is independent of its source (unlike copy-construction)") {
+    // Contrasts directly with "copying a Tensor aliases the same storage"
+    // above: Tensor's copy CONSTRUCTOR aliases, but the copy() METHOD does
+    // not -- that's the whole reason it exists (mirrors NumPy's own
+    // F[v,v].copy() idiom for escaping a view before further in-place work).
+    Tensor a({2, 2}, {1, 2, 3, 4});
+    Tensor b = a.copy();
+
+    b(0, 0) = 999.0;
+    CHECK(a(0, 0) == doctest::Approx(1.0));
+}

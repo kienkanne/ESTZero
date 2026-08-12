@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 #include "einsum.h"
+#include "odometer.h"
 
 struct ParsedSubscripts {
     std::vector<std::string> terms_strings;
@@ -119,42 +120,6 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
     }
 
     return {terms_strings, char_to_dim, char_to_col};
-}
-
-
-// Advances `global_indices` to the next combination of the einsum's distinct index letters 
-// The last label is the fastest-moving, which is cache-friendly with Tensor's "row-major"
-// format, where the last label sweeps the fastest.
-//
-// The odometer also moves the flat indices of all terms based on their strides. The strides
-// here are built from the Tensor's strides, and is 0 for a label that a term doesn't have.
-//
-// This odometer logic makes it that you don't have to recompute the flat index from strides
-// every iteration, and the complexity is O(1)
-void odometer(
-    std::vector<int>& global_indices,
-    std::vector<int>& terms_flats,
-    const std::vector<int>& dim_sizes,
-    const std::vector<std::vector<int>>& terms_strides) {
-
-    for (int label = static_cast<int>(global_indices.size()) - 1; label >= 0; --label) {
-        if (global_indices[label] < dim_sizes[label] - 1) {
-            ++global_indices[label];
-
-            for (size_t term_idx = 0;
-                 term_idx < terms_flats.size();
-                 ++term_idx) {
-                terms_flats[term_idx] += terms_strides[term_idx][label];
-            }
-            return;
-        }
-
-        global_indices[label] = 0;
-
-        for (size_t term_idx = 0; term_idx < terms_flats.size(); ++term_idx) {
-            terms_flats[term_idx] -= terms_strides[term_idx][label] * (dim_sizes[label] - 1);
-        }
-    }
 }
 
 

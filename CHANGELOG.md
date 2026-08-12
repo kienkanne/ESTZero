@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v1.5.5] Added arithmetic operators for `Tensor`, generalize `odometer`
+
+- Basic arithmetic binary/unary operators (+/-/\*\) (assignment included: +=/-=/\*\=) are added for `Tensor`. These operations all have two paths, one being the fast path that walks directly along the flat index if the operands are contiguous (strides matching default). The general path is used for views with modified strides.
+- The `odometer`, which was previously implemented as a helper for `einsum`, is moved to a separate header because of its generality. It's now used extensively by `Tensor` for the general path operations to compute the correct flat index cheaply with its O(1) complexity.
+- None of the current source code uses these operations yet, again this is prepration for CCSD equations. No performance update in `README.md` nor `bench/outputs`.
+
 ## [v1.5.4] Fixed `einsum` for operating on modified views of `Tensor`
 
 - `einsum` computed the strides for the operands on its own without caring about the `strides` attribute of each, which is added in the previous patch. This did not cause any issue as every `Tensor` in the main source code is freshly created and no `Tensor::swapaxes` or `Tensor::slice` views were used, so `strides` remained the default. Only adding specific tests show this, and this is important for CCSD later on where `Tensor` views are passed around a lot.

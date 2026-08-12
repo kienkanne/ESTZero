@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <Eigen/Dense>
+#include "odometer.h"
 
 // A plain row-major dense array. Previously Eigen's Tensor was only used to
 // hold data, so this reimplements just enough shape/indexing/slicing to feed
@@ -33,9 +34,130 @@ class Tensor {
     Tensor(std::shared_ptr<std::vector<double>> d, std::vector<int> sh, std::vector<int> st, size_t off)
         : data(d), shape(sh), strides(st), offset(off) {}
 
+    // == ARITHMETIC HELPERS ================================================================
+
+    // Private shape and stride checking method for arithmetic operators.
+    bool _match_check(const Tensor& other) const {
+        if (shape != other.shape) {
+            throw std::invalid_argument(
+                "Two tensors must have matching shape for arithmetic operators.");
+        }
+        return _is_contiguous() && other._is_contiguous();
+    }
+
+    // A view is contiguous only when its strides match row-major strides.
+    bool _is_contiguous() const {
+        size_t expected_stride = 1;
+        for (int axis = static_cast<int>(shape.size()) - 1; axis >= 0; --axis) {
+            if (strides[axis] != expected_stride) {
+                return false;
+            }
+            expected_stride *= static_cast<size_t>(shape[axis]);
+        }
+        return true;
+    }
+
+    // If a view is contigiuous, a fast path is used that walks directly along the flat index
+    // Otherwise, the odometer is used to correctly account for the modified strides
+    template <typename Operation>
+    Tensor _binary_op(const Tensor& other, Operation operation) const {
+        bool fast = _match_check(other);
+        std::vector<double> values(this->size());
+
+        if (fast) {
+            for (int i = 0; i != this->size(); ++i) {
+                values[i] = operation(this->flat_index(i), other.flat_index(i));
+            }
+        } else {
+            std::vector<int> result_indices(this->shape.size(), 0);
+            std::vector<int> term_flats {0,0}; //this_flat, term_flat
+
+            for (int flat = 0; flat != this->size(); ++flat) {
+                values[flat] = operation(
+                    this->flat_index(term_flats[0]), other.flat_index(term_flats[1]));
+
+                odometer(result_indices, term_flats, shape, {this->strides, other.strides});
+            }
+        }
+        return Tensor(shape, values);
+    }
+
+    // Same fast/general split as _binary_op, but for binary assignments
+    template <typename Operation>
+    Tensor& _binary_assign_op(const Tensor& other, Operation operation) {
+        bool fast = _match_check(other);
+
+        if (fast) {
+            for (int i = 0; i != this->size(); ++i) {
+                this->flat_index(i) = operation(
+                    this->flat_index(i), other.flat_index(i));
+            }
+        } else {
+            std::vector<int> result_indices(this->shape.size(), 0);
+            std::vector<int> term_flats {0, 0}; // this_flat, other_flat
+
+            for (int flat = 0; flat != this->size(); ++flat) {
+                this->flat_index(term_flats[0]) = operation(
+                    this->flat_index(term_flats[0]), other.flat_index(term_flats[1]));
+                odometer(result_indices, term_flats, shape, {this->strides, other.strides});
+            }
+        }
+        return *this;
+    }
+
+    // Same fast/general split as _binary_op, but for a single tensor
+    template <typename Operation>
+    Tensor _unary_op(Operation operation) const {
+        std::vector<double> values(this->size());
+
+        if (_is_contiguous()) {
+            for (int i = 0; i != this->size(); ++i) {
+                values[i] = operation(this->flat_index(i));
+            }
+        } else {
+            std::vector<int> indices(this->shape.size(), 0);
+            std::vector<int> this_flat = {0};
+
+            for (int flat = 0; flat != this->size(); ++flat) {
+                values[flat] = operation(this->flat_index(this_flat[0]));
+                odometer(indices, this_flat, shape, {this->strides});
+            }
+        }
+        return Tensor(shape, values);
+    }
+
+    template <typename Operation>
+    Tensor& _unary_assign_op(Operation operation) {
+        if (_is_contiguous()) {
+            for (int i = 0; i != this->size(); ++i) {
+                this->flat_index(i) = operation(this->flat_index(i));
+            }
+        } else {
+            std::vector<int> indices(this->shape.size(), 0);
+            std::vector<int> this_flat = {0};
+
+            for (int flat = 0; flat != this->size(); ++flat) {
+                this->flat_index(this_flat[0]) = operation(this->flat_index(this_flat[0]));
+                odometer(indices, this_flat, shape, {this->strides});
+            }
+        }
+        return *this;
+    }
+
 public:
     std::vector<int> shape;
     std::vector<int> strides;
+
+    void fill(double value) { std::fill(data->begin(), data->end(), value); }
+    void clear() { data->clear(); data->shrink_to_fit(); }
+    int ndim() const { return static_cast<int>(shape.size()); }
+    int size() const { 
+        int size = 1; 
+        for (const int& dim : shape) size *= dim; 
+        return size;
+    }
+
+    // == CONSTRUCTORS =======================================================================
 
     Tensor() = default;
 
@@ -61,9 +183,7 @@ public:
         data = std::make_shared<std::vector<double>>(values);
     }
 
-    void fill(double value) { std::fill(data->begin(), data->end(), value); }
-    void clear() { data->clear(); data->shrink_to_fit(); }
-    int ndim() const { return static_cast<int>(shape.size()); }
+    // == ELEMENT ACCESS ==================================================================
 
     // WARNING: Be careful when using on a strided slice or an axis-permuting swapaxes
     // views walk the buffer in a different order than operator() would, because the 
@@ -97,6 +217,8 @@ public:
         }
         return (*data)[flat];
     }
+
+    // == VIEW & COPY METHODS =============================================================
 
     Tensor swapaxes(size_t ax1, size_t ax2) const {
         auto new_shape = shape;
@@ -138,9 +260,67 @@ public:
         return Tensor(data, new_shape, new_strides, new_offset);
     }
 
+    Tensor copy() const {
+        return _unary_op([](double v) { return v; });
+    }
+
+    // == ARITHMETIC OPERATIONS =============================================================
+
+    Tensor operator+(const Tensor& other) const {
+        return _binary_op(other, [](double lhs, double rhs) { return lhs + rhs; });
+    }
+
+    Tensor operator-(const Tensor& other) const {
+        return _binary_op(other, [](double lhs, double rhs) { return lhs - rhs; });
+    }
+
+    Tensor& operator+=(const Tensor& other) {
+        return _binary_assign_op(other, [](double lhs, double rhs) { return lhs + rhs; });
+    }
+
+    Tensor& operator-=(const Tensor& other) {
+        return _binary_assign_op(other, [](double lhs, double rhs) { return lhs - rhs; });
+    }
+
+    Tensor operator*(double scalar) const {
+        return _unary_op([scalar](double v) { return v * scalar; });
+    }
+
+    friend Tensor operator*(double scalar, const Tensor& tensor) {
+        return tensor * scalar;
+    }
+
+    Tensor& operator*=(double scalar) {
+        return _unary_assign_op([scalar](double v) { return v * scalar; });
+    }
+
+    Tensor operator/(double scalar) const {
+        return _unary_op([scalar](double v) { return v / scalar; });
+    }
+
+    friend Tensor operator/(double scalar, const Tensor& tensor) {
+        return scalar / tensor;
+    }
+
+    Tensor& operator/=(double scalar) {
+        return _unary_assign_op([scalar](double v) { return v / scalar; });
+    }
+
     // LEGACY: Access raw data pointer, used by TensorView
     const double* data_ptr() const { return data->data(); }
 };
+
+
+// Copy a row-major Eigen Matrix into an owning row-major Tensor.
+inline Tensor mat_to_tensor(const Matrix& M) {
+    const int rows = static_cast<int>(M.rows());
+    const int cols = static_cast<int>(M.cols());
+
+    return Tensor({rows, cols},
+        std::vector<double>(M.data(), M.data() + rows * cols));
+}
+
+
 
 // LEGACY: TensorView was introduced as a reference wrapper in v1.3.1 to fix
 // `einsum` memory bug. In v1.6.0, `Tensor` now uses a std::shared_ptr pointing
@@ -173,14 +353,5 @@ public:
         return data_ptr[flat];
     }
 };
-
-// Copy a row-major Eigen Matrix into an owning row-major Tensor.
-inline Tensor mat_to_tensor(const Matrix& M) {
-    const int rows = static_cast<int>(M.rows());
-    const int cols = static_cast<int>(M.cols());
-
-    return Tensor({rows, cols},
-        std::vector<double>(M.data(), M.data() + rows * cols));
-}
 
 #endif
