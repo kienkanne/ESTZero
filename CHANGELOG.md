@@ -2,11 +2,17 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v1.5.5a] Wired in `einsum` for MP2 energy evaluation
+
+- The only algorithm in the source code that can utilize the new `Tensor` operators and view methods is the MP2 energy evaluation, and this mini-patch is testing this new feature on live code. This is a cheapest possible place to test out a primitive CCSD needs anyways, because this step takes very little time (few ms), so overall wall time won't be hit as much.
+- As expected, the unoptimized einsum heavily hits this step: 215.5ms vs 5.3ms (v1.5.5) for benzene/def2-svp. This ~40x slow down is mainly because the current `einsum` implementation doesn't have pairwise evaluation, so the triple contractions in MP2 energy is evaluated simultaneously (i.e. `iajb,iajb,iajb->`)
+- The old version written explicitly in loops is kept for reference with the tag `_old`.
+
 ## [v1.5.5] Added arithmetic operators for `Tensor`, generalize `odometer`
 
 - Basic arithmetic binary/unary operators (+/-/\*\) (assignment included: +=/-=/\*\=) are added for `Tensor`. These operations all have two paths, one being the fast path that walks directly along the flat index if the operands are contiguous (strides matching default). The general path is used for views with modified strides.
 - The `odometer`, which was previously implemented as a helper for `einsum`, is moved to a separate header because of its generality. It's now used extensively by `Tensor` for the general path operations to compute the correct flat index cheaply with its O(1) complexity.
-- None of the current source code uses these operations yet, again this is prepration for CCSD equations. No performance update in `README.md` nor `bench/outputs`.
+- None of the current source code uses these operations yet, again this is prepration for CCSD equations. Performance is similar to `v1.5.3`, so no update in `README.md`
 
 ## [v1.5.4] Fixed `einsum` for operating on modified views of `Tensor`
 

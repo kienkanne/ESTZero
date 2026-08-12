@@ -25,6 +25,15 @@ struct Sli {
     int step = 1;
 };
 
+// For power operator
+inline auto power = [](double base, int exp) {
+        double result = 1;
+        for (int i = 0; i < exp; ++i) {
+            result *= base;
+        }
+        return result;
+    };
+
 // Row-major storage: the last axis has stride one, sweeps fastest.
 class Tensor {
     std::shared_ptr<std::vector<double>> data;
@@ -304,6 +313,14 @@ public:
 
     Tensor& operator/=(double scalar) {
         return _unary_assign_op([scalar](double v) { return v / scalar; });
+    }
+
+    Tensor operator*(const Tensor& other) const {
+        return _binary_op(other, [](double lhs, double rhs) { return lhs * rhs; });
+    }
+
+    Tensor operator^(int exp) const {
+        return _unary_op([exp](double v) { return power(v, exp); });
     }
 
     // LEGACY: Access raw data pointer, used by TensorView
