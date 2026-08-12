@@ -68,8 +68,8 @@ public:
     // WARNING: Be careful when using on a strided slice or an axis-permuting swapaxes
     // views walk the buffer in a different order than operator() would, because the 
     // flat index of underlying contiguous data is still the original
-    double flat_index(size_t index) const { return data->at(offset + index); }
-    double& flat_index(size_t index) { return data->at(offset + index); }
+    double flat_index(size_t index) const { return (*data)[offset + index]; }
+    double& flat_index(size_t index) { return (*data)[offset + index]; }
 
     // The number of indices must match ndim()
     template <typename... Idx>
@@ -82,7 +82,7 @@ public:
         for (size_t i = 0; i < ndim(); ++i) {
             flat += ind[i] * strides[i];
         }
-        return data->at(flat);
+        return (*data)[flat];
     }
 
     template <typename... Idx>
@@ -95,7 +95,7 @@ public:
         for (size_t i = 0; i < ndim(); ++i) {
             flat += ind[i] * strides[i];
         }
-        return data->at(flat);
+        return (*data)[flat];
     }
 
     Tensor swapaxes(size_t ax1, size_t ax2) const {

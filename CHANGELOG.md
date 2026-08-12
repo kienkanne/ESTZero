@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions live in `README.md`.
 
+## [v1.5.3] Removed bounds-checked `.at()` from `Tensor` indexing
+
+- `Tensor::operator()` and `flat_index` used `std::vector::at()` for every element access after the `v1.5.2` shared_ptr rewrite, adding a bounds-check branch and stride loop to every read/write, including inside the ERI tensor build, `build_JK`, and the `einsum` MO transform. Every call site already satisfies in-bounds indices, so `.at()` is replaced with unchecked `operator[]`.
+- Restores MP2 (MO transform) to `v1.5.1` performance and further speeds up ERI tensor build and `build_JK` (see `README.md`).
+
 ## [v1.5.2] `Tensor` now uses `std::shared_ptr` for underlying data
 
 - `std::shared_ptr` allows for methods involving zero-copy views like slicing or swap axes (added in this patch). This is another preparation for the tensor manipulations in CCSD.
