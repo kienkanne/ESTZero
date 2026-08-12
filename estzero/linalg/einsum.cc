@@ -8,16 +8,10 @@
 
 #include "einsum.h"
 
-struct CharInfo {
-    // Maps char to column index, this is crucial for building
-    // the offset table (see below) for the einsum operation
-    size_t col; 
-    int dim_size;
-};
-
 struct ParsedSubscripts {
-    std::vector<std::string> terms;
-    std::unordered_map<char, CharInfo> char_to_dim;
+    std::vector<std::string> terms_strings;
+    std::unordered_map<char, int> char_to_dim;
+    std::unordered_map<char, int> char_to_col;
 };
 
 // Helper function to split a string by a delimiter
@@ -55,25 +49,25 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
         throw std::invalid_argument("Subscripts contain empty terms: " + raw_subscripts);
     }
 
-    std::vector<std::string> terms = split(lhs, ',');
-    for (const auto& term : terms) {
+    std::vector<std::string> terms_strings = split(lhs, ',');
+    for (const auto& term : terms_strings) {
         if (term.empty()) {
             throw std::invalid_argument("Subscripts contain empty terms: " + raw_subscripts);
         }
     }
     // The last term is the rhs
-    terms.push_back(rhs);
+    terms_strings.push_back(rhs);
 
     // Gate 3: Operand count match check
-    if (terms.size()-1 != operands.size()) {
+    if (terms_strings.size()-1 != operands.size()) {
         throw std::invalid_argument("Provided " + std::to_string(operands.size()) + 
-                                    " operands, but subscript expects " + std::to_string(terms.size()-1) + " terms.");
+                                    " operands, but subscript expects " + std::to_string(terms_strings.size()-1) + " terms.");
     }
 
     // Gate 4: Output index validation (RHS indices must be a subset of LHS)
     std::unordered_set<char> lhs_chars;
-    for (size_t term_index = 0; term_index < terms.size() - 1; ++term_index) {
-        const auto& term = terms[term_index];
+    for (size_t term_index = 0; term_index < terms_strings.size() - 1; ++term_index) {
+        const auto& term = terms_strings[term_index];
         for (char c : term) lhs_chars.insert(c);
     }
 
@@ -92,134 +86,139 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
     }
 
     // Gate 5: Operand dimensionality match check
-    for (size_t i = 0; i < terms.size()-1; ++i) {
-        if (operands[i].ndim() != static_cast<int>(terms[i].length())) {
+    for (size_t i = 0; i < terms_strings.size()-1; ++i) {
+        if (operands[i].ndim() != static_cast<int>(terms_strings[i].length())) {
             throw std::invalid_argument("Operand " + std::to_string(i) + " has " + 
                                         std::to_string(operands[i].ndim()) + " dimensions, but subscript '" + 
-                                        terms[i] + "' expects " + std::to_string(terms[i].length()) + ".");
+                                        terms_strings[i] + "' expects " + std::to_string(terms_strings[i].length()) + ".");
         }
     }
 
     // Gate 6: Dimension size consistency across shared letters
     // Map from character to its corresponding dimension size
-    std::unordered_map<char, CharInfo> char_to_dim;
+    std::unordered_map<char, int> char_to_dim;
+    std::unordered_map<char, int> char_to_col;
     size_t next_col = 0;
-    for (size_t i = 0; i < terms.size()-1; ++i) {
-        const auto& term = terms[i];
+    for (size_t i = 0; i < terms_strings.size()-1; ++i) {
+        const auto& term = terms_strings[i];
         const auto& shape = operands[i].shape;
         for (size_t a = 0; a < term.length(); ++a) {
             char c = term[a];
             int size = shape[a];
             if (char_to_dim.count(c)) {
-                if (char_to_dim[c].dim_size != size) {
+                if (char_to_dim[c] != size) {
                     throw std::invalid_argument(std::string("Dimension mismatch for index '") + c + 
-                                                "': expected size " + std::to_string(char_to_dim[c].dim_size) + 
+                                                "': expected size " + std::to_string(char_to_dim[c]) + 
                                                 ", but got " + std::to_string(size) + ".");
                 }
             } else {
-                char_to_dim[c] = CharInfo{next_col++, size};
+                char_to_dim[c] = size;
+                char_to_col[c] = next_col++;
             }
         }
     }
 
-    return {terms, char_to_dim};
+    return {terms_strings, char_to_dim, char_to_col};
 }
 
 
-// Helper function to increment multi-dimensional indices and update offsets
-void move_idx(
-    std::vector<int>& indices,
-    const std::vector<int>& dimensions,
-    size_t& result_offset,
-    const std::vector<size_t>& result_strides,
-    std::vector<size_t>& operand_offsets,
-    const std::vector<std::vector<size_t>>& operand_strides) {
+// Advances `global_indices` to the next combination of the einsum's distinct index letters 
+// The last label is the fastest-moving, which is cache-friendly with Tensor's "row-major"
+// format, where the last label sweeps the fastest.
+//
+// The odometer also moves the flat indices of all terms based on their strides. The strides
+// here are built from the Tensor's strides, and is 0 for a label that a term doesn't have.
+//
+// This odometer logic makes it that you don't have to recompute the flat index from strides
+// every iteration, and the complexity is O(1)
+void odometer(
+    std::vector<int>& global_indices,
+    std::vector<int>& terms_flats,
+    const std::vector<int>& dim_sizes,
+    const std::vector<std::vector<int>>& terms_strides) {
 
-    for (int i = static_cast<int>(indices.size()) - 1; i >= 0; --i) {
-        if (indices[i] < dimensions[i]-1) {
-            indices[i]++;
+    for (int label = static_cast<int>(global_indices.size()) - 1; label >= 0; --label) {
+        if (global_indices[label] < dim_sizes[label] - 1) {
+            ++global_indices[label];
 
-            result_offset += result_strides[i];
-            for (size_t a = 0; a < operand_offsets.size(); ++a) {
-                operand_offsets[a] += operand_strides[a][i];
+            for (size_t term_idx = 0;
+                 term_idx < terms_flats.size();
+                 ++term_idx) {
+                terms_flats[term_idx] += terms_strides[term_idx][label];
             }
             return;
+        }
 
-        } else {
-            indices[i] = 0;
-            
-            result_offset -= static_cast<size_t>(dimensions[i] - 1) * result_strides[i];
-            for (size_t a = 0; a < operand_offsets.size(); ++a) {
-                operand_offsets[a] -= static_cast<size_t>(dimensions[i] - 1) * operand_strides[a][i];
-            }
+        global_indices[label] = 0;
+
+        for (size_t term_idx = 0; term_idx < terms_flats.size(); ++term_idx) {
+            terms_flats[term_idx] -= terms_strides[term_idx][label] * (dim_sizes[label] - 1);
         }
     }
 }
 
 
 Tensor einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
-    auto [terms, char_to_dim] = parse_subscripts(subscripts, operands);
+    auto [terms_strings, char_to_dim, char_to_col] = parse_subscripts(subscripts, operands);
 
     std::vector<int> result_shape;
-    for (const char& c : terms.back()) {
-        result_shape.push_back(char_to_dim[c].dim_size);
+    for (const char& c : terms_strings.back()) {
+        result_shape.push_back(char_to_dim[c]);
+    }
+    Tensor result(result_shape); // constructor already computes correct natural strides
+
+    const int n_labels = static_cast<int>(char_to_dim.size());
+    std::vector<int> dim_sizes(n_labels);
+    for (const auto& [label, col] : char_to_col) {
+        dim_sizes[col] = char_to_dim.at(label);
     }
 
-    Tensor result(result_shape);
-    std::vector<size_t> result_strides(char_to_dim.size(), 0);
-    size_t result_stride = 1;
-    for (int axis = static_cast<int>(terms.back().size()) - 1; axis >= 0; --axis) {
-        const auto& info = char_to_dim.at(terms.back()[axis]);
-        result_strides[info.col] = result_stride;
-        result_stride *= static_cast<size_t>(info.dim_size);
-    }
-
-    std::vector<std::vector<size_t>> operands_strides;
-    for (size_t operand_index = 0; operand_index < operands.size(); ++operand_index) {
-        std::vector<size_t> strides(char_to_dim.size(), 0);
-        size_t stride = 1;
-
-        // Previous bug: Cols automatically inferred from char order enumerating the term,
-        // but this breaks when the same char appears in multiple terms, as it should map
-        // to the same column in the result.
-        for (int axis = static_cast<int>(terms[operand_index].size()) - 1; axis >= 0; --axis) {
-            const auto& info = char_to_dim.at(terms[operand_index][axis]);
-            strides[info.col] = stride;
-            stride *= static_cast<size_t>(operands[operand_index].shape[axis]);
-        }
-        operands_strides.push_back(std::move(strides));
-    }
-
-    std::vector<int> dim_sizes(char_to_dim.size(), 0);
-    for (const auto& [label, info] : char_to_dim) {
-        dim_sizes[info.col] = info.dim_size;
-    }
-
-    std::vector<int> indices(char_to_dim.size(), 0);
     size_t total_combinations = 1;
-    for (const auto& [label, info] : char_to_dim) {
-        total_combinations *= static_cast<size_t>(info.dim_size);
+    for (int d : dim_sizes) {
+        total_combinations *= static_cast<size_t>(d);
     }
 
-    // Initialize offsets
-    size_t result_offset = 0;
-    std::vector<size_t> operand_offsets(operands.size(), 0);
+    // terms_strides[term_idx][col] = how much term `term_idx`'s flat offset moves per +1 of 
+    // the global label assigned to column `col`. "term" here means every operand AND the result
+    //
+    // Each row is a basically a relabeled copy of each tensor's (operands) own `.strides`.
+    // The loop below just maps them onto this canonical table that contain all indices/labels.
+    // The table is filled with 0 by default, so any index not owned by an operand is just 0,
+    // meaning that when that index moves the flat index of that operand just stays
+    std::vector<std::vector<int>> terms_strides(
+        terms_strings.size(), std::vector<int>(char_to_dim.size(), 0));
 
-    for (size_t combination = 0; combination < total_combinations; ++combination) {
+    for (int operand_idx = 0; operand_idx < operands.size(); ++operand_idx) {
+        const auto& term_string = terms_strings[operand_idx];
+
+        for (int axis = 0; axis < term_string.size(); ++axis) {
+            int col = char_to_col.at(term_string[axis]);
+            terms_strides[operand_idx][col] = operands[operand_idx].strides[axis];
+    }}
+
+    // Result row: same relabeling, but from the fresh result Tensor's own strides
+    for (int axis = 0; axis < terms_strings.back().size(); ++axis) {
+        int col = char_to_col.at(terms_strings.back()[axis]);
+        terms_strides.back()[col] = result.strides[axis];
+    }
+
+    // global_indices[col]: current value of the label at that column, over all label 
+    // combinations (odometer() walks every one exactly once)
+    std::vector<int> global_indices(n_labels, 0);
+    std::vector<int> terms_flats(terms_strings.size(), 0);
+    for (size_t c = 0; c < total_combinations; ++c) {
         double product = 1.0;
 
-        for (size_t operand_index = 0; operand_index < operands.size(); ++operand_index) {
-            product *= operands[operand_index].flat_index(operand_offsets[operand_index]);
+        for (size_t operand_idx = 0;
+            operand_idx < operands.size();
+            ++operand_idx) {
+            product *= operands[operand_idx].flat_index(
+                terms_flats[operand_idx]);
         }
 
-        result.flat_index(result_offset) += product;
-        move_idx(
-            indices,
-            dim_sizes,
-            result_offset,
-            result_strides,
-            operand_offsets,
-            operands_strides);
+        result.flat_index(terms_flats.back()) += product;
+
+        odometer(global_indices, terms_flats, dim_sizes, terms_strides);
     }
 
     return result;

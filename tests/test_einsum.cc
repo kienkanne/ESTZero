@@ -56,6 +56,43 @@ TEST_CASE("einsum: full reduction to scalar, ij->") {
     check_tensor(output, {}, {10});
 }
 
+// ── Tensors produced by view operations ─────────────────────────────────────
+// These live on non-contiguous logical views, so they verify that einsum uses
+// each Tensor's actual shape/strides/offset instead of reconstructing a plain
+// contiguous buffer from the logical dimensions.
+
+TEST_CASE("einsum: swapaxes view preserves logical order") {
+    Tensor input({2, 3}, {1, 2, 3,
+                         4, 5, 6});
+    Tensor view = input.swapaxes(0, 1);
+
+    Tensor output = einsum("ij->ij", {view});
+    check_tensor(output, {3, 2}, {1, 4,
+                                 2, 5,
+                                 3, 6});
+}
+
+TEST_CASE("einsum: sliced view uses its offset") {
+    Tensor input({4, 3}, {1, 2, 3,
+                         4, 5, 6,
+                         7, 8, 9,
+                         10, 11, 12});
+    Tensor view = input.slice(Sli{1, 4, 1}, Sli{});
+
+    Tensor output = einsum("ij->ij", {view});
+    check_tensor(output, {3, 3}, {4, 5, 6,
+                                 7, 8, 9,
+                                 10, 11, 12});
+}
+
+TEST_CASE("einsum: strided slice respects step") {
+    Tensor input({6}, {0, 1, 2, 3, 4, 5});
+    Tensor view = input.slice(Sli{0, 6, 2});
+
+    Tensor output = einsum("i->", {view});
+    check_tensor(output, {}, {6});
+}
+
 // ── Higher-dimensional tensors ──────────────────────────────────────────────
 // Beyond matrices: a rank-3 batched contraction and a rank-4 <-> rank-4
 // contraction, the shape transmo.cc actually exercises for AO->MO integrals.

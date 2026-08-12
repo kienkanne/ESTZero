@@ -1,6 +1,12 @@
 # CHANGELOG
 
-All version updates to this project will be documented in this file. The performance comparison between versions live in `README.md`.
+All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
+
+## [v1.5.4] Fixed `einsum` for operating on modified views of `Tensor`
+
+- `einsum` computed the strides for the operands on its own without caring about the `strides` attribute of each, which is added in the previous patch. This did not cause any issue as every `Tensor` in the main source code is freshly created and no `Tensor::swapaxes` or `Tensor::slice` views were used, so `strides` remained the default. Only adding specific tests show this, and this is important for CCSD later on where `Tensor` views are passed around a lot.
+- Fixed: `terms_strides` (table of strides for all terms for all indices) is now computed correctly from `Tensor.strides`, and `odometer` is introduced to correctly increment the global indices and the flat indices for all terms, keeping the complexity O(1).
+- The performance did not change compared to v1.5.3 and is not reported in `README.md`.
 
 ## [v1.5.3] Removed bounds-checked `.at()` from `Tensor` indexing
 

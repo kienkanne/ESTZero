@@ -44,15 +44,15 @@ For RHF, the test used to track through different versions is benzene/def2-svp (
 
 | version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|
-| v0.1.0 | 28.736 | 9.789 | 1182.5 | 16 | 177.1 MB | SCF Baseline |
-| v0.1.1 | 18.882 | 9.588 | 579.2 | 16 | 177.1 MB | Moved eri index helpers defintion to header file to reduce overhead |
-| v0.2.0 | 10.526 | 1.348 | 527.0 | 16 | 176.9 MB | Build ERI now loops over shell quartets (~8x speed up) |
-| v0.3.0 | 7.075 | 1.346 | 356.4 | 16 | 177.0 MB | Added scattering for JK building (similar ERI looping, scatter J twice and K four times, and symmetry) |
-| v0.4.0 | 7.061 | 1.343 | 355.7 | 16 | 175.5 MB | Reorganize code around wavefunction object (no algorithm optimization) |
-| v1.5.0 (vector) | 8.450 | 1.356 | 441.8 | 16 | 176.6 MB | Slightly slower JK build compared to v0.4.0 (reorganization effects) |
-| v1.5.0 (tensor) | 5.727 | 2.535 | 193.7 | 16 | 1300.8 MB | ERI build ~2x slower, JK build ~2.3x faster, and RSS ~7.4x as the vector exploited the 8-fold symmetry |
-| v1.5.2 | 4.018 | 1.756 | 139.7 | 16 | 1301.0 MB | Tensor's shared_ptr view rewrite (`swapaxes`/`slice`) switched element access to bounds-checked `.at()`, regressing every Tensor-touching phase |
-| v1.5.3 | 3.985 | 1.769 | 136.7 | 16 | 1301.0 MB | Fix: `.at()` replaced with unchecked indexing in `Tensor`. JK faster than v1.5.2; ERI still slower than v1.5.0 (vector), now purely from the 8-fold write expansion, not indexing overhead |
+| v0.1.0 | 28.736 | 9.789 | 1182.5 | 16 | 177.1 | SCF Baseline |
+| v0.1.1 | 18.882 | 9.588 | 579.2 | 16 | 177.1 | Moved eri index helpers defintion to header file to reduce overhead |
+| v0.2.0 | 10.526 | 1.348 | 527.0 | 16 | 176.9 | Build ERI now loops over shell quartets (~8x speed up) |
+| v0.3.0 | 7.075 | 1.346 | 356.4 | 16 | 177.0 | Added scattering for JK building (similar ERI looping, scatter J twice and K four times, and symmetry) |
+| v0.4.0 | 7.061 | 1.343 | 355.7 | 16 | 175.5 | Reorganize code around wavefunction object (no algorithm optimization) |
+| v1.5.0 (vector) | 8.450 | 1.356 | 441.8 | 16 | 176.6 | Slightly slower JK build compared to v0.4.0 (reorganization effects) |
+| v1.5.0 (tensor) | 5.727 | 2.535 | 193.7 | 16 | 1300.8 | ERI build ~2x slower, JK build ~2.3x faster, and RSS ~7.4x as the vector exploited the 8-fold symmetry |
+| v1.5.2 | 4.018 | 1.756 | 139.7 | 16 | 1301.0 | Tensor's shared_ptr view rewrite (`swapaxes`/`slice`) switched element access to bounds-checked `.at()`, regressing every Tensor-touching phase |
+| v1.5.3 | 3.985 | 1.769 | 136.7 | 16 | 1301.0 | Fix: `.at()` replaced with unchecked indexing in `Tensor`. JK faster than v1.5.2; ERI still slower than v1.5.0 (vector), now purely from the 8-fold write expansion, not indexing overhead |
 
 #### MP2
 
@@ -76,11 +76,11 @@ Version 1.1.0 reorganize the benchmark suite to separate the reference and the m
 
 | version | Total wall (s) | ERI build (s) | JK build* (per iter) (ms) | N_SCF_iter | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|
-| v1.1.0 | 13.998 | 1.020 | 862.6 | 15 | 188.2 MB | UHF SCF Baseline |
-| v1.5.0 (vector) | 16.248 | 1.028 | 1012.0 | 15 | 187.9 MB | Slightly slower JK build compared to v1.1.0 (reorganization effects) |
-| v1.5.0 (tensor) | 7.971 | 2.216 | 376.2 | 15 | 1352.9 MB | Similar speed up to RHF, but build JK is significantly faster because of both alpha and beta building per iteration |
-| v1.5.2 | 5.835 | 1.465 | 288.5 | 15 | 1352.9 MB | Same `.at()` regression as RHF SCF (`Tensor` is shared across references) |
-| v1.5.3 | 5.725 | 1.460 | 281.6 | 15 | 1352.9 MB | Same fix and gains as RHF SCF |
+| v1.1.0 | 13.998 | 1.020 | 862.6 | 15 | 188.2 | UHF SCF Baseline |
+| v1.5.0 (vector) | 16.248 | 1.028 | 1012.0 | 15 | 187.9 | Slightly slower JK build compared to v1.1.0 (reorganization effects) |
+| v1.5.0 (tensor) | 7.971 | 2.216 | 376.2 | 15 | 1352.9 | Similar speed up to RHF, but build JK is significantly faster because of both alpha and beta building per iteration |
+| v1.5.2 | 5.835 | 1.465 | 288.5 | 15 | 1352.9 | Same `.at()` regression as RHF SCF (`Tensor` is shared across references) |
+| v1.5.3 | 5.725 | 1.460 | 281.6 | 15 | 1352.9 | Same fix and gains as RHF SCF |
 
 > *Total time for both alpha and beta calculation time per iteration
 
