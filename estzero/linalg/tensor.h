@@ -323,6 +323,24 @@ public:
         return _unary_op([exp](double v) { return power(v, exp); });
     }
 
+    double sum() const {
+        double total = 0.0;
+        if (_is_contiguous()) {
+            for (int i = 0; i != size(); ++i) {
+                total += flat_index(i);
+            }
+            return total;
+        }
+
+        std::vector<int> indices(shape.size(), 0);
+        std::vector<int> tensor_flat {0};
+        for (int i = 0; i != size(); ++i) {
+            total += flat_index(tensor_flat[0]);
+            odometer(indices, tensor_flat, shape, {strides});
+        }
+        return total;
+    }
+
     // LEGACY: Access raw data pointer, used by TensorView
     const double* data_ptr() const { return data->data(); }
 };

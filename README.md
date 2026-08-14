@@ -68,7 +68,9 @@ Version v1.0.0 now includes MP2 for RHF. The baseline is the 4 step MO transform
 | v1.5.2 | 30.729 | 1.754 | 140.0 | 16 | 26.701 | 5.7 | 1732.1 | Same `.at()` regression as SCF above; the `einsum`-driven MO transform is Tensor-heavy so it's hit too |
 | v1.5.3 | 27.308 | 1.764 | 136.2 | 16 | 23.332 | 5.8 | 1732.1 | Fix restores MO transform/MP2 to v1.5.1-level speed; see SCF note above |
 | v1.5.5a | 28.592 | 1.762 | 136.8 | 16 | 24.527 | 215.5 | 1732.3 | Wired in `einsum` for MP2 energy evaluation. ~40x slow down due to `einsum` not having pairwise evaluation, so *`iajb,iajb,iajb->` is extremely slow* (Correction below) |
-| v1.5.5b | 28.585 | 1.764 | 136.9 | 16 | 24.375 | 227.0 | 1732.3 | Wired `einsum` with two operands and intermediates. Performance is slightly worse, `einsum` wasn't a problem for this case the 4 indices are the same; `einsum` setup fixed cost is what hit |
+| v1.5.5b<sup>(1)</sup> | 28.585 | 1.764 | 136.9 | 16 | 24.375 | 227.0 | 1732.3 | Wired `einsum` with two operands and intermediates. Performance is slightly worse, `einsum` wasn't a problem for this case the 4 indices are the same; `Tensor` setup fixed cost is what hit |
+
+> (1) Version v1.5.5c tried replacing all `einsum` with `Tensor` arithemic operators, but performance is identical, showing the fixed cost lie in `Tensor` setups.
 
 ### UHF
 
@@ -76,7 +78,7 @@ Version 1.1.0 reorganize the benchmark suite to separate the reference and the m
 
 #### SCF
 
-| version | Total wall (s) | ERI build (s) | JK build* (per iter) (ms) | N_SCF_iter | Peak RSS (MB) | Note |
+| version | Total wall (s) | ERI build (s) | JK build<sup>(2)</sup> (per iter) (ms) | N_SCF_iter | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|
 | v1.1.0 | 13.998 | 1.020 | 862.6 | 15 | 188.2 | UHF SCF Baseline |
 | v1.5.0 (vector) | 16.248 | 1.028 | 1012.0 | 15 | 187.9 | Slightly slower JK build compared to v1.1.0 (reorganization effects) |
@@ -84,23 +86,24 @@ Version 1.1.0 reorganize the benchmark suite to separate the reference and the m
 | v1.5.2 | 5.835 | 1.465 | 288.5 | 15 | 1352.9 | Same `.at()` regression as RHF SCF (`Tensor` is shared across references) |
 | v1.5.3 | 5.725 | 1.460 | 281.6 | 15 | 1352.9 | Same fix and gains as RHF SCF |
 
-> *Total time for both alpha and beta calculation time per iteration
+> (2) Total time for both alpha and beta calculation time per iteration
 
 #### MP2
 
 UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alpha-alpha, beta-beta, and alpha-beta MO integral tensors. Baseline version (v1.1.0): the index transform function used is similar to the one used for RHF MP2 to build alpha-alpha and beta-beta tensors; the alpha-beta block is built from the intermediate tensor after index 2 transformation of the alpha-alpha tensor
 
-| version | Total wall (s) | ERI build (s) | JK build* (per iter) (ms) |  N_SCF_iter | MO transform* (s) | MP2 energy (ms) | Peak RSS (MB) | Note |
+| version | Total wall (s) | ERI build (s) | JK build<sup>(2)</sup> (per iter) (ms) |  N_SCF_iter | MO transform<sup>(2)</sup> (s) | MP2 energy (ms) | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|
 | v1.1.0 | 21.285 | 1.024 | 905.5 | 15 | 6.635 | 0.8 | 393.1 | UHF MP2 Baseline |
-| v1.3.0 | 28.646 | 1.036 | 839.4 | 15 | 14.976** | 2.1 | 4255.5 | Same `einsum` rewrite as RHF MP2 above. Peak RSS ~11x. |
+| v1.3.0 | 28.646 | 1.036 | 839.4 | 15 | 14.976<sup>(3)</sup> | 2.1 | 4255.5 | Same `einsum` rewrite as RHF MP2 above. Peak RSS ~11x. |
 | v1.3.1 | 29.826 | 1.043 | 939.0 | 15 | 14.655 | 2.3 | 2857.3 | Fixed `einsum` memory bug |
 | v1.5.0 (vector) | 31.203 | 1.032 | 972.4 | 15 | 15.542 | 2.2 | 2856.6 | Similar to v1.3.1 |
 | v1.5.0 (tensor) | 22.084 | 2.213 | 378.6 | 15 | 14.099 | 2.0 | 1471.4 | Similar improvement to RHF MP2 |
-| v1.5.1 | 17.049 | 2.077 | 375.0 | 15 | 9.293** | 2.1 | 1466.4 | Fix: Use intermediate 2 of Iaa to build Iab directly |
+| v1.5.1 | 17.049 | 2.077 | 375.0 | 15 | 9.293<sup>(3)</sup> | 2.1 | 1466.4 | Fix: Use intermediate 2 of Iaa to build Iab directly |
 | v1.5.2 | 17.281 | 1.461 | 288.2 | 15 | 11.454 | 0.9 | 1466.3 | Same `.at()` regression; MO transform lost v1.5.1's gain despite no algorithm change |
 | v1.5.3 | 15.568 | 1.458 | 280.9 | 15 | 9.855 | 0.8 | 1466.5 | Fix restores MO transform/MP2 to v1.5.1 level |
 | v1.5.5a | 16.173 | 1.464 | 282.6 | 16 | 10.375 | 52.8 | 1466.9 | Same as in RHF MP2. ~66x slow down, which is worst than RHF MP2 due to the additional alpha beta mixing terms |
 | v1.5.5b | 16.105 | 1.457 | 280.7 | 16 | 10.367 | 30.0 | 1466.9 | Wired `einsum` with two operands and intermediates, but also uses `Tensor` operators whenever possible instead of `einsum` |
 
-> **v1.3.0-v1.5.0 didn't use intermediate 2 of Iaa to build Iab when using the new `einsum`, so performance was heavily impacted. This is fixed in v1.5.1
+> (3) v1.3.0-v1.5.0 didn't use intermediate 2 of Iaa to build Iab when using the new `einsum`, so performance was heavily impacted. This is fixed in v1.5.1
+

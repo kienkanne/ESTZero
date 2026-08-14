@@ -2,7 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
-## [v1.5.5b] Reroute `einsum` for MP2 energy evaluation (front-end optimization)
+## [v1.5.5c] Used `Tensor` operators entirely for MP2 energy evaluation
+
+- The MP2 energy evaluation formulas are actually very specific, and they are just actually tensor pairwise mupltications with a final summation. Follow the previous version idea of using `Tensor` operators to replace `einsum`, all operations in MP2 energy evaluation now uses these operators purely to exploit fast contiguous paths whenever possible. A `Tensor::sum()` method is added for the final summation.
+- However, performance is basically identical to v1.5.2. It shows that the number of arithmetic is identical and already fully exploited. It is the memory allocation steps of the built `Tensor` that cost the set up time, and it doesn't matter which tool is doing the arithemtic, whether it is `operator*` in `Tensor` or `einsum`.
+
+## [v1.5.5b] Rerouted `einsum` for MP2 energy evaluation
 
 - This mini-patch try to avoid using the triple contraction `einsum` (i.e. `iajb,iajb,iajb->`) and only keep it to two operands at most by explicitly creating intermediate tensors. Some of these intermediate steps can utilize `Tensor` operators (pairwise multiply or power) to optimize the calculation via the fast contiguous route offered by these methods.
 - However, RHF MP2 performance did not improve, perhaps slightly worse: 227.0ms vs 215.5ms in v1.5.5a for benzene/def2-svp. It's true that the current einsum is not optimized for cases more than 2 operands, but for `iajb,iajb,iajb->` specifically, it's still 4 indices, so this is not the source of the problem. Additionally, in a previous update that replaced explicit loops for einsum in `transmo.cc` (22.564s in v1.1.0 -> 22.287s in v.1.3.0), no performance drop was observed because `einsum` performs the same amount of arithmetic for the contractions as the loops. 
