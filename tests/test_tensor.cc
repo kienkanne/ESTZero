@@ -452,3 +452,103 @@ TEST_CASE("Tensor: copy is independent of its source (unlike copy-construction)"
     b(0, 0) = 999.0;
     CHECK(a(0, 0) == doctest::Approx(1.0));
 }
+
+// ── elementwise tensor*tensor (Hadamard product) ─────────────────────────────
+
+TEST_CASE("Tensor: elementwise multiplication works for owning tensors") {
+    Tensor a({2, 3}, {1, 2, 3, 4, 5, 6});
+    Tensor b({2, 3}, {6, 5, 4, 3, 2, 1});
+
+    check_tensor(a * b, {2, 3}, {6, 10, 12, 12, 10, 6});
+}
+
+TEST_CASE("Tensor: elementwise multiplication follows view strides") {
+    Tensor a({2, 6}, {1, 2, 3, 4, 5, 6,
+                       7, 8, 9, 10, 11, 12});
+    Tensor b({2, 3}, {1, 0, -1, 2, 0, -2});
+
+    Tensor product = a.slice(Sli{0, 2, 1}, Sli{1, 6, 2}) * b;
+    // a's slice picks columns 1,3,5 per row: {2,4,6 / 8,10,12}
+    check_tensor(product, {2, 3}, {2, 0, -6, 16, 0, -24});
+}
+
+TEST_CASE("Tensor: elementwise multiplication rejects mismatched shapes") {
+    Tensor a({2, 3});
+    Tensor b({3, 2});
+    CHECK_THROWS_AS((void)(a * b), std::invalid_argument);
+}
+
+// ── scalar division ───────────────────────────────────────────────────────────
+
+TEST_CASE("Tensor: scalar division divides each element") {
+    Tensor a({2, 3}, {2, 4, 6, 8, 10, 12});
+    check_tensor(a / 2.0, {2, 3}, {1, 2, 3, 4, 5, 6});
+}
+
+TEST_CASE("Tensor: scalar-divided-by-tensor takes the reciprocal direction") {
+    Tensor a({2, 2}, {1, 2, 4, 5});
+    check_tensor(12.0 / a, {2, 2}, {12, 6, 3, 12.0/5.0});
+}
+
+TEST_CASE("Tensor: scalar division follows view strides") {
+    Tensor a({2, 6}, {2, 4, 6, 8, 10, 12,
+                       14, 16, 18, 20, 22, 24});
+    Tensor divided = a.slice(Sli{0, 2, 1}, Sli{1, 6, 2}) / 2.0;
+    check_tensor(divided, {2, 3}, {2, 4, 6, 8, 10, 12});
+}
+
+TEST_CASE("Tensor: compound scalar division updates the tensor in place") {
+    Tensor a({2, 2}, {2, 4, 6, 8});
+
+    Tensor& result = (a /= 2.0);
+    CHECK(&result == &a);
+    check_tensor(a, {2, 2}, {1, 2, 3, 4});
+}
+
+TEST_CASE("Tensor: compound scalar division through a view mutates the source") {
+    Tensor a({2, 3}, {10, 20, 30, 40, 50, 60});
+    Tensor view = a.swapaxes(0, 1);
+
+    view /= 10.0;
+    check_tensor(a, {2, 3}, {1, 2, 3, 4, 5, 6});
+}
+
+// ── power ────────────────────────────────────────────────────────────────────
+
+TEST_CASE("Tensor: power raises each element to the given exponent") {
+    Tensor a({2, 3}, {1, 2, 3, 4, 5, 6});
+
+    check_tensor(a^2, {2, 3}, {1, 4, 9, 16, 25, 36});
+    check_tensor(a^0, {2, 3}, {1, 1, 1, 1, 1, 1});
+    check_tensor(a^1, {2, 3}, {1, 2, 3, 4, 5, 6});
+}
+
+TEST_CASE("Tensor: power follows view strides") {
+    Tensor a({2, 3}, {1, 2, 3, 4, 5, 6});
+    Tensor squared = a.swapaxes(0, 1)^2;
+
+    check_tensor(squared, {3, 2}, {1, 16, 4, 25, 9, 36});
+}
+
+// ── sum ──────────────────────────────────────────────────────────────────────
+
+TEST_CASE("Tensor: sum reduces a contiguous tensor to a scalar") {
+    Tensor a({2, 3}, {1, 2, 3, 4, 5, 6});
+    CHECK(a.sum() == doctest::Approx(21.0));
+}
+
+TEST_CASE("Tensor: sum follows view strides") {
+    Tensor a({2, 6}, {1, 2, 3, 4, 5, 6,
+                       7, 8, 9, 10, 11, 12});
+    Tensor view = a.slice(Sli{0, 2, 1}, Sli{1, 6, 2}); // {2,4,6 / 8,10,12}
+    CHECK(view.sum() == doctest::Approx(42.0));
+}
+
+TEST_CASE("Tensor: sum matches the MP2-style pairwise-multiply-then-sum pattern") {
+    // The exact shape calc_rhf_MP2_E now uses: (A * B * C).sum().
+    Tensor a({2, 2}, {1, 2, 3, 4});
+    Tensor b({2, 2}, {2, 2, 2, 2});
+    Tensor c({2, 2}, {1, 1, 1, 1});
+
+    CHECK((a * b * c).sum() == doctest::Approx(20.0)); // 2*(1+2+3+4)
+}

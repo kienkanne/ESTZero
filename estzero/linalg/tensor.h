@@ -308,7 +308,7 @@ public:
     }
 
     friend Tensor operator/(double scalar, const Tensor& tensor) {
-        return scalar / tensor;
+        return tensor._unary_op([scalar](double v) { return scalar / v; });
     }
 
     Tensor& operator/=(double scalar) {
