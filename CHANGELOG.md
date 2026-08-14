@@ -2,10 +2,17 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v1.5.5b] Reroute `einsum` for MP2 energy evaluation (front-end optimization)
+
+- This mini-patch try to avoid using the triple contraction `einsum` (i.e. `iajb,iajb,iajb->`) and only keep it to two operands at most by explicitly creating intermediate tensors. Some of these intermediate steps can utilize `Tensor` operators (pairwise multiply or power) to optimize the calculation via the fast contiguous route offered by these methods.
+- However, RHF MP2 performance did not improve, perhaps slightly worse: 227.0ms vs 215.5ms in v1.5.5a for benzene/def2-svp. It's true that the current einsum is not optimized for cases more than 2 operands, but for `iajb,iajb,iajb->` specifically, it's still 4 indices, so this is not the source of the problem. Additionally, in a previous update that replaced explicit loops for einsum in `transmo.cc` (22.564s in v1.1.0 -> 22.287s in v.1.3.0), no performance drop was observed because `einsum` performs the same amount of arithmetic for the contractions as the loops. 
+- The drop for MP2 energy evaluation only showed up because the process itself is already extremely fast, and the fixed cost is setting up `einsum`, which is at the ms level. The most costly step of for setting up is actually not inside `einsum`, but allocating memory for `Tensor`, which happens repeatedly in the MP2 energy evaluation.
+- UHF MP2, however, seen some noticeable improvement. It utilizes the operators by `Tensor` much better in the square operations in UHF MP2 instead of `einsum`, and also avoids additional memory allocation steps.
+
 ## [v1.5.5a] Wired in `einsum` for MP2 energy evaluation
 
 - The only algorithm in the source code that can utilize the new `Tensor` operators and view methods is the MP2 energy evaluation, and this mini-patch is testing this new feature on live code. This is a cheapest possible place to test out a primitive CCSD needs anyways, because this step takes very little time (few ms), so overall wall time won't be hit as much.
-- As expected, the unoptimized einsum heavily hits this step: 215.5ms vs 5.3ms (v1.5.5) for benzene/def2-svp. This ~40x slow down is mainly because the current `einsum` implementation doesn't have pairwise evaluation, so the triple contractions in MP2 energy is evaluated simultaneously (i.e. `iajb,iajb,iajb->`)
+- As expected, the unoptimized einsum heavily hits this step: 215.5ms vs 5.3ms (v1.5.5) for benzene/def2-svp. *This ~40x slow down is mainly because the current `einsum` implementation doesn't have pairwise evaluation, so the triple contractions in MP2 energy is evaluated simultaneously (i.e. `iajb,iajb,iajb->`)* Correction: (see v1.5.5b).
 - The old version written explicitly in loops is kept for reference with the tag `_old`.
 
 ## [v1.5.5] Added arithmetic operators for `Tensor`, generalize `odometer`
