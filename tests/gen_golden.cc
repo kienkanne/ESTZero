@@ -20,7 +20,6 @@
 #include <Eigen/Dense>
 
 #include "wfn.h"
-#include "utils.h"
 #include "build_JK.h"
 #include "rhf.h"
 #include "uhf.h"
@@ -96,6 +95,7 @@ int main() {
             const Matrix& T = wfn.get_T();
             const Matrix& V = wfn.get_V();
             const std::vector<double>& eri = wfn.get_eri_vector();
+            const Tensor eri_tensor = eri_vector_to_tensor(eri, static_cast<int>(S.rows()));
             const double V_nn = wfn.get_Vnn();
             const int n_docc  = wfn.get_n_docc();
             const int n_alpha = wfn.get_n_alpha();
@@ -126,11 +126,11 @@ int main() {
             if (sys.reference == "rhf") {
                 // Mirrors wfn.cc / rhf.cc exactly.
                 Result r = rhf_scf(1e-10, 200, 0, V_nn, n_docc, S, T, V, eri);
-                Matrix C_occ = r.Ca.leftCols(n_docc);
+                Matrix C_occ = r.CA.leftCols(n_docc);
                 Matrix D = C_occ * C_occ.transpose();
                 JK jk = build_JK(eri, D);
-                Tensor I_mo = transform_rhf_MO(eri, r.Ca, n_docc);
-                double E_mp2 = calc_rhf_MP2_E(I_mo, r.epsa, n_docc, r.E0);
+                Tensor I_mo = transmo_spat_iajb(eri_tensor, r.CA, n_docc);
+                double E_mp2 = calc_rhf_MP2_E(I_mo, r.epsA, n_docc, r.E0);
 
                 check_oracle(sys.label, "scf", r.E0, psi4_scf);
                 check_oracle(sys.label, "mp2", E_mp2, psi4_mp2);
@@ -140,21 +140,21 @@ int main() {
                 golden::write_matrix(out, "D", D);
                 golden::write_matrix(out, "J", jk.J);
                 golden::write_matrix(out, "K", jk.K);
-                golden::write_vector(out, "eps", r.epsa);
-                golden::write_matrix(out, "C", r.Ca);
+                golden::write_vector(out, "eps", r.epsA);
+                golden::write_matrix(out, "C", r.CA);
                 golden::write_tensor4(out, "I_mo", I_mo);
             } else { // uhf
                 // Mirrors wfn.cc / uhf.cc exactly.
                 Result r = uhf_scf(1e-10, 200, 0, V_nn, n_alpha, n_beta, S, T, V, eri);
-                Matrix Ca_occ = r.Ca.leftCols(n_alpha);
-                Matrix Cb_occ = r.Cb.leftCols(n_beta);
+                Matrix Ca_occ = r.CA.leftCols(n_alpha);
+                Matrix Cb_occ = r.CB.leftCols(n_beta);
                 Matrix Da = Ca_occ * Ca_occ.transpose();
                 Matrix Db = Cb_occ * Cb_occ.transpose();
                 JK jka = build_JK(eri, Da);
                 JK jkb = build_JK(eri, Db);
-                SpinMO mo = transform_uhf_MO(eri, r.Ca, n_alpha, r.Cb, n_beta);
-                double E_mp2 = calc_uhf_MP2_E(mo.Iaa_mo, mo.Ibb_mo, mo.Iab_mo,
-                                              r.epsa, r.epsb, n_alpha, n_beta, r.E0);
+                SpinMO mo = transmo_spin_iajb(eri_tensor, r.CA, n_alpha, r.CB, n_beta);
+                double E_mp2 = calc_uhf_MP2_E(mo.I_AA, mo.I_BB, mo.I_AB,
+                                              r.epsA, r.epsB, n_alpha, n_beta, r.E0);
 
                 check_oracle(sys.label, "scf", r.E0, psi4_scf);
                 check_oracle(sys.label, "mp2", E_mp2, psi4_mp2);
@@ -167,13 +167,13 @@ int main() {
                 golden::write_matrix(out, "Ka", jka.K);
                 golden::write_matrix(out, "Jb", jkb.J);
                 golden::write_matrix(out, "Kb", jkb.K);
-                golden::write_vector(out, "epsa", r.epsa);
-                golden::write_vector(out, "epsb", r.epsb);
-                golden::write_matrix(out, "Ca", r.Ca);
-                golden::write_matrix(out, "Cb", r.Cb);
-                golden::write_tensor4(out, "Iaa", mo.Iaa_mo);
-                golden::write_tensor4(out, "Ibb", mo.Ibb_mo);
-                golden::write_tensor4(out, "Iab", mo.Iab_mo);
+                golden::write_vector(out, "epsa", r.epsA);
+                golden::write_vector(out, "epsb", r.epsB);
+                golden::write_matrix(out, "Ca", r.CA);
+                golden::write_matrix(out, "Cb", r.CB);
+                golden::write_tensor4(out, "Iaa", mo.I_AA);
+                golden::write_tensor4(out, "Ibb", mo.I_BB);
+                golden::write_tensor4(out, "Iab", mo.I_AB);
             }
             std::cout << "    wrote " << golden::data_path(sys.name) << "\n";
         }

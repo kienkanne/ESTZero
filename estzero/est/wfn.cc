@@ -13,7 +13,6 @@
 #include "tensor.h"
 #include "mp2.h"
 #include "transmo.h"
-#include "utils.h"
 
 
 void WaveFunction::loader(const std::string xyz, const std::string basis, 
@@ -30,6 +29,7 @@ void WaveFunction::loader(const std::string xyz, const std::string basis,
 
     this->obs = libint2::BasisSet(basis, atoms);
     this->atoms = atoms;
+    this->nbf = static_cast<int>(obs.nbf());
 
     int n_electron = 0;
     for (const auto& atom : atoms) {
@@ -94,7 +94,6 @@ void WaveFunction::get_integrals(std::string eri_scheme_str) {
 }
 
 
-
 double WaveFunction::get_Vnn() {
     auto &atoms = this->atoms;
     double vnn = 0.0;
@@ -113,6 +112,7 @@ double WaveFunction::get_Vnn() {
     
     return vnn;
 }
+
 
 double WaveFunction::get_energy(const std::string reference, const std::string method, 
                                 const double econv=1e-8, const int max_iter=200, const int verbose=2) {
@@ -145,20 +145,20 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
 
 
     if (method == "scf") { return E0; }
+    // Post SCF, the eri_tensor is neeeded
+    if (this->eri_scheme_ == ERIScheme::Vector) {
+        this->eri_tensor = eri_vector_to_tensor(eri_vector, this->nbf);
+    }
 
     else if (method == "mp2") {
         if (reference == "rhf") {
-            const Tensor I_mo = (this->eri_scheme_ == ERIScheme::Tensor)
-                ? transform_rhf_MO(this->eri_tensor, result.Ca, this->n_docc)
-                : transform_rhf_MO(this->eri_vector, result.Ca, this->n_docc);
-            return calc_rhf_MP2_E(I_mo, result.epsa, this->n_docc, result.E0);
+            const Tensor Iiajb = transmo_spat_iajb(this->eri_tensor, result.CA, this->n_docc);
+            return calc_rhf_MP2_E(Iiajb, result.epsA, this->n_docc, result.E0);
         }
         else if (reference == "uhf") {
-            const SpinMO mo = (this->eri_scheme_ == ERIScheme::Tensor)
-                ? transform_uhf_MO(this->eri_tensor, result.Ca, this->n_alpha, result.Cb, this->n_beta)
-                : transform_uhf_MO(this->eri_vector, result.Ca, this->n_alpha, result.Cb, this->n_beta);
-            const auto& [Iaa_mo, Ibb_mo, Iab_mo] = mo;
-            return calc_uhf_MP2_E(Iaa_mo, Ibb_mo, Iab_mo, result.epsa, result.epsb,
+             const auto& [Iaa, Ibb, Iab] = transmo_spin_iajb(
+                this->eri_tensor, result.CA, this->n_alpha, result.CB, this->n_beta);
+            return calc_uhf_MP2_E(Iaa, Ibb, Iab, result.epsA, result.epsB,
                         this->n_alpha, this->n_beta, E0);
         }
     }

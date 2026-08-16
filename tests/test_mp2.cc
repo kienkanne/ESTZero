@@ -1,6 +1,7 @@
 #include "doctest.h"
 #include <Eigen/Dense>
 
+#include "integrals.h"
 #include "mp2.h"
 #include "transmo.h"
 #include "golden_io.h"
@@ -19,12 +20,13 @@ TEST_CASE("calc_uhf_MP2_E: reduces to calc_rhf_MP2_E for a real closed-shell cas
     const Vector eps = g.vec("eps");
     const int n_occ = g.n_docc;
     const double E0 = g.scalar("E_scf");
+    const Tensor eri_tensor = eri_vector_to_tensor(eri, g.nbf);
 
-    Tensor I_mo = transform_rhf_MO(eri, C, n_occ);
-    SpinMO mo = transform_uhf_MO(eri, C, n_occ, C, n_occ);
+    Tensor I_mo = transmo_spat_iajb(eri_tensor, C, n_occ);
+    SpinMO mo = transmo_spin_iajb(eri_tensor, C, n_occ, C, n_occ);
 
     double rhf = calc_rhf_MP2_E(I_mo, eps, n_occ, E0);
-    double uhf = calc_uhf_MP2_E(mo.Iaa_mo, mo.Ibb_mo, mo.Iab_mo, eps, eps, n_occ, n_occ, E0);
+    double uhf = calc_uhf_MP2_E(mo.I_AA, mo.I_BB, mo.I_AB, eps, eps, n_occ, n_occ, E0);
 
     CHECK(uhf == doctest::Approx(rhf).epsilon(1e-12));
 }

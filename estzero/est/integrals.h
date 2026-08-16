@@ -17,5 +17,6 @@ enum class ERIScheme { Vector, Tensor };
 Matrix build_one_center(libint2::Engine& engine, const libint2::BasisSet& obs);
 Tensor build_eri_tensor(libint2::Engine& engine, const libint2::BasisSet& obs);
 std::vector<double> build_eri_vector(libint2::Engine& engine, const libint2::BasisSet& obs);
+Tensor eri_vector_to_tensor(const std::vector<double>& eri_vector, int nbf);
 
 #endif

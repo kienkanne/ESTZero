@@ -75,7 +75,7 @@ TEST_CASE("integrals: ERI tensor matches golden") {
         WaveFunction wfn(std::string(EST_REPO_ROOT) + "/" + sys.xyz, sys.basis, sys.mult, sys.charge);
         wfn.get_integrals("tensor");
 
-        const Tensor& eri_tensor = wfn.get_eri();
+        const Tensor& eri_tensor = wfn.get_eri_tensor();
         const std::vector<double> eri_golden = g.list("eri");
         const int nbf = g.nbf;
 
@@ -104,7 +104,7 @@ TEST_CASE("integrals: ERI tensor and ERI vector agree on the same molecule") {
 
         WaveFunction wfn_tensor(xyz, sys.basis, sys.mult, sys.charge);
         wfn_tensor.get_integrals("tensor");
-        const Tensor& eri_tensor = wfn_tensor.get_eri();
+        const Tensor& eri_tensor = wfn_tensor.get_eri_tensor();
 
         const int nbf = wfn_tensor.get_S().rows();
         for (int i = 0; i < nbf; ++i)

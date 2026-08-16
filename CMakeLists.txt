@@ -20,7 +20,7 @@ add_library(est_core STATIC
     estzero/est/uhf.cc
     estzero/est/mp2.cc
     estzero/est/transmo.cc
-    estzero/est/spin_build.cc
+    estzero/est/cc_spin.cc
     estzero/linalg/einsum.cc
     estzero/linalg/utils.cc
 )
@@ -46,9 +46,4 @@ target_link_libraries(ESTZero PRIVATE est_core)
 if(EST_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
-endif()
-
-option(EST_BUILD_LEGACY "Build legacy benchmarks" OFF)
-if(EST_BUILD_LEGACY)
-    add_subdirectory(legacy)
 endif()

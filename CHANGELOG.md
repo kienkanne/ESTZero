@@ -2,6 +2,14 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [Unreleased] - Building towards CCSD
+
+## [v1.6.0] Added full spin MO tensor builder, renamed variables and functions for consistency.
+
+- `build_spin_ASprqs()` is added to build the anti-symmetrized spin MO tensor in physicist notation (UHF-CCSD prep). New MO transformations were added to obtain the fully transform ERI tensor for both occupied and virtual, instead of selective out as in MP2 (only needs `iajb`). The chemist notation was used in `integrals.cc`, so every algorithm involved implcitily used it too, including MP2. CCSD equations are mostly written in physicist notation, and this conversion is flagged explicitly.
+- Renamed variables and functions to explicitly express the notation type and spin. `I*` (i.e. `Iprqs`, `Ipqrs_AA`) now represents ERI in the MO basis for post-HF methods; `eri_tensor` or `eri_vector` is in AO basis. Spin is appended to the end and capitalized (`AA`, `BB`, `AB`). The MO transformation methods now explicitly say `spin` or `spat`, and the tensors coming from `spin` are annotated with the spin suffix.
+
+
 ## [v1.5.5c] Used `Tensor` operators entirely for MP2 energy evaluation
 
 - The MP2 energy evaluation formulas are actually very specific, and they are just actually tensor pairwise mupltications with a final summation. Follow the previous version idea of using `Tensor` operators to replace `einsum`, all operations in MP2 energy evaluation now uses these operators purely to exploit fast contiguous paths whenever possible. A `Tensor::sum()` method is added for the final summation.

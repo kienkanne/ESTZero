@@ -8,6 +8,13 @@
 #include <tensor.h>
 #include "integrals.h"
 
+struct Result {
+    double E0;
+    Matrix CA;
+    Matrix CB;
+    Vector epsA;
+    Vector epsB;
+};
 
 class WaveFunction {
 private:
@@ -16,6 +23,7 @@ private:
     int n_docc{};
     int n_alpha{};
     int n_beta{};
+    int nbf;
 
     Matrix S, T, V;
     Tensor eri_tensor;
@@ -42,7 +50,7 @@ public:
     const Matrix& get_T() const { return T; }
     const Matrix& get_V() const { return V; }
     const std::vector<double>& get_eri_vector() const { return eri_vector; }
-    const Tensor& get_eri() const { return eri_tensor; }
+    const Tensor& get_eri_tensor() const { return eri_tensor; }
     const std::vector<libint2::Atom>& get_atoms() const { return atoms; }
     int get_n_docc() const { return n_docc; }
     int get_n_alpha() const { return n_alpha; }

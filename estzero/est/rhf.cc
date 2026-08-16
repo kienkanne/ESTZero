@@ -4,7 +4,9 @@
 #include <libint2.hpp>
 #include <print>
 
+
 #include "rhf.h"
+#include "wfn.h"
 #include "build_JK.h"
 #include "timer.h"
 #include "tensor.h"

@@ -4,7 +4,7 @@
 #include <Eigen/Dense>
 #include <utils.h>
 #include <tensor.h>
-
+#include "wfn.h"
 
 template <typename ERI>
 Result rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndocc,
