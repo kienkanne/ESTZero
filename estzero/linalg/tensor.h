@@ -253,7 +253,7 @@ public:
             int step = slis[i].step;
 
             if (step == 0) { throw std::invalid_argument("Slice step cannot be zero."); }
-            if (stop == -1) { stop = shape[i]; }
+            if (stop < 0) { stop = shape[i] + stop + 1; }
 
             if (step > 0) {
                 if (stop < start) stop = start;
@@ -271,6 +271,10 @@ public:
 
     Tensor copy() const {
         return _unary_op([](double v) { return v; });
+    }
+
+    Tensor& assign(const Tensor& other) {
+        return _binary_assign_op(other, [](double, double new_val) { return new_val; });
     }
 
     // == ARITHMETIC OPERATIONS =============================================================
@@ -319,6 +323,11 @@ public:
         return _binary_op(other, [](double lhs, double rhs) { return lhs * rhs; });
     }
 
+    Tensor operator/(const Tensor& other) const {
+        return _binary_op(other, [](double lhs, double rhs) { return lhs / rhs; });
+    }
+
+
     Tensor operator^(int exp) const {
         return _unary_op([exp](double v) { return power(v, exp); });
     }
@@ -355,6 +364,11 @@ inline Tensor mat_to_tensor(const Matrix& M) {
         std::vector<double>(M.data(), M.data() + rows * cols));
 }
 
+
+inline Tensor vec_to_tensor(const Vector& V) {
+    return Tensor({static_cast<int>(V.size())},
+        std::vector<double>(V.data(), V.data() + V.size()));
+}
 
 
 // LEGACY: TensorView was introduced as a reference wrapper in v1.3.1 to fix

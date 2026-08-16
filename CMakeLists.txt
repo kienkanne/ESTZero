@@ -20,6 +20,7 @@ add_library(est_core STATIC
     estzero/est/uhf.cc
     estzero/est/mp2.cc
     estzero/est/transmo.cc
+    estzero/est/spin_build.cc
     estzero/linalg/einsum.cc
     estzero/linalg/utils.cc
 )

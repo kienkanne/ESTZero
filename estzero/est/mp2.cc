@@ -1,8 +1,9 @@
 #include <Eigen/Dense>
+#include <print>
 #include "mp2.h"
 #include "tensor.h"
 #include "timer.h"
-
+#include "cc_uhf.h"
 
 double calc_rhf_MP2_E(const Tensor& Imo, const Vector& eps, int n_occ, double E0) {
     timing::Scoped _t("MP2 Energy Calculation");
@@ -12,10 +13,7 @@ double calc_rhf_MP2_E(const Tensor& Imo, const Vector& eps, int n_occ, double E0
     const int nbf = eps.size();
     const int n_virt = nbf - n_occ;
 
-    Tensor eps_t({static_cast<int>(eps.size())});
-    for (int i=0; i != eps_t.size(); ++i) {
-        eps_t(i) = eps(i);
-    }
+    Tensor eps_t = vec_to_tensor(eps);
 
     const Tensor& eps_occ = eps_t.slice(Sli{0, n_occ});
     const Tensor& eps_virt = eps_t.slice(Sli{n_occ, -1});
@@ -35,25 +33,18 @@ double calc_rhf_MP2_E(const Tensor& Imo, const Vector& eps, int n_occ, double E0
 }
 
 
-double calc_uhf_MP2_E(const Tensor& Iaa_mo, const Tensor& Ibb_mo, const Tensor& Iab_mo,
+double calc_uhf_MP2_E(const Tensor& Iaa, const Tensor& Ibb, const Tensor& Iab,
                     const Vector& epsa, const Vector& epsb, int n_alpha, int n_beta, double E0) {
     timing::Scoped _t("MP2 Energy Calculation");
 
-    double E_MP2 = E0;
+    double E_MP2 = 0.0;
 
     const int nbf = epsa.size();
     const int n_avirt = nbf - n_alpha;
     const int n_bvirt = nbf - n_beta;
 
-    Tensor epsa_t({static_cast<int>(epsa.size())});
-    for (int i=0; i != epsa_t.size(); ++i) {
-        epsa_t(i) = epsa(i);
-    }
-
-    Tensor epsb_t({static_cast<int>(epsa.size())});
-    for (int i=0; i != epsb_t.size(); ++i) {
-        epsb_t(i) = epsb(i);
-    }
+    Tensor epsa_t = vec_to_tensor(epsa);
+    Tensor epsb_t = vec_to_tensor(epsb);
 
     const Tensor& epsa_occ = epsa_t.slice(Sli{0, n_alpha});
     const Tensor& epsa_virt = epsa_t.slice(Sli{n_alpha, -1});
@@ -70,7 +61,7 @@ double calc_uhf_MP2_E(const Tensor& Iaa_mo, const Tensor& Ibb_mo, const Tensor& 
         Eaa_iajb(i, a, j, b) = 1.0 / (epsa_occ(i) - epsa_virt(a) + epsa_occ(j) - epsa_virt(b));
     }}}}
 
-    E_MP2 += 0.25 * (((Iaa_mo - Iaa_mo.swapaxes(1,3))^2) * Eaa_iajb).sum();
+    E_MP2 += 0.25 * (((Iaa - Iaa.swapaxes(1,3))^2) * Eaa_iajb).sum();
     }
 
     {
@@ -83,7 +74,7 @@ double calc_uhf_MP2_E(const Tensor& Iaa_mo, const Tensor& Ibb_mo, const Tensor& 
         Ebb_iajb(i, a, j, b) = 1.0 / (epsb_occ(i) - epsb_virt(a) + epsb_occ(j) - epsb_virt(b));
     }}}}
 
-    E_MP2 += 0.25 * (((Ibb_mo - Ibb_mo.swapaxes(1,3))^2) * Ebb_iajb).sum();
+    E_MP2 += 0.25 * (((Ibb - Ibb.swapaxes(1,3))^2) * Ebb_iajb).sum();
     }
     
     {
@@ -96,10 +87,18 @@ double calc_uhf_MP2_E(const Tensor& Iaa_mo, const Tensor& Ibb_mo, const Tensor& 
         Eab_iajb(i, a, j, b) = 1.0 / (epsa_occ(i) - epsa_virt(a) + epsb_occ(j) - epsb_virt(b));
     }}}}
 
-    E_MP2 += ((Iab_mo^2) * Eab_iajb).sum();
+    E_MP2 += ((Iab^2) * Eab_iajb).sum();
     }
 
-    return E_MP2;
+    // TEST MP2 CCSD energy first iteration
+    Tensor Ismo = build_spin_MO(Iaa, Ibb, Iab, n_alpha, n_beta, nbf);
+    auto [Dia, Diajb] = build_Dia_Diajb(epsa, epsb, n_alpha, n_beta);
+    double E_MP2_test = test_mp2_energy(Ismo, Dia, Diajb, n_alpha+n_beta); 
+
+    std::println("Correct: {}", E_MP2);
+    std::println("CCSD: {}", E_MP2_test);
+
+    return E0 + E_MP2;
 }
 
 
