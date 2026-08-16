@@ -13,7 +13,7 @@
 
 
 template <typename ERI>
-Result rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndocc,
+SCFResult rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndocc,
                 const Matrix& S, const Matrix& T,
                 const Matrix& V, const ERI& eri) {
     timing::Scoped _t("SCF Iterations");
@@ -91,9 +91,9 @@ Result rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndocc,
     throw std::runtime_error("SCF failed to converge.\n");
 }
 
-template Result rhf_scf<std::vector<double>>(double, int, int, double, int,
+template SCFResult rhf_scf<std::vector<double>>(double, int, int, double, int,
                                              const Matrix&, const Matrix&,
                                              const Matrix&, const std::vector<double>&);
-template Result rhf_scf<Tensor>(double, int, int, double, int,
+template SCFResult rhf_scf<Tensor>(double, int, int, double, int,
                                 const Matrix&, const Matrix&, const Matrix&,
                                 const Tensor&);

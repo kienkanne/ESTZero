@@ -125,7 +125,7 @@ int main() {
 
             if (sys.reference == "rhf") {
                 // Mirrors wfn.cc / rhf.cc exactly.
-                Result r = rhf_scf(1e-10, 200, 0, V_nn, n_docc, S, T, V, eri);
+                SCFResult r = rhf_scf(1e-10, 200, 0, V_nn, n_docc, S, T, V, eri);
                 Matrix C_occ = r.CA.leftCols(n_docc);
                 Matrix D = C_occ * C_occ.transpose();
                 JK jk = build_JK(eri, D);
@@ -145,7 +145,7 @@ int main() {
                 golden::write_tensor4(out, "I_mo", I_mo);
             } else { // uhf
                 // Mirrors wfn.cc / uhf.cc exactly.
-                Result r = uhf_scf(1e-10, 200, 0, V_nn, n_alpha, n_beta, S, T, V, eri);
+                SCFResult r = uhf_scf(1e-10, 200, 0, V_nn, n_alpha, n_beta, S, T, V, eri);
                 Matrix Ca_occ = r.CA.leftCols(n_alpha);
                 Matrix Cb_occ = r.CB.leftCols(n_beta);
                 Matrix Da = Ca_occ * Ca_occ.transpose();

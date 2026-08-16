@@ -153,18 +153,22 @@ Tensor einsum(const std::string& subscripts, const std::vector<Tensor>& operands
     std::vector<std::vector<int>> terms_strides(
         terms_strings.size(), std::vector<int>(char_to_dim.size(), 0));
 
+    // BUG FIX: Accumulate (not overwrite). a label can appear more than once in the same term. When that 
+    // happens, every axis tied to the label must move together, so the flat-offset delta per +1 label is 
+    // the sum of those axes strides.
     for (int operand_idx = 0; operand_idx < operands.size(); ++operand_idx) {
         const auto& term_string = terms_strings[operand_idx];
 
         for (int axis = 0; axis < term_string.size(); ++axis) {
             int col = char_to_col.at(term_string[axis]);
-            terms_strides[operand_idx][col] = operands[operand_idx].strides[axis];
+            terms_strides[operand_idx][col] += operands[operand_idx].strides[axis];
     }}
 
-    // Result row: same relabeling, but from the fresh result Tensor's own strides
+    // Same fix for result row. Technically, parse_subscripts' Gate 4 rejects a duplicate output index, 
+    // so applying it here is for consistency only.
     for (int axis = 0; axis < terms_strings.back().size(); ++axis) {
         int col = char_to_col.at(terms_strings.back()[axis]);
-        terms_strides.back()[col] = result.strides[axis];
+        terms_strides.back()[col] += result.strides[axis];
     }
 
     // global_indices[col]: current value of the label at that column, over all label 

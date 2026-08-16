@@ -11,7 +11,7 @@
 
 
 template <typename ERI>
-Result uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_alpha, int n_beta,
+SCFResult uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_alpha, int n_beta,
                 const Matrix& S, const Matrix& T,
                 const Matrix& V, const ERI& eri) {
     timing::Scoped _t("SCF Iterations");
@@ -117,9 +117,9 @@ Result uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_alpha
     throw std::runtime_error("SCF failed to converge.\n");
 }
 
-template Result uhf_scf<std::vector<double>>(double, int, int, double, int, int,
+template SCFResult uhf_scf<std::vector<double>>(double, int, int, double, int, int,
                                              const Matrix&, const Matrix&,
                                              const Matrix&, const std::vector<double>&);
-template Result uhf_scf<Tensor>(double, int, int, double, int, int,
+template SCFResult uhf_scf<Tensor>(double, int, int, double, int, int,
                                 const Matrix&, const Matrix&, const Matrix&,
                                 const Tensor&);

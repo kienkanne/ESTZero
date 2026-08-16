@@ -4,6 +4,11 @@ All version updates to this project will be documented in this file. The perform
 
 ## [Unreleased] - Building towards CCSD
 
+## [v1.6.1] Fixed `einsum` accumulate bug. Added validation for CCSD energy (first iteration) against MP2
+
+- `einsum` had a bug which made `piqi->pq` failed in `build_FN`. When the strides of terms are calculated, they must accumualte, not overwrite, for cases of duplicate label.
+- An additional executable is added: `verify_ccsd`. This initializes the t1 and t2 amplitudes (first CCSD iteration) and compute the energy, which must be equal to the conventional MP2 energy evaluation (difference 8.527e-14). This validation is important enough that it earns an executable for illustration, instead of being hidden in the `tests/` module.
+
 ## [v1.6.0] Added full spin MO tensor builder, renamed variables and functions for consistency.
 
 - `build_spin_ASprqs()` is added to build the anti-symmetrized spin MO tensor in physicist notation (UHF-CCSD prep). New MO transformations were added to obtain the fully transform ERI tensor for both occupied and virtual, instead of selective out as in MP2 (only needs `iajb`). The chemist notation was used in `integrals.cc`, so every algorithm involved implcitily used it too, including MP2. CCSD equations are mostly written in physicist notation, and this conversion is flagged explicitly.

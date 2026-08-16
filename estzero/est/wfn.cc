@@ -117,7 +117,7 @@ double WaveFunction::get_Vnn() {
 double WaveFunction::get_energy(const std::string reference, const std::string method, 
                                 const double econv=1e-8, const int max_iter=200, const int verbose=2) {
     double E0;
-    Result result;
+    SCFResult result;
 
     if (reference == "rhf") {
         if (this->n_docc != this-> n_alpha) {
@@ -156,9 +156,9 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
             return calc_rhf_MP2_E(Iiajb, result.epsA, this->n_docc, result.E0);
         }
         else if (reference == "uhf") {
-             const auto& [Iaa, Ibb, Iab] = transmo_spin_iajb(
+            const auto& [Iiajb_AA, Iiajb_BB, Iiajb_AB] = transmo_spin_iajb(
                 this->eri_tensor, result.CA, this->n_alpha, result.CB, this->n_beta);
-            return calc_uhf_MP2_E(Iaa, Ibb, Iab, result.epsA, result.epsB,
+            return calc_uhf_MP2_E(Iiajb_AA, Iiajb_BB, Iiajb_AB, result.epsA, result.epsB,
                         this->n_alpha, this->n_beta, E0);
         }
     }

@@ -14,9 +14,9 @@ TEST_CASE("uhf_scf: reproduces rhf_scf exactly on a closed-shell singlet") {
     const std::vector<double> eri = g.list("eri");
     const double v_nn = g.scalar("v_nn");
 
-    Result rhf = rhf_scf(1e-10, 200, 0, v_nn, g.n_docc,
+    SCFResult rhf = rhf_scf(1e-10, 200, 0, v_nn, g.n_docc,
                           g.mat("S"), g.mat("T"), g.mat("V"), eri);
-    Result uhf = uhf_scf(1e-10, 200, 0, v_nn, g.n_alpha, g.n_beta,
+    SCFResult uhf = uhf_scf(1e-10, 200, 0, v_nn, g.n_alpha, g.n_beta,
                          g.mat("S"), g.mat("T"), g.mat("V"), eri);
     CHECK(uhf.E0 == doctest::Approx(rhf.E0).epsilon(1e-9));
 }
@@ -59,13 +59,13 @@ TEST_CASE("scf: converged energy, eps and density match golden (and the Psi4 ora
         const double v_nn = g.scalar("v_nn");
 
         if (g.reference == "rhf") {
-            Result r = rhf_scf(1e-10, 200, 0, v_nn, g.n_docc, g.mat("S"), g.mat("T"), g.mat("V"), eri);
+            SCFResult r = rhf_scf(1e-10, 200, 0, v_nn, g.n_docc, g.mat("S"), g.mat("T"), g.mat("V"), eri);
             CHECK(r.E0 == doctest::Approx(g.scalar("E_scf")).epsilon(1e-9));           // regression
             CHECK(r.E0 == doctest::Approx(g.scalar("psi4_scf_energy")).epsilon(1e-6)); // oracle
             CHECK(r.epsA.isApprox(g.vec("eps"), 1e-8));
             CHECK(density(r.CA, g.n_docc).isApprox(g.mat("D"), 1e-8));
         } else {
-            Result r = uhf_scf(1e-10, 200, 0, v_nn, g.n_alpha, g.n_beta,
+            SCFResult r = uhf_scf(1e-10, 200, 0, v_nn, g.n_alpha, g.n_beta,
                                g.mat("S"), g.mat("T"), g.mat("V"), eri);
             CHECK(r.E0 == doctest::Approx(g.scalar("E_scf")).epsilon(1e-9));           // regression
             CHECK(r.E0 == doctest::Approx(g.scalar("psi4_scf_energy")).epsilon(1e-6)); // oracle

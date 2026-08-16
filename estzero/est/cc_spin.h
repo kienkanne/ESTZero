@@ -33,11 +33,10 @@ struct Dia_Dijab {
 
 Tensor build_spin_ASprqs(const Tensor& Ipqrs_AA, const Tensor& Ipqrs_BB, const Tensor& Ipqrs_AB,
                     const int n_alpha, const int n_beta, const int nbf);
+                    
+Tensor build_spin_FN(const Tensor& Ha, const Tensor& Hb, const Tensor& ASprqs, const int n_alpha, const int n_beta);
+Dia_Dijab build_spin_Dia_Dijab(const Tensor& FN, const int n_alpha, const int n_beta);
 
-Tensor build_spin_FN(const Tensor& Ha, const Tensor& Hb, const Tensor& Ismo,
-                const int n_alpha, const int n_beta);
-
-Dia_Dijab build_spin_Dia_Dijab(const Vector& epsa, const Vector& epsb, const int n_alpha, const int n_beta);
-double test_mp2_energy(const Tensor& Ismo, const Tensor& Dia, const Tensor& Dijab, const int n_occ);
+double test_mp2_energy(const Tensor& ASprqs, const Tensor& Dia, const Tensor& Dijab, const int n_occ);
 
 #endif

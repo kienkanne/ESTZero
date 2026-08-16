@@ -43,6 +43,9 @@ target_compile_options(est_core PUBLIC
 add_executable(ESTZero estzero/est/main.cc)
 target_link_libraries(ESTZero PRIVATE est_core)
 
+add_executable(verify_ccsd estzero/est/verify_ccsd.cc)
+target_link_libraries(verify_ccsd PRIVATE est_core)
+
 if(EST_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)

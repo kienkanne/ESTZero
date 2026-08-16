@@ -14,6 +14,42 @@ void check_tensor(const Tensor& actual, const std::vector<int>& shape,
 
 } // namespace
 
+// ── Repeated index within a single operand (diagonal/trace patterns) ───────
+// Regression tests: terms_strides used to be built by assignment, so when a
+// label appeared twice in the same operand's term, the second occurrence's
+// stride silently overwrote the first's -- only one of the two tied axes
+// actually moved when that label incremented, e.g. einsum("ii->", {A})
+// walked A's column stride only, ignoring the row stride entirely. First
+// surfaced building the normal-ordered Fock matrix's two-electron term,
+// F_pq += sum_i <pi||qi>, i.e. einsum("piqi->pq", ...).
+
+TEST_CASE("einsum: trace via a doubled index, ii->") {
+    Tensor A({3, 3}, {1, 2, 3,
+                       4, 5, 6,
+                       7, 8, 9});
+    double trace = einsum("ii->", {A})();
+    CHECK(trace == doctest::Approx(1 + 5 + 9));
+}
+
+TEST_CASE("einsum: rank-4 trace over a doubled index, piqi->pq") {
+    // Same shape as the normal-ordered Fock matrix's two-electron term:
+    // contract axes 1 and 3 (tied to the same label) while axes 0 and 2
+    // stay free.
+    Tensor B({2, 2, 2, 2});
+    for (int p = 0; p < 2; ++p)
+    for (int i = 0; i < 2; ++i)
+    for (int q = 0; q < 2; ++q)
+    for (int j = 0; j < 2; ++j)
+        B(p, i, q, j) = p * 1000 + i * 100 + q * 10 + j;
+
+    Tensor R = einsum("piqi->pq", {B});
+    for (int p = 0; p < 2; ++p)
+    for (int q = 0; q < 2; ++q) {
+        double expected = B(p, 0, q, 0) + B(p, 1, q, 1);
+        CHECK(R(p, q) == doctest::Approx(expected));
+    }
+}
+
 // ── Basic contractions (matrices) ───────────────────────────────────────────
 // Hand-checkable against the einsum definition directly.
 

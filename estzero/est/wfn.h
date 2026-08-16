@@ -8,7 +8,7 @@
 #include <tensor.h>
 #include "integrals.h"
 
-struct Result {
+struct SCFResult {
     double E0;
     Matrix CA;
     Matrix CB;

@@ -81,12 +81,13 @@ Tensor build_spin_ASprqs(const Tensor& Ipqrs_AA, const Tensor& Ipqrs_BB, const T
 
 
 // Normal-ordered Fock matrix. FN = HN + sum_m <pi||qi>.
-Tensor build_spin_FN(const Tensor& Ha, const Tensor& Hb, const Tensor& Iprqs,
-                const int n_alpha, const int n_beta) {
+// Ha/Hb must each be the one-electron Hamiltonian already transformed into that spin's OWN MO basis 
+// (Ha = Ca^T (T+V) Ca, Hb = Cb^T (T+V) Cb)
+Tensor build_spin_FN(const Tensor& Ha, const Tensor& Hb, const Tensor& ASprqs, const int n_alpha, const int n_beta) {
     const int nbf = Ha.shape[0];
     Tensor HN({2 * nbf, 2 * nbf});
 
-    const auto [OA_des, OB_des, VA_des, VB_des, 
+    const auto [OA_des, OB_des, VA_des, VB_des,
                 OA_src, VA_src, OB_src, VB_src] = get_slices_ab_ov(n_alpha, n_beta, nbf);
 
     // Ha and Hb are stored in spin-major order. Reorder each spin block into shared
@@ -104,7 +105,7 @@ Tensor build_spin_FN(const Tensor& Ha, const Tensor& Hb, const Tensor& Iprqs,
 
     const Sli All{};
     const Sli O{0, n_alpha + n_beta};
-    Tensor two_electron = einsum("piqi->pq", {Iprqs.slice(All, O, All, O)});
+    Tensor two_electron = einsum("piqi->pq", {ASprqs.slice(All, O, All, O)});
 
     return HN + two_electron;
 }
@@ -135,8 +136,9 @@ Dia_Dijab build_spin_Dia_Dijab(const Tensor& FN, const int n_alpha, const int n_
     return {Dia, Dijab};
 }
 
-double test_mp2_energy(const Tensor& ASprqs, const Tensor& Dia, const Tensor& Dijab, const int n_occ,
-                        const Sli O, const Sli V) {
+double test_mp2_energy(const Tensor& ASprqs, const Tensor& Dia, const Tensor& Dijab, const int n_occ) {
+    const Sli O{0, n_occ};
+    const Sli V{n_occ, ASprqs.shape[0]};
     const Tensor Ioovv = ASprqs.slice(O, O, V, V);
     const Tensor t2 = Ioovv / Dijab;
 
