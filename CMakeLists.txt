@@ -13,7 +13,7 @@ set(LIBINT_ROOT "/localscratch/kbui/CPP/libint_install")
 option(EST_BUILD_TESTS "Build unit tests" ON)
 
 add_library(est_core STATIC
-    estzero/est/build_JK.cc
+    estzero/est/jk_build.cc
     estzero/est/integrals.cc
     estzero/est/wfn.cc
     estzero/est/rhf.cc
@@ -22,7 +22,7 @@ add_library(est_core STATIC
     estzero/est/transmo.cc
     estzero/est/cc_spin.cc
     estzero/est/cc_build.cc
-    estzero/est/cc_driver.cc
+    estzero/est/cc_iter.cc
     estzero/linalg/einsum.cc
 )
 

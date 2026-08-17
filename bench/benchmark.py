@@ -219,12 +219,12 @@ def main():
             mo_s   = phases.get("MO Transformation",     {}).get("seconds", math.nan)
             mp2_ms = phases.get("MP2 Energy Calculation",{}).get("avg_ms",  math.nan)
 
-            jk_phase = phases.get("build_JK")
+            jk_phase = phases.get("JK build")
             if jk_phase:
                 jk_ms = jk_phase["avg_ms"]
             else:
-                jka = phases.get("build_JKa", {}).get("avg_ms", 0.0)
-                jkb = phases.get("build_JKb", {}).get("avg_ms", 0.0)
+                jka = phases.get("JK build", {}).get("avg_ms", 0.0)
+                jkb = phases.get("JK build", {}).get("avg_ms", 0.0)
                 jk_ms = (jka + jkb) if (jka or jkb) else math.nan
 
             result = {

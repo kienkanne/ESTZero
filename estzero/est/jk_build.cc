@@ -1,7 +1,7 @@
 #include <vector>
 #include <libint2.hpp>
 
-#include "build_JK.h"
+#include "jk_build.h"
 #include "tensor.h"
 #include "integrals.h"
 

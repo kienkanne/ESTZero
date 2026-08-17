@@ -1,7 +1,7 @@
 #include "doctest.h"
 #include <Eigen/Dense>
 
-#include "build_JK.h"
+#include "jk_build.h"
 #include "golden_io.h"
 
 

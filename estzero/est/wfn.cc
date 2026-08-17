@@ -3,8 +3,10 @@
 #include <libint2.hpp>
 #include <stdexcept>
 #include <format>
+#include <string>
 
 #include "wfn.h"
+#include "cc_iter.h"
 #include "libint2/basis.h"
 #include "integrals.h"
 #include "timer.h"
@@ -13,6 +15,7 @@
 #include "tensor.h"
 #include "mp2.h"
 #include "transmo.h"
+#include "cc_driver.h"
 
 
 void WaveFunction::loader(const std::string xyz, const std::string basis, 
@@ -115,28 +118,18 @@ double WaveFunction::get_Vnn() {
 double WaveFunction::get_energy(const std::string reference, const std::string method, 
                                 const double econv=1e-8, const int max_iter=200, const int verbose=2) {
     double E_scf;
-    SCFResult result;
+    SCFResult sr;
 
     if (reference == "rhf") {
-        if (this->n_docc != this-> n_alpha) {
-            throw std::runtime_error("Cannot use RHF with multiplicity other than 1!");
-        }
+        if (this->n_docc != this-> n_alpha) { throw std::runtime_error("Cannot use RHF with multiplicity other than 1!"); }
 
-        result = (this->eri_scheme_ == ERIScheme::Tensor)
-            ? rhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_docc,
-                    this->S, this->T, this->V, this->eri_tensor)
-            : rhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_docc,
-                    this->S, this->T, this->V, this->eri_vector);
-        E_scf = result.E_scf;
+        sr = rhf_scf(*this, econv, max_iter, verbose);
+        E_scf = sr.E_scf;
     }
 
     else if (reference == "uhf") {
-        result = (this->eri_scheme_ == ERIScheme::Tensor)
-            ? uhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_alpha, this->n_beta,
-                    this->S, this->T, this->V, this->eri_tensor)
-            : uhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_alpha, this->n_beta,
-                    this->S, this->T, this->V, this->eri_vector);
-        E_scf = result.E_scf;
+        sr = sr = uhf_scf(*this, econv, max_iter, verbose);
+        E_scf = sr.E_scf;
     }
 
     else { throw std::runtime_error(std::format("Unknown reference: {}", reference)); }
@@ -150,15 +143,20 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
 
     else if (method == "mp2") {
         if (reference == "rhf") {
-            const Tensor Iiajb = transmo_spat_iajb(this->eri_tensor, result.CA, this->n_docc);
-            return E_scf + calc_rhf_mp2_E(Iiajb, result.epsA, this->n_docc);
+            const Tensor Iiajb = transmo_spat_iajb(this->eri_tensor, sr.CA, this->n_docc);
+            return E_scf + calc_rhf_mp2_E(Iiajb, sr.epsA, this->n_docc);
         }
         else if (reference == "uhf") {
             const auto& [Iiajb_AA, Iiajb_BB, Iiajb_AB] = transmo_spin_iajb(
-                this->eri_tensor, result.CA, this->n_alpha, result.CB, this->n_beta);
-            return E_scf + calc_uhf_mp2_E(Iiajb_AA, Iiajb_BB, Iiajb_AB, result.epsA, result.epsB,
+                this->eri_tensor, sr.CA, this->n_alpha, sr.CB, this->n_beta);
+            return E_scf + calc_uhf_mp2_E(Iiajb_AA, Iiajb_BB, Iiajb_AB, sr.epsA, sr.epsB,
                         this->n_alpha, this->n_beta);
         }
+    }
+
+    else if (method.starts_with("cc")) {
+        CCResult ccresult = cc_driver(*this, sr, method, reference, econv, max_iter, verbose);
+        return E_scf + ccresult.E_ccsd;
     }
 
     else { throw std::runtime_error(std::format("Unknown method: {}", method)); }

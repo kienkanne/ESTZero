@@ -4,21 +4,17 @@
 
 #include "uhf.h"
 #include "wfn.h"
-#include "build_JK.h"
+#include "jk_build.h"
 #include "timer.h"
 #include "sym_ortho.h"
 #include "diis.h"
 
-template <typename ERI>
-SCFResult uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_alpha, int n_beta,
-                const Matrix& S, const Matrix& T,
-                const Matrix& V, const ERI& eri) {
-    timing::Scoped _t("SCF Iterations");
+SCFResult uhf_scf(WaveFunction wfn, double econv, int max_iter, int verbose) {
+    const Matrix S = wfn.get_S();
+    const Matrix X = sym_ortho(S);
+    const Matrix H = wfn.get_T() + wfn.get_V();
 
-    int nbf = S.rows();
-
-    const Matrix H = T + V;
-	const Matrix X = sym_ortho(S);
+    int nbf = H.rows();
     Matrix FA = H;
     Matrix FB = H;
 
@@ -26,6 +22,7 @@ SCFResult uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_al
 	double E_scf_last = 0.0;
     double dE = E_scf - E_scf_last;
     double rms_err = 0.0;
+    double Vnn = wfn.get_Vnn();
 
     std::vector<Matrix> FA_list;
     std::vector<Matrix> FB_list;
@@ -41,7 +38,7 @@ SCFResult uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_al
         Vector epsA = solver.eigenvalues(); // Not reference, keep in case of convergence
 
         Matrix CA = X * CA_p;
-        Matrix Cocc_A  = CA.leftCols(n_alpha);
+        Matrix Cocc_A  = CA.leftCols(wfn.get_n_alpha());
         Matrix DA = Cocc_A * Cocc_A.transpose();
 
         solver.compute(FB_p);
@@ -49,19 +46,27 @@ SCFResult uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_al
         Vector epsB = solver.eigenvalues(); // Not reference, keep in case of convergence
 
         Matrix CB = X * CB_p;
-        Matrix Cocc_B  = CB.leftCols(n_beta);
+        Matrix Cocc_B  = CB.leftCols(wfn.get_n_beta());
         Matrix DB = Cocc_B * Cocc_B.transpose();
 
-        JK JKA;
-        {timing::Scoped _t("  build_JKa");
-            JKA = build_JK(eri, DA);}
-        auto& [JA, KA] = JKA;
+        JK jkA; JK jkB;
 
-        JK JKB;
-        {timing::Scoped _t("  build_JKb");
-            JKB = build_JK(eri, DB);}
-        auto& [JB, KB] = JKB;
+        {timing::Scoped _t("JK build");
+            if (wfn.get_eri_scheme() == ERIScheme::Tensor) { 
+                jkA = build_JK(wfn.get_eri_tensor(), DA); 
+            } else {
+                jkA = build_JK(wfn.get_eri_vector(), DA); 
+        }}
+        auto& [JA, KA] = jkA;
 
+        {timing::Scoped _t("JK build");
+            if (wfn.get_eri_scheme() == ERIScheme::Tensor) { 
+                jkB = build_JK(wfn.get_eri_tensor(), DB); 
+            } else {
+                jkB = build_JK(wfn.get_eri_vector(), DB); 
+        }}
+        auto& [JB, KB] = jkB;
+        
         FA = H + JA + JB - KA;
         FB = H + JA + JB - KB;
 
@@ -82,11 +87,11 @@ SCFResult uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_al
 
 		E_scf = 0.5 * ((DA + DB).cwiseProduct(H)
                     + DA.cwiseProduct(FA)
-                    + DB.cwiseProduct(FB)).sum() + V_nn;
+                    + DB.cwiseProduct(FB)).sum() + Vnn;
 		dE = E_scf - E_scf_last;
 
         if (verbose >= 2) {
-            std::println("SCF Iter {:3} | E_scf = {:.8f} | dE = {:.3e} | rms_E {:.3e}", i+1, E_scf, dE, rms_err);
+            std::println("SCF Iter  {:3} | E_scf = {:.8f} | dE = {:.3e} | rms_E {:.3e}", i+1, E_scf, dE, rms_err);
         }
 
 		if ((std::abs(dE) < econv) && (rms_err < econv)) {
@@ -116,9 +121,3 @@ SCFResult uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_al
     throw std::runtime_error("SCF failed to converge.\n");
 }
 
-template SCFResult uhf_scf<std::vector<double>>(double, int, int, double, int, int,
-                                             const Matrix&, const Matrix&,
-                                             const Matrix&, const std::vector<double>&);
-template SCFResult uhf_scf<Tensor>(double, int, int, double, int, int,
-                                const Matrix&, const Matrix&, const Matrix&,
-                                const Tensor&);

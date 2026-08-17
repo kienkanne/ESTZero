@@ -25,7 +25,7 @@ int main() {
     const int n_beta = wfn.get_n_beta();
     const int nbf = static_cast<int>(S.rows());
 
-    SCFResult r = uhf_scf(1e-10, 200, 0, Vnn, n_alpha, n_beta, S, T, V, eri_tensor);
+    SCFResult r = uhf_scf(wfn, 1e-10, 200, 0);
 
     // Oracle: golden tested MP2 path (iajb-restricted transform).
     const auto& [Iiajb_AA, Iiajb_BB, Iiajb_AB] = 
@@ -36,7 +36,7 @@ int main() {
     // New path: full-space transform -> spin-orbital Ismo -> test_mp2_energy.
     const auto& [Ipqrs_AA, Ipqrs_BB, Ipqrs_AB] = 
                 transmo_spin_pqrs(eri_tensor, r.CA, n_alpha, r.CB, n_beta);
-    Tensor ASprqs = build_spin_ASprqs(Ipqrs_AA, Ipqrs_BB, Ipqrs_AB, n_alpha, n_beta, nbf);
+    Tensor ASprqs = build_spin_ASprqs(Ipqrs_AA, Ipqrs_BB, Ipqrs_AB, n_alpha, n_beta);
 
     // Ha/Hb must be in each spin's own MO basis.
     Tensor HA = mat_to_tensor(Matrix(r.CA.transpose() * (T + V) * r.CA));

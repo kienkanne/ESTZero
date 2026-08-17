@@ -65,10 +65,12 @@ void scatter_mixed_spin(Tensor& IS, const Tensor& I_chem_AB,
 // helpers above to avoid writing out all possible combinations. The final Tensor is then anti-symmetrized,
 // which is used by all other intermediate-tensor-builders in CCSD.
 Tensor build_spin_ASprqs(const Tensor& Ipqrs_AA, const Tensor& Ipqrs_BB, const Tensor& Ipqrs_AB,
-                    const int n_alpha, const int n_beta, const int nbf) {
-    const auto [OA_des, OB_des, VA_des, VB_des, 
-                OA_src, VA_src, OB_src, VB_src] = get_slices_ab_ov(n_alpha, n_beta, nbf);
+                    const int n_alpha, const int n_beta) {
 
+    const int nbf = Ipqrs_AA.shape[0];
+    const auto [OA_des, OB_des, VA_des, VB_des,
+                OA_src, OB_src, VA_src, VB_src] = get_slices_ab_ov(n_alpha, n_beta, nbf);
+    
     Tensor Iprqs({2*nbf, 2*nbf, 2*nbf, 2*nbf});
 
     scatter_same_spin(Iprqs, Ipqrs_AA, OA_des, VA_des, OA_src, VA_src);
@@ -88,7 +90,7 @@ Tensor build_spin_FN(const Tensor& Ha, const Tensor& Hb, const Tensor& ASprqs, c
     Tensor HN({2 * nbf, 2 * nbf});
 
     const auto [OA_des, OB_des, VA_des, VB_des,
-                OA_src, VA_src, OB_src, VB_src] = get_slices_ab_ov(n_alpha, n_beta, nbf);
+                OA_src, OB_src, VA_src, VB_src] = get_slices_ab_ov(n_alpha, n_beta, nbf);
 
     // Ha and Hb are stored in spin-major order. Reorder each spin block into shared
     // occupancy-major order Oa, Ob, Va, Vb. Cross-spin blocks stay zero. This is similar
@@ -115,8 +117,8 @@ Dia_Dijab build_spin_Dia_Dijab(const Tensor& FN, const int n_alpha, const int n_
     const int nbf = static_cast<int>(FN.shape[0]/2);
     const int n_occ = n_alpha + n_beta;
     const int n_virt = 2*nbf - n_occ;
-        const auto [OA_des, OB_des, VA_des, VB_des, 
-                OA_src, VA_src, OB_src, VB_src] = get_slices_ab_ov(n_alpha, n_beta, nbf);
+        const auto [OA_des, OB_des, VA_des, VB_des,
+                    OA_src, OB_src, VA_src, VB_src] = get_slices_ab_ov(n_alpha, n_beta, nbf);
     
     Tensor FN_diag({2 * nbf});
     for (int i=0; i != nbf*2; ++i) { FN_diag(i) = FN(i, i); }

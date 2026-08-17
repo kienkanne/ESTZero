@@ -2,7 +2,6 @@
 #define LOADER
 
 #include <Eigen/Core>
-#include <vector>
 #include <Eigen/Dense>
 #include <libint2.hpp>
 #include <tensor.h>
@@ -49,12 +48,16 @@ public:
     const Matrix& get_S() const { return S; }
     const Matrix& get_T() const { return T; }
     const Matrix& get_V() const { return V; }
+
+    ERIScheme get_eri_scheme() const { return eri_scheme_; }
     const std::vector<double>& get_eri_vector() const { return eri_vector; }
     const Tensor& get_eri_tensor() const { return eri_tensor; }
+
     const std::vector<libint2::Atom>& get_atoms() const { return atoms; }
     int get_n_docc() const { return n_docc; }
     int get_n_alpha() const { return n_alpha; }
     int get_n_beta() const { return n_beta; }
+
 };
 
 #endif

@@ -1,4 +1,14 @@
 {
+  "h2_stretched/sto-3g": {
+    "xyz": "input/h2_stretched.xyz",
+    "basis": "sto-3g",
+    "tier": "tiny",
+    "run_by_default": true,
+    "reference": "rhf",
+    "mult": 1,
+    "charge": 0,
+    "methods": ["scf", "mp2", "ccsd"]
+  },
   "h2o/sto-3g": {
     "xyz": "input/h2o.xyz",
     "basis": "sto-3g",
@@ -7,7 +17,7 @@
     "reference": "rhf",
     "mult": 1,
     "charge": 0,
-    "methods": ["scf", "mp2"]
+    "methods": ["scf", "mp2", "ccsd"]
   },
   "h2o/cc-pvdz": {
     "xyz": "input/h2o.xyz",
@@ -17,7 +27,7 @@
     "reference": "rhf",
     "mult": 1,
     "charge": 0,
-    "methods": ["scf", "mp2"]
+    "methods": ["scf", "mp2", "ccsd"]
   },
   "fm/def2-svp": {
     "xyz": "input/fm.xyz",
@@ -79,6 +89,26 @@
     "charge": 0,
     "methods": ["scf", "mp2"]
   },
+  "ch3/sto-3g": {
+    "xyz": "input/ch3.xyz",
+    "basis": "sto-3g",
+    "tier": "tiny",
+    "run_by_default": true,
+    "reference": "uhf",
+    "mult": 2,
+    "charge": 0,
+    "methods": ["scf", "mp2", "ccsd"]
+  },
+  "ch3/cc-pvdz": {
+    "xyz": "input/ch3.xyz",
+    "basis": "cc-pvdz",
+    "tier": "small",
+    "run_by_default": true,
+    "reference": "uhf",
+    "mult": 2,
+    "charge": 0,
+    "methods": ["scf", "mp2", "ccsd"]
+  },
   "o2/def2-tzvppd": {
     "xyz": "input/o2.xyz",
     "basis": "def2-tzvppd",
@@ -96,26 +126,6 @@
     "run_by_default": true,
     "reference": "uhf",
     "mult": 2,
-    "charge": 0,
-    "methods": ["scf", "mp2"]
-  },
-  "ch3/sto-3g": {
-    "xyz": "input/ch3.xyz",
-    "basis": "sto-3g",
-    "tier": "tiny",
-    "run_by_default": true,
-    "reference": "uhf",
-    "mult": 2,
-    "charge": 0,
-    "methods": ["scf", "mp2"]
-  },
-  "h2_stretched/sto-3g": {
-    "xyz": "input/h2_stretched.xyz",
-    "basis": "sto-3g",
-    "tier": "tiny",
-    "run_by_default": true,
-    "reference": "rhf",
-    "mult": 1,
     "charge": 0,
     "methods": ["scf", "mp2"]
   }
