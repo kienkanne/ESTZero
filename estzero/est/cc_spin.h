@@ -39,4 +39,8 @@ Dia_Dijab build_spin_Dia_Dijab(const Tensor& FN, const int n_alpha, const int n_
 
 double test_mp2_energy(const Tensor& ASprqs, const Tensor& Dia, const Tensor& Dijab, const int n_occ);
 
+// CCSD correlation energy from converged amplitudes.
+double calc_ccsd_E(const Tensor& ASpqrs, const Tensor& FN,
+                    const Tensor& t1, const Tensor& t2, Sli O, Sli V);
+
 #endif

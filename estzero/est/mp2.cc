@@ -3,7 +3,7 @@
 #include "tensor.h"
 #include "timer.h"
 
-double calc_rhf_MP2_E(const Tensor& Iiajb, const Vector& eps, int n_occ, double E0) {
+double calc_rhf_mp2_E(const Tensor& Iiajb, const Vector& eps, int n_occ, double E0) {
     timing::Scoped _t("MP2 Energy Calculation");
 
     double E_MP2 = E0;
@@ -31,7 +31,7 @@ double calc_rhf_MP2_E(const Tensor& Iiajb, const Vector& eps, int n_occ, double 
 }
 
 
-double calc_uhf_MP2_E(const Tensor& Iiajb_AA, const Tensor& Iiajb_BB, const Tensor& Iiajb_AB,
+double calc_uhf_mp2_E(const Tensor& Iiajb_AA, const Tensor& Iiajb_BB, const Tensor& Iiajb_AB,
                     const Vector& epsA, const Vector& epsB, int n_alpha, int n_beta, double E0) {
     timing::Scoped _t("MP2 Energy Calculation");
 

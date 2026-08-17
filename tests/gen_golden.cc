@@ -130,7 +130,7 @@ int main() {
                 Matrix D = C_occ * C_occ.transpose();
                 JK jk = build_JK(eri, D);
                 Tensor I_mo = transmo_spat_iajb(eri_tensor, r.CA, n_docc);
-                double E_mp2 = calc_rhf_MP2_E(I_mo, r.epsA, n_docc, r.E0);
+                double E_mp2 = calc_rhf_mp2_E(I_mo, r.epsA, n_docc, r.E0);
 
                 check_oracle(sys.label, "scf", r.E0, psi4_scf);
                 check_oracle(sys.label, "mp2", E_mp2, psi4_mp2);
@@ -153,7 +153,7 @@ int main() {
                 JK jka = build_JK(eri, Da);
                 JK jkb = build_JK(eri, Db);
                 SpinMO mo = transmo_spin_iajb(eri_tensor, r.CA, n_alpha, r.CB, n_beta);
-                double E_mp2 = calc_uhf_MP2_E(mo.I_AA, mo.I_BB, mo.I_AB,
+                double E_mp2 = calc_uhf_mp2_E(mo.I_AA, mo.I_BB, mo.I_AB,
                                               r.epsA, r.epsB, n_alpha, n_beta, r.E0);
 
                 check_oracle(sys.label, "scf", r.E0, psi4_scf);

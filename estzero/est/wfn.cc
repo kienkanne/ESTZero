@@ -90,7 +90,6 @@ void WaveFunction::get_integrals(std::string eri_scheme_str) {
         timing::Scoped _t("ERI build");
         this->eri_vector = build_eri_vector(eri_engine, obs);
     }
-
 }
 
 
@@ -109,7 +108,6 @@ double WaveFunction::get_Vnn() {
             vnn += (atoms[i].atomic_number * atoms[j].atomic_number) / r_ab;
         }
     }
-    
     return vnn;
 }
 
@@ -153,12 +151,12 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
     else if (method == "mp2") {
         if (reference == "rhf") {
             const Tensor Iiajb = transmo_spat_iajb(this->eri_tensor, result.CA, this->n_docc);
-            return calc_rhf_MP2_E(Iiajb, result.epsA, this->n_docc, result.E0);
+            return calc_rhf_mp2_E(Iiajb, result.epsA, this->n_docc, result.E0);
         }
         else if (reference == "uhf") {
             const auto& [Iiajb_AA, Iiajb_BB, Iiajb_AB] = transmo_spin_iajb(
                 this->eri_tensor, result.CA, this->n_alpha, result.CB, this->n_beta);
-            return calc_uhf_MP2_E(Iiajb_AA, Iiajb_BB, Iiajb_AB, result.epsA, result.epsB,
+            return calc_uhf_mp2_E(Iiajb_AA, Iiajb_BB, Iiajb_AB, result.epsA, result.epsB,
                         this->n_alpha, this->n_beta, E0);
         }
     }

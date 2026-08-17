@@ -13,7 +13,7 @@
 // the frozen h2o integrals/orbitals only as realistic inputs — the assertion
 // itself is a code-path equality, not a golden-value comparison.
 
-TEST_CASE("calc_uhf_MP2_E: reduces to calc_rhf_MP2_E for a real closed-shell case") {
+TEST_CASE("calc_uhf_MP2_E: reduces to calc_rhf_mp2_E for a real closed-shell case") {
     golden::Golden g = golden::load_golden("h2o_sto-3g");
     const std::vector<double> eri = g.list("eri");
     const Matrix C = g.mat("C");
@@ -25,8 +25,8 @@ TEST_CASE("calc_uhf_MP2_E: reduces to calc_rhf_MP2_E for a real closed-shell cas
     Tensor I_mo = transmo_spat_iajb(eri_tensor, C, n_occ);
     SpinMO mo = transmo_spin_iajb(eri_tensor, C, n_occ, C, n_occ);
 
-    double rhf = calc_rhf_MP2_E(I_mo, eps, n_occ, E0);
-    double uhf = calc_uhf_MP2_E(mo.I_AA, mo.I_BB, mo.I_AB, eps, eps, n_occ, n_occ, E0);
+    double rhf = calc_rhf_mp2_E(I_mo, eps, n_occ, E0);
+    double uhf = calc_uhf_mp2_E(mo.I_AA, mo.I_BB, mo.I_AB, eps, eps, n_occ, n_occ, E0);
 
     CHECK(uhf == doctest::Approx(rhf).epsilon(1e-12));
 }
@@ -44,9 +44,9 @@ TEST_CASE("mp2: reproduces golden correlation energy, matching the Psi4 oracle")
 
         double e_mp2;
         if (g.reference == "rhf") {
-            e_mp2 = calc_rhf_MP2_E(g.tensor("I_mo"), g.vec("eps"), g.n_docc, E_scf);
+            e_mp2 = calc_rhf_mp2_E(g.tensor("I_mo"), g.vec("eps"), g.n_docc, E_scf);
         } else {
-            e_mp2 = calc_uhf_MP2_E(g.tensor("Iaa"), g.tensor("Ibb"), g.tensor("Iab"),
+            e_mp2 = calc_uhf_mp2_E(g.tensor("Iaa"), g.tensor("Ibb"), g.tensor("Iab"),
                                    g.vec("epsa"), g.vec("epsb"), g.n_alpha, g.n_beta, E_scf);
         }
 

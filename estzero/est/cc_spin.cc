@@ -144,3 +144,11 @@ double test_mp2_energy(const Tensor& ASprqs, const Tensor& Dia, const Tensor& Di
 
     return 0.25 * (t2 * Ioovv).sum();
 }
+
+double calc_ccsd_E(const Tensor& ASpqrs, const Tensor& FN,
+                    const Tensor& t1, const Tensor& t2, Sli O, Sli V) {
+    double E = einsum("ia,ia->", {FN.slice(O, V), t1})();
+    E += 0.25 * einsum("ijab,ijab->", {ASpqrs.slice(O, O, V, V), t2})();
+    E += 0.5 * einsum("ijab,ia,jb->", {ASpqrs.slice(O, O, V, V), t1, t1})();
+    return E;
+}
