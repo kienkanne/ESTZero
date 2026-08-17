@@ -1,8 +1,6 @@
 #ifndef RHF
 #define RHF
 
-#include <Eigen/Dense>
-#include <utils.h>
 #include <tensor.h>
 #include "wfn.h"
 

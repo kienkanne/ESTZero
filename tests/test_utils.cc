@@ -2,7 +2,8 @@
 #include <Eigen/Dense>
 #include <libint2.hpp>
 
-#include "utils.h"
+#include "diis.h"
+#include "sym_ortho.h"
 
 
 // ── sym_ortho ────────────────────────────────────────────────────────────

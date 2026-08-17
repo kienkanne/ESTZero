@@ -114,7 +114,7 @@ double WaveFunction::get_Vnn() {
 
 double WaveFunction::get_energy(const std::string reference, const std::string method, 
                                 const double econv=1e-8, const int max_iter=200, const int verbose=2) {
-    double E0;
+    double E_scf;
     SCFResult result;
 
     if (reference == "rhf") {
@@ -127,7 +127,7 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
                     this->S, this->T, this->V, this->eri_tensor)
             : rhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_docc,
                     this->S, this->T, this->V, this->eri_vector);
-        E0 = result.E0;
+        E_scf = result.E_scf;
     }
 
     else if (reference == "uhf") {
@@ -136,13 +136,13 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
                     this->S, this->T, this->V, this->eri_tensor)
             : uhf_scf(econv, max_iter, verbose, get_Vnn(), this->n_alpha, this->n_beta,
                     this->S, this->T, this->V, this->eri_vector);
-        E0 = result.E0;
+        E_scf = result.E_scf;
     }
 
     else { throw std::runtime_error(std::format("Unknown reference: {}", reference)); }
 
 
-    if (method == "scf") { return E0; }
+    if (method == "scf") { return E_scf; }
     // Post SCF, the eri_tensor is neeeded
     if (this->eri_scheme_ == ERIScheme::Vector) {
         this->eri_tensor = eri_vector_to_tensor(eri_vector, this->nbf);
@@ -151,13 +151,13 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
     else if (method == "mp2") {
         if (reference == "rhf") {
             const Tensor Iiajb = transmo_spat_iajb(this->eri_tensor, result.CA, this->n_docc);
-            return calc_rhf_mp2_E(Iiajb, result.epsA, this->n_docc, result.E0);
+            return E_scf + calc_rhf_mp2_E(Iiajb, result.epsA, this->n_docc);
         }
         else if (reference == "uhf") {
             const auto& [Iiajb_AA, Iiajb_BB, Iiajb_AB] = transmo_spin_iajb(
                 this->eri_tensor, result.CA, this->n_alpha, result.CB, this->n_beta);
-            return calc_uhf_mp2_E(Iiajb_AA, Iiajb_BB, Iiajb_AB, result.epsA, result.epsB,
-                        this->n_alpha, this->n_beta, E0);
+            return E_scf + calc_uhf_mp2_E(Iiajb_AA, Iiajb_BB, Iiajb_AB, result.epsA, result.epsB,
+                        this->n_alpha, this->n_beta);
         }
     }
 

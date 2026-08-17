@@ -31,7 +31,7 @@ int main() {
     const auto& [Iiajb_AA, Iiajb_BB, Iiajb_AB] = 
                 transmo_spin_iajb(eri_tensor, r.CA, n_alpha, r.CB, n_beta);
     double E_oracle = calc_uhf_mp2_E(Iiajb_AA, Iiajb_BB, Iiajb_AB,
-                                      r.epsA, r.epsB, n_alpha, n_beta, r.E0);
+                                      r.epsA, r.epsB, n_alpha, n_beta);
 
     // New path: full-space transform -> spin-orbital Ismo -> test_mp2_energy.
     const auto& [Ipqrs_AA, Ipqrs_BB, Ipqrs_AB] = 
@@ -44,7 +44,7 @@ int main() {
     Tensor FN = build_spin_FN(HA, HB, ASprqs, n_alpha, n_beta);
     auto [Dia, Dijab] = build_spin_Dia_Dijab(FN, n_alpha, n_beta);
     
-    double E_testmp2 = r.E0 + test_mp2_energy(ASprqs, Dia, Dijab, n_alpha + n_beta);
+    double E_testmp2 = r.E_scf + test_mp2_energy(ASprqs, Dia, Dijab, n_alpha + n_beta);
 
     // Test using newly built ccsd energy equation
     const int n_occ = n_alpha + n_beta;
@@ -53,7 +53,7 @@ int main() {
     Tensor t1_zero(Dia.shape);
     Tensor t2_mp2 = ASprqs.slice(O_sli, O_sli, V_sli, V_sli) / Dijab;
 
-    double E_ccsd = r.E0 + calc_ccsd_E(ASprqs, FN, t1_zero, t2_mp2, O_sli, V_sli);
+    double E_ccsd = r.E_scf + calc_ccsd_E(ASprqs, FN, t1_zero, t2_mp2, O_sli, V_sli);
 
     std::println("n_alpha={} n_beta={} nbf={}", n_alpha, n_beta, nbf);
     std::println("oracle (calc_uhf_MP2_E): {:.12f}", E_oracle);

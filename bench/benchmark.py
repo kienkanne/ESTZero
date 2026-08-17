@@ -17,8 +17,8 @@ OUT_DIR = ROOT / "bench" / "outputs"
 OUT_DIR.mkdir(exist_ok=True)
 
 
-ITER_RE   = re.compile(r"Iter\s+(\d+)")
-ENERGY_RE = re.compile(r"Final SCF energy:\s*(-?\d+(?:\.\d+)?)")
+ITER_RE   = re.compile(r"SCF Iter\s+(\d+)")
+ENERGY_RE = re.compile(r"Final energy:\s*(-?\d+(?:\.\d+)?)")
 NBF_RE    = re.compile(r"nbf:\s*(\d+)")
 RSS_RE    = re.compile(r"peak RSS:\s*(\d+(?:\.\d+)?)\s*MB")
 PHASE_RE  = re.compile(r"^\s*(.*?)\s+(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+(?:\.\d+)?)\s*$")

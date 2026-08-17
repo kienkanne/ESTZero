@@ -9,7 +9,7 @@
 #include "integrals.h"
 
 struct SCFResult {
-    double E0;
+    double E_scf;
     Matrix CA;
     Matrix CB;
     Vector epsA;

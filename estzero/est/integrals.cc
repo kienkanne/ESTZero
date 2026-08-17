@@ -1,5 +1,4 @@
 #include <vector>
-#include <Eigen/Dense>
 #include <libint2.hpp>
 
 #include "integrals.h"

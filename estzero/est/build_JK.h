@@ -1,8 +1,6 @@
 #ifndef BUILD_JK
 #define BUILD_JK
 
-#include <integrals.h>
-#include <Eigen/Dense>
 #include <libint2.hpp>
 #include "tensor.h"
 

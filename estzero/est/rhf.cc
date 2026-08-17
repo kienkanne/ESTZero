@@ -4,12 +4,13 @@
 #include <libint2.hpp>
 #include <print>
 
-
 #include "rhf.h"
 #include "wfn.h"
 #include "build_JK.h"
 #include "timer.h"
 #include "tensor.h"
+#include "sym_ortho.h"
+#include "diis.h"
 
 
 template <typename ERI>
@@ -24,10 +25,10 @@ SCFResult rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndoc
 	const Matrix X = sym_ortho(S);
     Matrix F = H;
 
-    double E0 = 0.0;
-	double E0_last = 1e2;
-    double dE = E0 - E0_last;
-    double rms_err = 1e2;
+    double E_scf = 0.0;
+	double E_scf_last = 0.0;
+    double dE = E_scf - E_scf_last;
+    double rms_err = 0.0;
 
     std::vector<Matrix> F_list;
     std::vector<Matrix> err_list;
@@ -59,17 +60,17 @@ SCFResult rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndoc
         // Frobenius norm, then divide to get mean
         rms_err = err_vec.norm() / std::sqrt(err_vec.size());
 
-		E0 = D.cwiseProduct(H + F).sum() + V_nn;
-		dE = E0 - E0_last;
+		E_scf = D.cwiseProduct(H + F).sum() + V_nn;
+		dE = E_scf - E_scf_last;
 
         if (verbose >= 2) {
-        std::println("Iter {:3} | E = {:.8f} | dE = {:.3e} | rms_E {:.3e}", i+1, E0, dE, rms_err);
+        std::println("SCF Iter {:3} | E = {:.8f} | dE = {:.3e} | rms_E {:.3e}", i+1, E_scf, dE, rms_err);
         }
 
 		if ((std::abs(dE) < econv) && (rms_err < econv)) {
             if (verbose >= 2) { std::println("SCF converged!"); }
             Vector eps = solver.eigenvalues();
-			return {E0, C, C, eps, eps};
+			return {E_scf, C, C, eps, eps};
 		}
 
         // Use a slice of the history to limit DIIS memory
@@ -85,10 +86,10 @@ SCFResult rhf_scf(double econv, int max_iter, int verbose, double V_nn, int ndoc
                 F += coeffs[i] * F_list[i];
             }
         }
-        E0_last = E0;
+        E_scf_last = E_scf;
     }
 
-    throw std::runtime_error("SCF failed to converge.\n");
+    throw std::runtime_error("SCF failed to converge.");
 }
 
 template SCFResult rhf_scf<std::vector<double>>(double, int, int, double, int,

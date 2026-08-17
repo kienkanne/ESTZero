@@ -19,14 +19,14 @@ TEST_CASE("calc_uhf_MP2_E: reduces to calc_rhf_mp2_E for a real closed-shell cas
     const Matrix C = g.mat("C");
     const Vector eps = g.vec("eps");
     const int n_occ = g.n_docc;
-    const double E0 = g.scalar("E_scf");
+    const double E_scf = g.scalar("E_scf");
     const Tensor eri_tensor = eri_vector_to_tensor(eri, g.nbf);
 
     Tensor I_mo = transmo_spat_iajb(eri_tensor, C, n_occ);
     SpinMO mo = transmo_spin_iajb(eri_tensor, C, n_occ, C, n_occ);
 
-    double rhf = calc_rhf_mp2_E(I_mo, eps, n_occ, E0);
-    double uhf = calc_uhf_mp2_E(mo.I_AA, mo.I_BB, mo.I_AB, eps, eps, n_occ, n_occ, E0);
+    double rhf = E_scf + calc_rhf_mp2_E(I_mo, eps, n_occ);
+    double uhf = E_scf + calc_uhf_mp2_E(mo.I_AA, mo.I_BB, mo.I_AB, eps, eps, n_occ, n_occ);
 
     CHECK(uhf == doctest::Approx(rhf).epsilon(1e-12));
 }
@@ -44,10 +44,10 @@ TEST_CASE("mp2: reproduces golden correlation energy, matching the Psi4 oracle")
 
         double e_mp2;
         if (g.reference == "rhf") {
-            e_mp2 = calc_rhf_mp2_E(g.tensor("I_mo"), g.vec("eps"), g.n_docc, E_scf);
+            e_mp2 = E_scf + calc_rhf_mp2_E(g.tensor("I_mo"), g.vec("eps"), g.n_docc);
         } else {
-            e_mp2 = calc_uhf_mp2_E(g.tensor("Iaa"), g.tensor("Ibb"), g.tensor("Iab"),
-                                   g.vec("epsa"), g.vec("epsb"), g.n_alpha, g.n_beta, E_scf);
+            e_mp2 = E_scf + calc_uhf_mp2_E(g.tensor("Iaa"), g.tensor("Ibb"), g.tensor("Iab"),
+                                   g.vec("epsa"), g.vec("epsb"), g.n_alpha, g.n_beta);
         }
 
         CHECK(e_mp2 == doctest::Approx(g.scalar("E_mp2")).epsilon(1e-12));       // regression

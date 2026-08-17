@@ -1,14 +1,13 @@
 #include <vector>
-#include <Eigen/Dense>
-#include <Eigen/Eigenvalues>
-#include <libint2.hpp>
 #include <print>
+#include <Eigen/Eigenvalues>
 
 #include "uhf.h"
 #include "wfn.h"
 #include "build_JK.h"
 #include "timer.h"
-
+#include "sym_ortho.h"
+#include "diis.h"
 
 template <typename ERI>
 SCFResult uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_alpha, int n_beta,
@@ -23,10 +22,10 @@ SCFResult uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_al
     Matrix FA = H;
     Matrix FB = H;
 
-    double E0 = 0.0;
-	double E0_last = 1e2;
-    double dE = E0 - E0_last;
-    double rms_err = 1e2;
+    double E_scf = 0.0;
+	double E_scf_last = 0.0;
+    double dE = E_scf - E_scf_last;
+    double rms_err = 0.0;
 
     std::vector<Matrix> FA_list;
     std::vector<Matrix> FB_list;
@@ -81,18 +80,18 @@ SCFResult uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_al
         // Frobenius norm, then divide to get mean
         rms_err = err_vec.norm() / std::sqrt(err_vec.size());
 
-		E0 = 0.5 * ((DA + DB).cwiseProduct(H)
+		E_scf = 0.5 * ((DA + DB).cwiseProduct(H)
                     + DA.cwiseProduct(FA)
                     + DB.cwiseProduct(FB)).sum() + V_nn;
-		dE = E0 - E0_last;
+		dE = E_scf - E_scf_last;
 
         if (verbose >= 2) {
-        std::println("Iter {:3} | E = {:.8f} | dE = {:.3e} | rms_E {:.3e}", i+1, E0, dE, rms_err);
+            std::println("SCF Iter {:3} | E_scf = {:.8f} | dE = {:.3e} | rms_E {:.3e}", i+1, E_scf, dE, rms_err);
         }
 
 		if ((std::abs(dE) < econv) && (rms_err < econv)) {
             if (verbose >= 2) { std::println("SCF converged!"); }
-			return {E0, CA, CB, epsA, epsB};
+			return {E_scf, CA, CB, epsA, epsB};
 		}
 
         // Use a slice of the history to limit DIIS memory
@@ -111,7 +110,7 @@ SCFResult uhf_scf(double econv, int max_iter, int verbose, double V_nn, int n_al
                 FB += coeffs[i] * FB_list[i];
             }
         }
-        E0_last = E0;
+        E_scf_last = E_scf;
     }
 
     throw std::runtime_error("SCF failed to converge.\n");

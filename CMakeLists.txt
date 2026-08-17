@@ -21,8 +21,9 @@ add_library(est_core STATIC
     estzero/est/mp2.cc
     estzero/est/transmo.cc
     estzero/est/cc_spin.cc
+    estzero/est/cc_build.cc
+    estzero/est/cc_driver.cc
     estzero/linalg/einsum.cc
-    estzero/linalg/utils.cc
 )
 
 target_include_directories(est_core PUBLIC

@@ -49,14 +49,14 @@ int main(int argc, char* argv[]) {
         auto wfn = WaveFunction(xyz_file, basis, mult, charge);
         wfn.get_integrals(eri_scheme_str);
         
-        double E0;
-        E0 = wfn.get_energy(reference, method, econv, max_iter, verbose);
-        std::println("Final SCF energy: {:.8f}", E0);
+        double E;
+        E = wfn.get_energy(reference, method, econv, max_iter, verbose);
+        std::println("Final energy: {:.8f}", E);
         
         libint2::finalize();
 
     } catch (const std::exception& error) {
-        std::println("SCF error: {}", error.what());
+        std::println("ESTZero error: {}", error.what());
         return EXIT_FAILURE;
     }
     timing::report();
