@@ -73,12 +73,13 @@ SCFResult rhf_scf(WaveFunction wfn, double econv, int max_iter, int verbose) {
 			return {E_scf, C, C, eps, eps};
 		}
 
-        // Use a slice of the history to limit DIIS memory
-        // Avoid old iterations from polluting the subspace
-        if (err_list.size() > 5) {
+        // Use a slice of the history to limit DIIS memory, avoid old iterations from polluting the subspace
+        if (err_list.size() > 6) {
             err_list.erase(err_list.begin());
             F_list.erase(F_list.begin());
+        }
 
+        if (err_list.size() >= 3) {
             Vector coeffs = diis(err_list);
             F.setZero();
 

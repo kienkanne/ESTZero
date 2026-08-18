@@ -46,11 +46,12 @@ def main():
                 "reference":     reference,
                 "e_convergence": 1e-8,
                 "d_convergence": 1e-8,
-                "maxiter":       200,
-                "guess":         "core",
+                "maxiter":      200,
+                "guess":        "core",
+                "mp2_type":     "conv",
+                "freeze_core":  "false",
             })
-            if method == "mp2":
-                psi4.set_options({"mp2_type": "conv", "freeze_core": False})
+
 
             mol = psi4.geometry(geom)
             t0 = time.perf_counter()

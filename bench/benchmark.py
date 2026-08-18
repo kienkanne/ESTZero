@@ -22,6 +22,17 @@ ENERGY_RE = re.compile(r"Final energy:\s*(-?\d+(?:\.\d+)?)")
 NBF_RE    = re.compile(r"nbf:\s*(\d+)")
 RSS_RE    = re.compile(r"peak RSS:\s*(\d+(?:\.\d+)?)\s*MB")
 PHASE_RE  = re.compile(r"^\s*(.*?)\s+(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+(?:\.\d+)?)\s*$")
+CC_ITER_RE = re.compile(r"^CC\S*\s+Iteration")
+CC_MO_KEY  = "MO Transformation (CC)"
+
+
+def _cc_iter_phase(phases):
+    """Find whichever '<CC-method> Iteration' phase is present (CCSD today,
+    CCSD(T)/CC2/etc. later) without hardcoding the method name."""
+    for name, data in phases.items():
+        if CC_ITER_RE.match(name):
+            return data
+    return {}
 
 
 def parse_output(text):
@@ -105,8 +116,8 @@ def _json_scf(d):
 def _print_mp2(collected, logger: logging.Logger):
     hdr = (f"{'system':<20} {'ref':>3} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
            f" {'psi4(s)':>8} {'wall(s)':>8} {'ERI(s)':>7} {'JK/it(ms)':>10}"
-           f" {'MO(s)':>7} {'MP2(ms)':>8}"
-           f" {'iters':>6} {'RSS(MB)':>8}")
+           f" {'iters':>6} {'MO(s)':>8}"
+           f" {'MP2(ms)':>7} {'RSS(MB)':>8}")
     logger.info(f"\n── MP2 {'─' * (len(hdr) - 6)}")
     logger.info(hdr)
     logger.info("─" * len(hdr))
@@ -116,9 +127,9 @@ def _print_mp2(collected, logger: logging.Logger):
         d = sys_data["mp2"]
         logger.info(f"{label:<20} {d['reference']:>3} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
               f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f} {fmt(d['eri_s'],'7.3f'):>7}"
-              f" {fmt(d['jk_ms'],'10.1f'):>10}"
+              f" {fmt(d['jk_ms'],'10.1f'):>10} {d['n_iter']:>6}"
               f" {fmt(d['mo_s'],'7.3f'):>7} {fmt(d['mp2_ms'],'8.1f'):>8}"
-              f" {d['n_iter']:>6} {fmt(d['peak_rss'],'8.1f'):>8}")
+              f" {fmt(d['peak_rss'],'8.1f'):>8}")
     logger.info("─" * len(hdr))
 
 def _json_mp2(d):
@@ -126,9 +137,34 @@ def _json_mp2(d):
             "mo(s)": d["mo_s"], "mp2(ms)": d["mp2_ms"]}
 
 
+def _print_ccsd(collected, logger: logging.Logger):
+    hdr = (f"{'system':<20} {'ref':>3} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
+           f" {'psi4(s)':>8} {'wall(s)':>8} {'ERI(s)':>7} {'JK/it(ms)':>10}"
+           f" {'scf_it':>6} {'MO(s)':>7} {'CCSD/it(ms)':>12} {'cc_it':>6}"
+           f" {'RSS(MB)':>8}")
+    logger.info(f"\n── CCSD {'─' * (len(hdr) - 7)}")
+    logger.info(hdr)
+    logger.info("─" * len(hdr))
+    for label, sys_data in collected.items():
+        if "ccsd" not in sys_data:
+            continue
+        d = sys_data["ccsd"]
+        logger.info(f"{label:<20} {d['reference']:>3} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
+              f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f} {fmt(d['eri_s'],'7.3f'):>7}"
+              f" {fmt(d['jk_ms'],'10.1f'):>10} {d['n_iter']:>6}"
+              f" {fmt(d['mo_cc_s'],'7.3f'):>7} {fmt(d['cc_ms'],'12.1f'):>12} {fmt(d['cc_iters'],'6.0f'):>6}"
+              f" {fmt(d['peak_rss'],'8.1f'):>8}")
+    logger.info("─" * len(hdr))
+
+def _json_ccsd(d):
+    return {"wall(s)": d["wall"], "eri(s)": d["eri_s"], "jk(ms)": d["jk_ms"],
+            "mo(s)": d["mo_cc_s"], "cc(ms)": d["cc_ms"], "cc_iters": d["cc_iters"]}
+
+
 METHOD_SPECS = {
-    "scf": {"printer": _print_scf, "to_json": _json_scf},
-    "mp2": {"printer": _print_mp2, "to_json": _json_mp2},
+    "scf":  {"printer": _print_scf,  "to_json": _json_scf},
+    "mp2":  {"printer": _print_mp2,  "to_json": _json_mp2},
+    "ccsd": {"printer": _print_ccsd, "to_json": _json_ccsd},
 }
 
 
@@ -187,56 +223,76 @@ def main():
         for method in methods:
             print(f"[mySCF/{method}] {label} ...")
 
-            best     = None
-            peak_rss = math.nan
+            try:
+                best     = None
+                peak_rss = math.nan
 
-            for _ in range(args.repeats):
-                wall, energy, nbf, phases, rss_mb, n_iter = run_once(
-                    system["xyz"], system["basis"], method,
-                    system.get("reference", "rhf"),
-                    system.get("mult", 1),
-                    system.get("charge", 0),
-                    args.maxiter, args.econv, args.scheme)
-                if best is None or wall < best[0]:
-                    best = (wall, energy, nbf, phases, n_iter)
-                if math.isnan(peak_rss) or rss_mb > peak_rss:
-                    peak_rss = rss_mb
+                for _ in range(args.repeats):
+                    wall, energy, nbf, phases, rss_mb, n_iter = run_once(
+                        system["xyz"], system["basis"], method,
+                        system.get("reference", "rhf"),
+                        system.get("mult", 1),
+                        system.get("charge", 0),
+                        args.maxiter, args.econv, args.scheme)
+                    if best is None or wall < best[0]:
+                        best = (wall, energy, nbf, phases, n_iter)
+                    if math.isnan(peak_rss) or rss_mb > peak_rss:
+                        peak_rss = rss_mb
 
-            wall, energy, nbf, phases, n_iter = best
-            outputs[label].setdefault("nbf", nbf)
+                wall, energy, nbf, phases, n_iter = best
+                outputs[label].setdefault("nbf", nbf)
 
-            mref = sys_ref.get(method)
-            if mref is None:
-                status, dE, ref_wall = "NOREF", math.nan, math.nan
-            else:
-                dE       = abs(energy - mref["energy"])
-                ref_wall = mref.get("wall", math.nan)
-                ok       = dE < args.tol
-                all_pass = all_pass and ok
-                status   = "PASS" if ok else "FAIL"
+                mref = sys_ref.get(method)
+                if mref is None:
+                    status, dE, ref_wall = "NOREF", math.nan, math.nan
+                else:
+                    dE       = abs(energy - mref["energy"])
+                    ref_wall = mref.get("wall", math.nan)
+                    ok       = dE < args.tol
+                    all_pass = all_pass and ok
+                    status   = "PASS" if ok else "FAIL"
 
-            eri_s  = phases.get("ERI build",             {}).get("seconds", math.nan)
-            mo_s   = phases.get("MO Transformation",     {}).get("seconds", math.nan)
-            mp2_ms = phases.get("MP2 Energy Calculation",{}).get("avg_ms",  math.nan)
+                eri_s  = phases.get("ERI build",             {}).get("seconds", math.nan)
+                mo_s   = phases.get("MO Transformation",     {}).get("seconds", math.nan)
+                mp2_ms = phases.get("MP2 Energy Calculation",{}).get("avg_ms",  math.nan)
 
-            jk_phase = phases.get("JK build")
-            if jk_phase:
-                jk_ms = jk_phase["avg_ms"]
-            else:
-                jka = phases.get("JK build", {}).get("avg_ms", 0.0)
-                jkb = phases.get("JK build", {}).get("avg_ms", 0.0)
-                jk_ms = (jka + jkb) if (jka or jkb) else math.nan
+                mo_cc_s  = phases.get(CC_MO_KEY, {}).get("seconds", math.nan)
+                cc_phase = _cc_iter_phase(phases)
+                cc_ms    = cc_phase.get("avg_ms", math.nan)
+                cc_iters = cc_phase.get("calls",  math.nan)
 
-            result = {
-                "nbf": nbf, "wall": wall, "n_iter": n_iter, "peak_rss": peak_rss,
-                "dE": dE, "ref_wall": ref_wall, "status": status,
-                "eri_s": eri_s, "jk_ms": jk_ms, "mo_s": mo_s, "mp2_ms": mp2_ms,
-                "reference": system.get("reference", "rhf"),
-            }
-            collected[label][method] = result
-            outputs[label][method]   = METHOD_SPECS[method]["to_json"](result)
+                jk_phase = phases.get("JK build")
+                if jk_phase:
+                    jk_ms = jk_phase["avg_ms"]
+                else:
+                    jka = phases.get("JK build", {}).get("avg_ms", 0.0)
+                    jkb = phases.get("JK build", {}).get("avg_ms", 0.0)
+                    jk_ms = (jka + jkb) if (jka or jkb) else math.nan
 
-            print(f"[mySCF/{method}] {label} Done!")
+                result = {
+                    "nbf": nbf, "wall": wall, "n_iter": n_iter, "peak_rss": peak_rss,
+                    "dE": dE, "ref_wall": ref_wall, "status": status,
+                    "eri_s": eri_s, "jk_ms": jk_ms, "mo_s": mo_s, "mp2_ms": mp2_ms,
+                    "mo_cc_s": mo_cc_s, "cc_ms": cc_ms, "cc_iters": cc_iters,
+                    "reference": system.get("reference", "rhf"),
+                }
+                collected[label][method] = result
+                outputs[label][method]   = METHOD_SPECS[method]["to_json"](result)
+
+                print(f"[mySCF/{method}] {label} Done!")
+
+            except Exception as e:
+                logger.info(f"[mySCF/{method}] {label} ERROR: {e}")
+                all_pass = False
+                result = {
+                    "nbf": sys_ref.get("nbf"), "wall": math.nan, "n_iter": 0, "peak_rss": math.nan,
+                    "dE": math.nan, "ref_wall": math.nan, "status": "ERROR",
+                    "eri_s": math.nan, "jk_ms": math.nan, "mo_s": math.nan, "mp2_ms": math.nan,
+                    "mo_cc_s": math.nan, "cc_ms": math.nan, "cc_iters": math.nan,
+                    "reference": system.get("reference", "rhf"),
+                }
+                collected[label][method] = result
+                outputs[label][method]   = {"error": str(e)}
 
     methods_run = {m for sys_data in collected.values() for m in sys_data}
     for method, spec in METHOD_SPECS.items():

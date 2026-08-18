@@ -4,17 +4,14 @@ An electronic structure engine built using C++ that is optimized over time. The 
 
 The test used to evaluate the performance of the engine is formaldehyde at the def2-tzvp basis set. The accuracy and performance is benchmarked against Psi4. 
 
-Psi4 options:
-```bash
-e_convergence 1e-8
-d_convergence 1e-8
-maxiter 200
-scf_type pk # no density-fitting
-guess core
+## References
 
-mp2_type conv
-freeze_core false
-```
+This repository is inspired by the following projects, which are also the references for the equations and programming materials:
+
+- Psi4Numpy: https://github.com/psi4/psi4numpy/
+- CCQC's summer program: https://github.com/CCQC/summer-program
+- Dr. Crawford's C++ Programming Projects: https://github.com/CrawfordGroup/ProgrammingProjects/
+- Dr. Crawford's PyCC: https://github.com/CrawfordGroup/pycc/
 
 ## Benchmarking
 
@@ -28,6 +25,18 @@ python bench/gen_reference.py
 python3 bench/benchmark.py
 ```
 
+Psi4 options:
+```bash
+e_convergence 1e-8
+d_convergence 1e-8
+maxiter 200
+scf_type pk # no density-fitting
+guess core
+
+mp2_type conv
+freeze_core false
+```
+
 ## Performance log
 
 This log tracks the update in features and their performance in the most computationally costly steps. Versions without algorithm update for each section is not documented. See `bench/outputs` for full version peformance logs.
@@ -36,11 +45,11 @@ This log tracks the update in features and their performance in the most computa
 
 > v1.5.2 switched `Tensor`'s element access (`operator()`/`flat_index`) to bounds-checked `std::vector::at()` as part of the shared_ptr-backed zero-copy view rewrite (`swapaxes`/`slice`). Since `Tensor` is the storage type behind the ERI tensor scheme, `build_JK`, and the `einsum`-driven MO transform, this regressed every section below that touches it — most visibly UHF MP2's MO transform, which lost the v1.5.1 fix's gains. v1.5.3 replaces `.at()` with unchecked indexing (safe here, since every call site already guarantees in-bounds access), restoring MP2 to v1.5.1 levels and improving ERI/JK further; the remaining ERI gap vs. the v1.5.0 vector scheme is now fully explained by the tensor scheme's inherent 8-fold permutation writes per integral, not indexing overhead.
 
-### RHF
+### SCF
 
 For RHF, the test used to track through different versions is benzene/def2-svp (nbf=114), as it has a sufficiently large number of basis functions for testing. The baseline version, v0.1.0, uses in-core 4-index ERIs (no permutational symmetry, no screening), dense N^4 JK build, DIIS, symmetric orthogonalization, core guess.
 
-#### SCF
+#### RHF
 
 | version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|
@@ -54,9 +63,23 @@ For RHF, the test used to track through different versions is benzene/def2-svp (
 | v1.5.2 | 4.018 | 1.756 | 139.7 | 16 | 1301.0 | Tensor's shared_ptr view rewrite (`swapaxes`/`slice`) switched element access to bounds-checked `.at()`, regressing every Tensor-touching phase |
 | v1.5.3 | 3.985 | 1.769 | 136.7 | 16 | 1301.0 | Fix: `.at()` replaced with unchecked indexing in `Tensor`. JK faster than v1.5.2; ERI still slower than v1.5.0 (vector), now purely from the 8-fold write expansion, not indexing overhead |
 
-#### MP2
+#### UHF
 
-Version v1.0.0 now includes MP2 for RHF. The baseline is the 4 step MO transformation written via explicit loops ~ O(N^5). The calculation runs a base SCF first, so ERI build and JK build performance is similar to versions above.
+Version 1.1.0 reorganize the benchmark suite to separate the reference and the method; UHF is added as an additional reference to the previous RHF, with the methods being SCF and MP2. The benchmark system for UHF is •CH3 methyl radical/aug-cc-pvtz (nbf=115). The baseline for UHF SCF is similar to RHF SCF version 0.4.0, but with separate alpha and beta terms following the Pople-Nesbet equations.
+
+| version | Total wall (s) | ERI build (s) | JK build<sup>(1)</sup> (per iter) (ms) | N_SCF_iter | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|
+| v1.1.0 | 13.998 | 1.020 | 862.6 | 15 | 188.2 | UHF SCF Baseline |
+| v1.5.0 (vector) | 16.248 | 1.028 | 1012.0 | 15 | 187.9 | Slightly slower JK build compared to v1.1.0 (reorganization effects) |
+| v1.5.0 (tensor) | 7.971 | 2.216 | 376.2 | 15 | 1352.9 | Similar speed up to RHF, but build JK is significantly faster because of both alpha and beta building per iteration |
+| v1.5.2 | 5.835 | 1.465 | 288.5 | 15 | 1352.9 | Same `.at()` regression as RHF SCF (`Tensor` is shared across references) |
+| v1.5.3 | 5.725 | 1.460 | 281.6 | 15 | 1352.9 | Same fix and gains as RHF SCF |
+
+> (1) Total time for both alpha and beta calculation time per iteration
+
+### MP2
+
+Version v1.0.0 included MP2 for RHF. The baseline is the 4 step MO transformation written via explicit loops ~ O(N^5). The calculation runs a base SCF first, so ERI build and JK build performance is similar to versions above.
 
 | version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) |  N_SCF_iter | MO transform(s) | MP2 energy (ms) | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|
@@ -68,31 +91,15 @@ Version v1.0.0 now includes MP2 for RHF. The baseline is the 4 step MO transform
 | v1.5.2 | 30.729 | 1.754 | 140.0 | 16 | 26.701 | 5.7 | 1732.1 | Same `.at()` regression as SCF above; the `einsum`-driven MO transform is Tensor-heavy so it's hit too |
 | v1.5.3 | 27.308 | 1.764 | 136.2 | 16 | 23.332 | 5.8 | 1732.1 | Fix restores MO transform/MP2 to v1.5.1-level speed; see SCF note above |
 | v1.5.5a | 28.592 | 1.762 | 136.8 | 16 | 24.527 | 215.5 | 1732.3 | Wired in `einsum` for MP2 energy evaluation. ~40x slow down due to `einsum` not having pairwise evaluation, so *`iajb,iajb,iajb->` is extremely slow* (Correction below) |
-| v1.5.5b<sup>(1)</sup> | 28.585 | 1.764 | 136.9 | 16 | 24.375 | 227.0 | 1732.3 | Wired `einsum` with two operands and intermediates. Performance is slightly worse, `einsum` wasn't a problem for this case the 4 indices are the same; `Tensor` setup fixed cost is what hit |
+| v1.5.5b<sup>(2)</sup> | 28.585 | 1.764 | 136.9 | 16 | 24.375 | 227.0 | 1732.3 | Wired `einsum` with two operands and intermediates. Performance is slightly worse, `einsum` wasn't a problem for this case the 4 indices are the same; `Tensor` setup fixed cost is what hit |
 
-> (1) Version v1.5.5c tried replacing all `einsum` with `Tensor` arithemic operators, but performance is identical, showing the fixed cost lie in `Tensor` setups.
+> (2) Version v1.5.5c tried replacing all `einsum` with `Tensor` arithemic operators, but performance is identical, showing the fixed cost lie in `Tensor` setups.
 
-### UHF
-
-Version 1.1.0 reorganize the benchmark suite to separate the reference and the method; UHF is added as an additional reference to the previous RHF, with the methods being SCF and MP2. The benchmark system for UHF is •CH3 methyl radical/aug-cc-pvtz (nbf=115). The baseline for UHF SCF is similar to RHF SCF version 0.4.0, but with separate alpha and beta terms following the Pople-Nesbet equations.
-
-#### SCF
-
-| version | Total wall (s) | ERI build (s) | JK build<sup>(2)</sup> (per iter) (ms) | N_SCF_iter | Peak RSS (MB) | Note |
-|---|---|---|---|---|---|---|
-| v1.1.0 | 13.998 | 1.020 | 862.6 | 15 | 188.2 | UHF SCF Baseline |
-| v1.5.0 (vector) | 16.248 | 1.028 | 1012.0 | 15 | 187.9 | Slightly slower JK build compared to v1.1.0 (reorganization effects) |
-| v1.5.0 (tensor) | 7.971 | 2.216 | 376.2 | 15 | 1352.9 | Similar speed up to RHF, but build JK is significantly faster because of both alpha and beta building per iteration |
-| v1.5.2 | 5.835 | 1.465 | 288.5 | 15 | 1352.9 | Same `.at()` regression as RHF SCF (`Tensor` is shared across references) |
-| v1.5.3 | 5.725 | 1.460 | 281.6 | 15 | 1352.9 | Same fix and gains as RHF SCF |
-
-> (2) Total time for both alpha and beta calculation time per iteration
-
-#### MP2
+#### UHF
 
 UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alpha-alpha, beta-beta, and alpha-beta MO integral tensors. Baseline version (v1.1.0): the index transform function used is similar to the one used for RHF MP2 to build alpha-alpha and beta-beta tensors; the alpha-beta block is built from the intermediate tensor after index 2 transformation of the alpha-alpha tensor
 
-| version | Total wall (s) | ERI build (s) | JK build<sup>(2)</sup> (per iter) (ms) |  N_SCF_iter | MO transform<sup>(2)</sup> (s) | MP2 energy (ms) | Peak RSS (MB) | Note |
+| version | Total wall (s) | ERI build (s) | JK build<sup>(1)</sup> (per iter) (ms) |  N_SCF_iter | MO transform<sup>(1)</sup> (s) | MP2 energy (ms) | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|
 | v1.1.0 | 21.285 | 1.024 | 905.5 | 15 | 6.635 | 0.8 | 393.1 | UHF MP2 Baseline |
 | v1.3.0 | 28.646 | 1.036 | 839.4 | 15 | 14.976<sup>(3)</sup> | 2.1 | 4255.5 | Same `einsum` rewrite as RHF MP2 above. Peak RSS ~11x. |
@@ -107,3 +114,12 @@ UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alp
 
 > (3) v1.3.0-v1.5.0 didn't use intermediate 2 of Iaa to build Iab when using the new `einsum`, so performance was heavily impacted. This is fixed in v1.5.1
 
+### CCSD
+
+#### UHF
+
+Version 2.0.0 introduced CCSD for UHF. The baseline use the formulated equations adopted from [Stanton:1991:4334], all are written in `einsum` and uses the class `Tensor`. The system reported here for benchmarking is `o2/6-31g` (nbf=18, triplet). The system is the appropriate size to use, as it's large enough to expose CC iterations wall time but also keeping the total low (~20s) for quick benchmarking. The MO transformation here transforms every axis over the entire `nbf` range, which is different than in MP2 above, only producing `iajb` (ovov).
+
+| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) |  N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|---|
+| v2.0.0 | 19.770 | 0.006 | 0.1 | 12 | 0.066 | 932.4 | 21 | 51.0 | UHF CCSD Baseline |

@@ -3,6 +3,7 @@
 #include <Eigen/Eigenvalues>
 
 #include "uhf.h"
+#include "tensor.h"
 #include "wfn.h"
 #include "jk_build.h"
 #include "timer.h"
@@ -99,13 +100,14 @@ SCFResult uhf_scf(WaveFunction wfn, double econv, int max_iter, int verbose) {
 			return {E_scf, CA, CB, epsA, epsB};
 		}
 
-        // Use a slice of the history to limit DIIS memory
-        // Avoid old iterations from polluting the subspace
-        if (err_list.size() > 5) {
+                // Use a slice of the history to limit DIIS memory, avoid old iterations from polluting the subspace
+        if (err_list.size() > 6) {
             err_list.erase(err_list.begin());
             FA_list.erase(FA_list.begin());
             FB_list.erase(FB_list.begin());
+        }
 
+        if (err_list.size() >= 3) {
             Vector coeffs = diis(err_list);
             FA.setZero();
             FB.setZero();

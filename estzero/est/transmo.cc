@@ -69,7 +69,7 @@ SpinMO transmo_spin_iajb(const Tensor& eri_tensor, const Matrix& CA, int n_alpha
 
 
 Tensor transmo_spat_pqrs(const Tensor& eri_tensor, const Matrix& C) {
-    timing::Scoped _t("MO Transformation");
+    timing::Scoped _t("MO Transformation (CC)");
     Tensor Ct = mat_to_tensor(C);
 
     return transmo(eri_tensor, Ct, Ct, Ct, Ct);
@@ -77,7 +77,7 @@ Tensor transmo_spat_pqrs(const Tensor& eri_tensor, const Matrix& C) {
 
 
 SpinMO transmo_spin_pqrs(const Tensor& eri_tensor, const Matrix& CA, int n_alpha, const Matrix& CB, int n_beta) {
-    timing::Scoped _t("MO Transformation");
+    timing::Scoped _t("MO Transformation (CC)");
 
     const int nbf = static_cast<int>(CA.rows());
     const int n_avirt = nbf - n_alpha;

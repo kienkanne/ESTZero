@@ -2,7 +2,10 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
-## [Unreleased] - Building towards CCSD
+## [v2.0.0] Added Unrestricted HF Coupled Cluster Singles & Doubles (CCSD)
+
+- Fully working UHF CCSD module, with spin-orbital CCSD equations adopted from [Stanton:1991:4334]. Equations all written using the `Tensor` and `einsum` underlying infrastructure built in the last few updates, which include multiple contractions and arthimetic operations on tensors (i.e. `Fae`, `Fmi`, `Fme`, `Wmnij`, `Wabef`, `Wmbej`, and the amplitude equations).
+- Main references: [Psi4Numpy](https://github.com/psi4/psi4numpy/tree/master/Coupled-Cluster), [PyCC](https://github.com/CrawfordGroup/pycc/tree/main/pycc).
 
 ## [v1.6.1] Fixed `einsum` accumulate bug. Added validation for CCSD energy (first iteration) against MP2
 
