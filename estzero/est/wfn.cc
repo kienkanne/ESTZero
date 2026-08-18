@@ -156,7 +156,7 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
 
     else if (method.starts_with("cc")) {
         CCResult ccresult = cc_driver(*this, sr, method, reference, econv, max_iter, verbose);
-        return E_scf + ccresult.E_ccsd;
+        return E_scf + ccresult.E_cc;
     }
 
     else { throw std::runtime_error(std::format("Unknown method: {}", method)); }

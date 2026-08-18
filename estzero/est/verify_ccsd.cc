@@ -53,7 +53,7 @@ int main() {
     Tensor t1_zero(Dia.shape);
     Tensor t2_mp2 = ASprqs.slice(O_sli, O_sli, V_sli, V_sli) / Dijab;
 
-    double E_ccsd = r.E_scf + calc_ccsd_E(ASprqs, FN, t1_zero, t2_mp2, O_sli, V_sli);
+    double E_ccsd = r.E_scf + calc_cc_E(ASprqs, FN, t1_zero, t2_mp2, O_sli, V_sli);
 
     std::println("n_alpha={} n_beta={} nbf={}", n_alpha, n_beta, nbf);
     std::println("oracle (calc_uhf_MP2_E): {:.12f}", E_oracle);

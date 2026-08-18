@@ -2,6 +2,10 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v2.0.1] Added UHF CCD (no singles)
+
+- This addition is trivial because `t1` just doesn't get an update. Technically, it can be optimized by dropping unnecessary contractions on the empty `t1` tensor, but this method is limited in accuracy for UHF CCD, and Psi4 does not even implement it. For this reason the optimal CCD path is not coded, it won't be reported as well.
+
 ## [v2.0.0] Added Unrestricted HF Coupled Cluster Singles & Doubles (CCSD)
 
 - Fully working UHF CCSD module, with spin-orbital CCSD equations adopted from [Stanton:1991:4334]. Equations all written using the `Tensor` and `einsum` underlying infrastructure built in the last few updates, which include multiple contractions and arthimetic operations on tensors (i.e. `Fae`, `Fmi`, `Fme`, `Wmnij`, `Wabef`, `Wmbej`, and the amplitude equations).

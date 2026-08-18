@@ -1,3 +1,8 @@
+// REFERENCES. The CCSD equations are adopted from the following sources:
+// - Formulation of CCSD Equations: [Stanton:1991:4334]
+// - Psi4Numpy Coupled-Cluster module: https://github.com/psi4/psi4numpy/tree/master/Coupled-Cluster
+// - Dr. Crawford's PyCC repository: https://github.com/CrawfordGroup/pycc/tree/main/pycc
+
 #include "tensor.h"
 #include "einsum.h"
 #include "cc_build.h"
@@ -17,12 +22,11 @@ Tensor build_Fae(const Tensor& ASpqrs, const Tensor& FN, const Tensor& tlide_tau
                 const Tensor& t1, const Tensor& t2, Sli O, Sli V) {
     Tensor Fae = FN.slice(V, V).copy();
     for (int i = 0; i != Fae.shape[0]; ++i) { Fae(i, i) = 0; }
-
+    
     Fae -= 0.5 * einsum("me,ma->ae", {FN.slice(O, V), t1});
     Fae += einsum("mf,mafe->ae", {t1, ASpqrs.slice(O, V, V, V)});
-
+    
     Fae -= 0.5 * einsum("mnaf,mnef->ae", {tlide_tau, ASpqrs.slice(O, O, V, V)});
-
     return Fae;
 }
 
@@ -78,6 +82,7 @@ Tensor build_Wabef(const Tensor& ASpqrs, const Tensor& FN, const Tensor& tau,
 Tensor build_Wmbej(const Tensor& ASpqrs, const Tensor& FN, const Tensor& tau,
                 const Tensor& t1, const Tensor& t2, Sli O, Sli V) {
     Tensor Wmbej = ASpqrs.slice(O, V, V, O).copy();
+
     Wmbej += einsum("jf,mbef->mbej", {t1, ASpqrs.slice(O, V, V, V)});
     Wmbej -= einsum("nb,mnej->mbej", {t1, ASpqrs.slice(O, O, V, O)});
 
@@ -127,10 +132,11 @@ Tensor build_T2(const Tensor& ASpqrs, const Tensor& tau, // (takes tau, not FN)
     t2_new += 0.5 * einsum("ijef,abef->ijab", {tau, Wabef});
 
     { // And here
-        Tensor tmp = einsum("ie,ma,mbej->ijab", {t1, t1, ASpqrs.slice(O, V, V, O)});
         Tensor Pijab = einsum("imae,mbej->ijab", {t2, Wmbej});
+
+        Tensor tmp = einsum("ie,ma,mbej->ijab", {t1, t1, ASpqrs.slice(O, V, V, O)});
         Pijab -= tmp;
-        
+
         // P(ij) * P(ab): (ij - ji) * (ab - ba) = ijab - ijba - jiab + jiba
         t2_new += Pijab;
         t2_new -= Pijab.swapaxes(2, 3);
@@ -143,7 +149,7 @@ Tensor build_T2(const Tensor& ASpqrs, const Tensor& tau, // (takes tau, not FN)
         t2_new += Pij;
         t2_new -= Pij.swapaxes(0, 1);
     }
-
+    
     {
         Tensor Pab = einsum("ma,mbij->ijab", {t1, ASpqrs.slice(O, V, O, O)});
         t2_new -= Pab;

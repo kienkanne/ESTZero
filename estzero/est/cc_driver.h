@@ -38,7 +38,9 @@ inline CCResult cc_driver(WaveFunction wfn, SCFResult sr, std::string method, st
         Sli V = Sli {n_alpha + n_beta, ASprqs.shape[0]};
         
         if (method == "ccsd") {
-            return ccsd_iterate(econv, max_iter, verbose, ASprqs, FN, Dia, Dijab, O, V);
+            return cc_iterate(econv, max_iter, verbose, ASprqs, FN, Dia, Dijab, O, V);
+        } else if (method == "ccd") {
+            return cc_iterate(econv, max_iter, verbose, ASprqs, FN, Dia, Dijab, O, V, true);
         } else {
             throw std::runtime_error(std::format("Unknown method: {}", method));
         }
