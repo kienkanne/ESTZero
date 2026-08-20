@@ -3,40 +3,42 @@
 
 #include "tensor.h"
 
-struct Taus {
-    Tensor tau; Tensor tilde_tau;
-};
+struct Dia_Dijab {Tensor Dia; Tensor Dijab; };
+Dia_Dijab build_Dia_Dijab(const Tensor& FN, const int nbf, const int n_occ, bool spin);
 
-Taus build_taus(const Tensor& t1, const Tensor& t2);
+struct Taus { Tensor tau; Tensor tilde_tau;};
+Taus build_taus(const Tensor& t1, const Tensor& t2, bool spin);
 
 
-Tensor build_Fae(const Tensor& ASprqs, const Tensor& FN, const Tensor& tilde_tau,
-                const Tensor& t1, const Tensor& t2, Sli O, Sli V);
+Tensor build_Fae(const Tensor& DEprqs, const Tensor& FN, const Tensor& tilde_tau,
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin);
                 
-Tensor build_Fmi(const Tensor& ASprqs, const Tensor& FN, const Tensor& tilde_tau,
+Tensor build_Fmi(const Tensor& DEprqs, const Tensor& FN, const Tensor& tilde_tau,
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin);
+
+Tensor build_Fme(const Tensor& DEprqs, const Tensor& FN, const Tensor& tau,
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin);
+
+
+// UHF uses DEprqs <pr||qs>, while RHF uses Iprqs (the raw ERI tensor)
+Tensor build_Wmnij(const Tensor& _prqs, const Tensor& FN, const Tensor& tau,
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin);
+
+// UHF uses DEprqs <pr||qs>, while RHF uses Iprqs (the raw ERI tensor)
+Tensor build_Wmbej(const Tensor& _prqs, const Tensor& FN, const Tensor& tau,
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin);
+
+
+// ONLY USED BY UHF
+Tensor build_Wabef(const Tensor& DEprqs, const Tensor& FN, const Tensor& tau,
                 const Tensor& t1, const Tensor& t2, Sli O, Sli V);
 
-Tensor build_Fme(const Tensor& ASprqs, const Tensor& FN,
-                const Tensor& t1,  Sli O, Sli V);
-
-
-Tensor build_Wmnij(const Tensor& ASprqs, const Tensor& FN, const Tensor& tau,
+// ONLY USED BY RHF
+Tensor build_Wmbje(const Tensor& Iprqs, const Tensor& FN, const Tensor& tau,
                 const Tensor& t1, const Tensor& t2, Sli O, Sli V);
 
-Tensor build_Wabef(const Tensor& ASprqs, const Tensor& FN, const Tensor& tau,
-                const Tensor& t1, const Tensor& t2, Sli O, Sli V);
-
-Tensor build_Wmbej(const Tensor& ASprqs, const Tensor& FN, const Tensor& tau,
-                const Tensor& t1, const Tensor& t2, Sli O, Sli V);
-
-
-Tensor build_T1(const Tensor& ASprqs, const Tensor& FN,
-                const Tensor& Fae, const Tensor& Fmi, const Tensor& Fme,
-                const Tensor& t1, const Tensor& t2, Sli O, Sli V);
-
-Tensor build_T2(const Tensor& ASprqs, const Tensor& tau,
-                const Tensor& Fae, const Tensor& Fmi, const Tensor& Fme,
-                const Tensor& Wmnij, const Tensor& Wabef, const Tensor& Wmbej,
+// ONLY USED BY RHF
+Tensor build_Zmbij(const Tensor& Iprqs, const Tensor& FN, const Tensor& tau,
                 const Tensor& t1, const Tensor& t2, Sli O, Sli V);
 
 #endif

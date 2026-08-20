@@ -6,8 +6,9 @@
 #include "transmo.h"
 #include "mp2.h"
 #include "cc_spin.h"
+#include "cc_build.h"
 
-// Standalone verification: build the spin-orbital ASprqs/Dia/Dijab pipeline for an open-shell
+// Standalone verification: build the spin-orbital DEprqs/Dia/Dijab pipeline for an open-shell
 // UHF system and check that test_mp2_energy() reproduces the correlation energy as the already
 // golden-tested calc_uhf_MP2_E, from the same Ca/Cb/epsa/epsb.
 int main() {
@@ -36,24 +37,24 @@ int main() {
     // New path: full-space transform -> spin-orbital Ismo -> test_mp2_energy.
     const auto& [Ipqrs_AA, Ipqrs_BB, Ipqrs_AB] = 
                 transmo_spin_pqrs(eri_tensor, r.CA, n_alpha, r.CB, n_beta);
-    Tensor ASprqs = build_spin_ASprqs(Ipqrs_AA, Ipqrs_BB, Ipqrs_AB, n_alpha, n_beta);
+    Tensor Iprqs = build_spin_Iprqs(Ipqrs_AA, Ipqrs_BB, Ipqrs_AB, n_alpha, n_beta);
 
     // Ha/Hb must be in each spin's own MO basis.
     Tensor HA = mat_to_tensor(Matrix(r.CA.transpose() * (T + V) * r.CA));
     Tensor HB = mat_to_tensor(Matrix(r.CB.transpose() * (T + V) * r.CB));
-    Tensor FN = build_spin_FN(HA, HB, ASprqs, n_alpha, n_beta);
-    auto [Dia, Dijab] = build_spin_Dia_Dijab(FN, n_alpha, n_beta);
-    
-    double E_testmp2 = r.E_scf + test_mp2_energy(ASprqs, Dia, Dijab, n_alpha + n_beta);
+    Tensor DEprqs = Iprqs - Iprqs.swapaxes(2, 3);
+    Tensor FN = build_spin_FN(HA, HB, DEprqs, n_alpha, n_beta);
+    auto [Dia, Dijab] = build_Dia_Dijab(FN, nbf, n_alpha + n_beta, true);
+    double E_testmp2 = test_mp2_energy(DEprqs, Dia, Dijab, n_alpha + n_beta);
 
     // Test using newly built ccsd energy equation
     const int n_occ = n_alpha + n_beta;
     const Sli O_sli{0, n_occ};
-    const Sli V_sli{n_occ, ASprqs.shape[0]};
+    const Sli V_sli{n_occ, Iprqs.shape[0]};
     Tensor t1_zero(Dia.shape);
-    Tensor t2_mp2 = ASprqs.slice(O_sli, O_sli, V_sli, V_sli) / Dijab;
-
-    double E_ccsd = r.E_scf + calc_cc_E(ASprqs, FN, t1_zero, t2_mp2, O_sli, V_sli);
+    Tensor t2_mp2 = DEprqs.slice(O_sli, O_sli, V_sli, V_sli) / Dijab;
+    auto [tau, tilde_tau] = build_taus(t1_zero, t2_mp2, true);
+    double E_ccsd = calc_spin_cc_E(DEprqs, FN, tau, t1_zero, t2_mp2, O_sli, V_sli);
 
     std::println("n_alpha={} n_beta={} nbf={}", n_alpha, n_beta, nbf);
     std::println("oracle (calc_uhf_MP2_E): {:.12f}", E_oracle);
@@ -62,7 +63,7 @@ int main() {
     std::println("[2] calc_ccsd_E(): {:.12f}", E_ccsd);
     std::println("");
     std::println("[1] difference: {:.3e}", E_oracle - E_testmp2);
-    std::println("[1] difference: {:.3e}", E_oracle - E_ccsd);
+    std::println("[2] difference: {:.3e}", E_oracle - E_ccsd);
 
     libint2::finalize();
     return 0;

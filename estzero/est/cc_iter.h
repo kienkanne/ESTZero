@@ -9,7 +9,8 @@ struct CCResult {
     Tensor t2;
 };
 
-CCResult cc_iterate(double econv, int max_iter, int verbose, const Tensor& ASprqs, const Tensor& FN,
-                        const Tensor& Dia, const Tensor& Dijab, Sli O, Sli V, bool is_CCD = false);
+CCResult cc_iterate(double econv, int max_iter, int verbose, const Tensor& Iprqs, 
+                    const Tensor& DEprqs, const Tensor& FN, const Tensor& Dia, const Tensor& Dijab, 
+                    Sli O, Sli V, bool spin, bool is_CCD = false);
 
 #endif

@@ -1,7 +1,6 @@
 #include "tensor.h"
-#include "cc_spin.h"
 #include "einsum.h"
-
+#include "cc_spin.h"
 
 namespace {
 
@@ -64,7 +63,7 @@ void scatter_mixed_spin(Tensor& IS, const Tensor& I_chem_AB,
 // blocks. This is transforming a "spin-major" format to "occupancy-format", which requires the
 // helpers above to avoid writing out all possible combinations. The final Tensor is then anti-symmetrized,
 // which is used by all other intermediate-tensor-builders in CCSD.
-Tensor build_spin_ASprqs(const Tensor& Ipqrs_AA, const Tensor& Ipqrs_BB, const Tensor& Ipqrs_AB,
+Tensor build_spin_Iprqs(const Tensor& Ipqrs_AA, const Tensor& Ipqrs_BB, const Tensor& Ipqrs_AB,
                     const int n_alpha, const int n_beta) {
 
     const int nbf = Ipqrs_AA.shape[0];
@@ -77,16 +76,16 @@ Tensor build_spin_ASprqs(const Tensor& Ipqrs_AA, const Tensor& Ipqrs_BB, const T
     scatter_same_spin(Iprqs, Ipqrs_BB, OB_des, VB_des, OB_src, VB_src);
     scatter_mixed_spin(Iprqs, Ipqrs_AB, OA_des, VA_des, OA_src, VA_src, OB_des, VB_des, OB_src, VB_src);
 
-    // Antisymmetrize once here ASprqs = <pr||qs> = <pr|qs> - <pq|rs>
-    return Iprqs - Iprqs.swapaxes(2, 3);
+    return Iprqs;
 }
 
 
 // Normal-ordered Fock matrix. FN = HN + sum_m <pi||qi>.
 // Ha/Hb must each be the one-electron Hamiltonian already transformed into that spin's OWN MO basis 
 // (Ha = Ca^T (T+V) Ca, Hb = Cb^T (T+V) Cb)
-Tensor build_spin_FN(const Tensor& Ha, const Tensor& Hb, const Tensor& ASprqs, const int n_alpha, const int n_beta) {
-    const int nbf = Ha.shape[0];
+Tensor build_spin_FN(const Tensor& HA, const Tensor& HB, const Tensor& DEprqs, 
+                    const int n_alpha, const int n_beta) {
+    const int nbf = HA.shape[0];
     Tensor HN({2 * nbf, 2 * nbf});
 
     const auto [OA_des, OB_des, VA_des, VB_des,
@@ -95,64 +94,100 @@ Tensor build_spin_FN(const Tensor& Ha, const Tensor& Hb, const Tensor& ASprqs, c
     // Ha and Hb are stored in spin-major order. Reorder each spin block into shared
     // occupancy-major order Oa, Ob, Va, Vb. Cross-spin blocks stay zero. This is similar
     // idea above, but a matrix is smaller so rolling all out is feasible
-    HN.slice(OA_des, OA_des).assign(Ha.slice(OA_src, OA_src));
-    HN.slice(OA_des, VA_des).assign(Ha.slice(OA_src, VA_src));
-    HN.slice(VA_des, OA_des).assign(Ha.slice(VA_src, OA_src));
-    HN.slice(VA_des, VA_des).assign(Ha.slice(VA_src, VA_src));
+    HN.slice(OA_des, OA_des).assign(HA.slice(OA_src, OA_src));
+    HN.slice(OA_des, VA_des).assign(HA.slice(OA_src, VA_src));
+    HN.slice(VA_des, OA_des).assign(HA.slice(VA_src, OA_src));
+    HN.slice(VA_des, VA_des).assign(HA.slice(VA_src, VA_src));
 
-    HN.slice(OB_des, OB_des).assign(Hb.slice(OB_src, OB_src));
-    HN.slice(OB_des, VB_des).assign(Hb.slice(OB_src, VB_src));
-    HN.slice(VB_des, OB_des).assign(Hb.slice(VB_src, OB_src));
-    HN.slice(VB_des, VB_des).assign(Hb.slice(VB_src, VB_src));
+    HN.slice(OB_des, OB_des).assign(HB.slice(OB_src, OB_src));
+    HN.slice(OB_des, VB_des).assign(HB.slice(OB_src, VB_src));
+    HN.slice(VB_des, OB_des).assign(HB.slice(VB_src, OB_src));
+    HN.slice(VB_des, VB_des).assign(HB.slice(VB_src, VB_src));
 
     const Sli All{};
     const Sli O{0, n_alpha + n_beta};
-    Tensor two_electron = einsum("piqi->pq", {ASprqs.slice(All, O, All, O)});
+    Tensor two_electron = einsum("piqi->pq", {DEprqs.slice(All, O, All, O)});
 
     return HN + two_electron;
 }
 
 
-Dia_Dijab build_spin_Dia_Dijab(const Tensor& FN, const int n_alpha, const int n_beta) {
-    const int nbf = static_cast<int>(FN.shape[0]/2);
-    const int n_occ = n_alpha + n_beta;
-    const int n_virt = 2*nbf - n_occ;
-        const auto [OA_des, OB_des, VA_des, VB_des,
-                    OA_src, OB_src, VA_src, VB_src] = get_slices_ab_ov(n_alpha, n_beta, nbf);
-    
-    Tensor FN_diag({2 * nbf});
-    for (int i=0; i != nbf*2; ++i) { FN_diag(i) = FN(i, i); }
+// Stanton Eqn 1
+Tensor build_spin_T1(const Tensor& DEprqs, const Tensor& FN,
+                const Tensor& Fae, const Tensor& Fmi, const Tensor& Fme,
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin) {
+    Tensor t1_new = FN.slice(O, V).copy();
 
-    Tensor Dia({n_occ, n_virt});
-    Tensor Dijab({n_occ, n_occ, n_virt, n_virt});
+    t1_new += einsum("ie,ae->ia", {t1, Fae});
+    t1_new -= einsum("ma,mi->ia", {t1, Fmi});
+    t1_new += einsum("imae,me->ia", {t2, Fme});
+    t1_new -= einsum("nf,naif->ia", {t1, DEprqs.slice(O, V, O, V)});
+    t1_new -= 0.5 * einsum("imef,maef->ia", {t2, DEprqs.slice(O, V, V, V)});
+    t1_new -= 0.5 * einsum("mnae,nmei->ia", {t2, DEprqs.slice(O, O, V, O)});
 
-    for (int i = 0; i < n_occ; ++i) {
-    for (int a = 0; a < n_virt; ++a) {
-        Dia(i, a) = FN_diag(i) - FN_diag(n_occ + a);
-
-        for (int j = 0; j < n_occ; ++j) {
-        for (int b = 0; b < n_virt; ++b) {
-            Dijab(i, j, a, b) = FN_diag(i) + FN_diag(j) - FN_diag(n_occ + a) - FN_diag(n_occ + b);
-    }}}}
-
-    return {Dia, Dijab};
+    return t1_new;
 }
 
-double test_mp2_energy(const Tensor& ASprqs, const Tensor& Dia, const Tensor& Dijab, const int n_occ) {
+// Stanton Eqn 2
+Tensor build_spin_T2(const Tensor& DEprqs, const Tensor& tau, // (takes tau, not FN)
+                const Tensor& Fae, const Tensor& Fmi, const Tensor& Fme,
+                const Tensor& Wmnij, const Tensor& Wabef, const Tensor& Wmbej,
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin) {
+    Tensor t2_new = DEprqs.slice(O, O, V, V).copy();
+    
+    // P(ij) = (Pij - Pji)
+    Tensor tmp = Fae - 0.5 * einsum("mb,me->be", {t1, Fme});
+    Tensor Pab = einsum("ijae,be->ijab", {t2, tmp});
+    t2_new += Pab;
+    t2_new -= Pab.swapaxes(2, 3);
+
+    // Most costly step here
+    tmp = Fmi + 0.5 * einsum("je,me->mj", {t1, Fme});
+    Tensor Pij = einsum("imab,mj->ijab", {t2, tmp});
+    t2_new -= Pij;
+    t2_new += Pij.swapaxes(0, 1);
+    t2_new += 0.5 * einsum("mnab,mnij->ijab", {tau, Wmnij});
+    t2_new += 0.5 * einsum("ijef,abef->ijab", {tau, Wabef});
+
+    // And here
+    Tensor Pijab = einsum("imae,mbej->ijab", {t2, Wmbej});
+
+    tmp = einsum("ie,ma,mbej->ijab", {t1, t1, DEprqs.slice(O, V, V, O)});
+    Pijab -= tmp;
+
+    // P(ij) * P(ab): (ij - ji) * (ab - ba) = ijab - ijba - jiab + jiba
+    t2_new += Pijab;
+    t2_new -= Pijab.swapaxes(2, 3);
+    t2_new -= Pijab.swapaxes(0, 1);
+    t2_new += Pijab.swapaxes(0, 1).swapaxes(2, 3);
+    
+    Pij = einsum("ie,abej->ijab", {t1, DEprqs.slice(V, V, V, O)});
+    t2_new += Pij;
+    t2_new -= Pij.swapaxes(0, 1);
+    
+    Pab = einsum("ma,mbij->ijab", {t1, DEprqs.slice(O, V, O, O)});
+    t2_new -= Pab;
+    t2_new += Pab.swapaxes(2, 3);
+    
+    return t2_new;
+}
+
+double test_mp2_energy(const Tensor& DEprqs, const Tensor& Dia, const Tensor& Dijab, const int n_occ) {
     const Sli O{0, n_occ};
-    const Sli V{n_occ, ASprqs.shape[0]};
-    const Tensor Ioovv = ASprqs.slice(O, O, V, V);
+    const Sli V{n_occ, DEprqs.shape[0]};
+    const Tensor Ioovv = DEprqs.slice(O, O, V, V);
     const Tensor t2 = Ioovv / Dijab;
 
     return 0.25 * (t2 * Ioovv).sum();
 }
 
-double calc_cc_E(const Tensor& ASpqrs, const Tensor& FN,
-                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool is_CCD) {
-    double E_cc = 0.25 * einsum("ijab,ijab->", {ASpqrs.slice(O, O, V, V), t2})();
-    if (is_CCD) { return E_cc; }
+double calc_spin_cc_E(const Tensor& DEprqs, const Tensor& FN, const Tensor& tau,
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V) {
+    const Tensor I_oovv = DEprqs.slice(O, O, V, V);
+    double E_cc = 0.25 * einsum("ijab,ijab->", {I_oovv, t2})();
     
     E_cc += einsum("ia,ia->", {FN.slice(O, V), t1})();
-    E_cc += 0.5 * einsum("ijab,ia,jb->", {ASpqrs.slice(O, O, V, V), t1, t1})();
+    E_cc += 0.5 * einsum("ijab,ia,jb->", {I_oovv, t1, t1})();
+
     return E_cc;
 }

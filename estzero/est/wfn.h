@@ -57,7 +57,7 @@ public:
     int get_n_docc() const { return n_docc; }
     int get_n_alpha() const { return n_alpha; }
     int get_n_beta() const { return n_beta; }
-
+    int get_nbf() const { return nbf; }
 };
 
 #endif

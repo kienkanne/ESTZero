@@ -27,21 +27,25 @@ inline Slices_AB_OV get_slices_ab_ov(const int n_alpha, const int n_beta, const 
             OA_src, OB_src, VA_src, VB_src};
 }
 
-struct Dia_Dijab {
-    Tensor Dia; Tensor Dijab;
-};
 
-Tensor build_spin_ASprqs(const Tensor& Ipqrs_AA, const Tensor& Ipqrs_BB, const Tensor& Ipqrs_AB,
+Tensor build_spin_Iprqs(const Tensor& Ipqrs_AA, const Tensor& Ipqrs_BB, const Tensor& Ipqrs_AB,
                     const int n_alpha, const int n_beta);
                     
-Tensor build_spin_FN(const Tensor& Ha, const Tensor& Hb, const Tensor& ASprqs, 
+Tensor build_spin_FN(const Tensor& HA, const Tensor& HB, const Tensor& DEprqs, 
                     const int n_alpha, const int n_beta);
-                    
-Dia_Dijab build_spin_Dia_Dijab(const Tensor& FN, const int n_alpha, const int n_beta);
 
-double test_mp2_energy(const Tensor& ASprqs, const Tensor& Dia, const Tensor& Dijab, const int n_occ);
+double test_mp2_energy(const Tensor& DEprqs, const Tensor& Dia, const Tensor& Dijab, const int n_occ);
 
-double calc_cc_E(const Tensor& ASpqrs, const Tensor& FN,
-                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool is_CCD = false);
+double calc_spin_cc_E(const Tensor& DEprqs, const Tensor& FN, const Tensor& tau,
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V);
+
+Tensor build_spin_T1(const Tensor& DEprqs, const Tensor& FN,
+                const Tensor& Fae, const Tensor& Fmi, const Tensor& Fme,
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin);
+
+Tensor build_spin_T2(const Tensor& DEprqs, const Tensor& tau, // (takes tau, not FN)
+                const Tensor& Fae, const Tensor& Fmi, const Tensor& Fme,
+                const Tensor& Wmnij, const Tensor& Wabef, const Tensor& Wmbej,
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin);
 
 #endif
