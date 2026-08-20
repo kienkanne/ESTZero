@@ -17,13 +17,16 @@ OUT_DIR = ROOT / "bench" / "outputs"
 OUT_DIR.mkdir(exist_ok=True)
 
 
-ITER_RE   = re.compile(r"SCF Iter\s+(\d+)")
-ENERGY_RE = re.compile(r"Final energy:\s*(-?\d+(?:\.\d+)?)")
-NBF_RE    = re.compile(r"nbf:\s*(\d+)")
-RSS_RE    = re.compile(r"peak RSS:\s*(\d+(?:\.\d+)?)\s*MB")
-PHASE_RE  = re.compile(r"^\s*(.*?)\s+(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+(?:\.\d+)?)\s*$")
-CC_ITER_RE = re.compile(r"^CC\S*\s+Iteration")
-CC_MO_KEY  = "MO Transformation (CC)"
+ITER_RE      = re.compile(r"SCF Iter\s+(\d+)")
+ENERGY_RE    = re.compile(r"Final energy:\s*(-?\d+(?:\.\d+)?)")
+CCSD_E_RE    = re.compile(r"CCSD energy:\s*(-?\d+(?:\.\d+)?)")
+PTRIPLES_RE  = re.compile(r"Perturbative triples correction:\s*(-?\d+(?:\.\d+)?)")
+NBF_RE       = re.compile(r"nbf:\s*(\d+)")
+RSS_RE       = re.compile(r"peak RSS:\s*(\d+(?:\.\d+)?)\s*MB")
+PHASE_RE     = re.compile(r"^\s*(.*?)\s+(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+(?:\.\d+)?)\s*$")
+CC_ITER_RE   = re.compile(r"^CC\S*\s+Iteration")
+CC_MO_KEY    = "MO Transformation (CC)"
+PTRIPLES_KEY = "Perbutative Triples"
 
 
 def _cc_iter_phase(phases):
@@ -37,12 +40,18 @@ def _cc_iter_phase(phases):
 
 def parse_output(text):
     energy = nbf = None
+    ccsd_e = None
+    ptriples = math.nan
     rss_mb = math.nan
     phases = {}
     n_iter = 0
     for line in text.splitlines():
         if m := ENERGY_RE.search(line):
             energy = float(m.group(1))
+        elif m := CCSD_E_RE.search(line):
+            ccsd_e = float(m.group(1))
+        elif m := PTRIPLES_RE.search(line):
+            ptriples = float(m.group(1))
         elif m := NBF_RE.search(line):
             nbf = int(m.group(1))
         elif m := RSS_RE.search(line):
@@ -56,7 +65,7 @@ def parse_output(text):
                 "calls":   int(calls),
                 "avg_ms":  float(avg_ms),
             }
-    return energy, nbf, phases, rss_mb, n_iter
+    return energy, nbf, phases, rss_mb, n_iter, ccsd_e, ptriples
 
 
 def run_once(xyz, basis, method, reference, mult, charge, maxiter, econv, scheme):
@@ -71,10 +80,10 @@ def run_once(xyz, basis, method, reference, mult, charge, maxiter, econv, scheme
     wall = time.perf_counter() - t0
     if proc.returncode != 0:
         raise RuntimeError(f"SCF binary failed:\n{proc.stderr}\n{proc.stdout}")
-    energy, nbf, phases, rss_mb, n_iter = parse_output(proc.stdout)
+    energy, nbf, phases, rss_mb, n_iter, ccsd_e, ptriples = parse_output(proc.stdout)
     if energy is None:
         raise RuntimeError(f"Could not parse energy:\n{proc.stdout}")
-    return wall, energy, nbf, phases, rss_mb, n_iter
+    return wall, energy, nbf, phases, rss_mb, n_iter, ccsd_e, ptriples
 
 
 def fmt(val, spec, missing="-"):
@@ -161,10 +170,41 @@ def _json_ccsd(d):
             "mo(s)": d["mo_cc_s"], "cc(ms)": d["cc_ms"], "cc_iters": d["cc_iters"]}
 
 
+def _print_ccsd_t(collected, logger: logging.Logger):
+    # One ccsd_t run yields both the CCSD and the (T)-corrected energy; |dE|/ok below track
+    # CCSD(T) only (matching every other table). The intermediate CCSD is checked against its
+    # own Psi4 reference too, but only ever surfaces as an explicit WARNING line in the run log
+    # if it disagrees -- see the main loop.
+    hdr = (f"{'system':<20} {'ref':>3} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
+           f" {'psi4(s)':>8} {'wall(s)':>8} {'ERI(s)':>7} {'JK/it(ms)':>10}"
+           f" {'scf_it':>6} {'MO(s)':>7} {'CCSD/it(ms)':>12} {'cc_it':>6}"
+           f" {'CCSD(s)':>8} {'PertT(s)':>8} {'RSS(MB)':>8}")
+    logger.info(f"\n── CCSD(T) {'─' * (len(hdr) - 10)}")
+    logger.info(hdr)
+    logger.info("─" * len(hdr))
+    for label, sys_data in collected.items():
+        if "ccsd_t" not in sys_data:
+            continue
+        d = sys_data["ccsd_t"]
+        logger.info(f"{label:<20} {d['reference']:>3} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
+              f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f} {fmt(d['eri_s'],'7.3f'):>7}"
+              f" {fmt(d['jk_ms'],'10.1f'):>10} {d['n_iter']:>6}"
+              f" {fmt(d['mo_cc_s'],'7.3f'):>7} {fmt(d['cc_ms'],'12.1f'):>12} {fmt(d['cc_iters'],'6.0f'):>6}"
+              f" {fmt(d['ccsd_only_s'],'8.3f'):>8} {fmt(d['ptriples_s'],'8.3f'):>8} {fmt(d['peak_rss'],'8.1f'):>8}")
+    logger.info("─" * len(hdr))
+
+def _json_ccsd_t(d):
+    return {"wall(s)": d["wall"], "eri(s)": d["eri_s"], "jk(ms)": d["jk_ms"],
+            "mo(s)": d["mo_cc_s"], "cc(ms)": d["cc_ms"], "cc_iters": d["cc_iters"],
+            "ccsd(s)": d["ccsd_only_s"], "ptriples(s)": d["ptriples_s"],
+            "ptriples(E)": d["ptriples"], "dE_ccsd": d["dE_ccsd"]}
+
+
 METHOD_SPECS = {
-    "scf":  {"printer": _print_scf,  "to_json": _json_scf},
-    "mp2":  {"printer": _print_mp2,  "to_json": _json_mp2},
-    "ccsd": {"printer": _print_ccsd, "to_json": _json_ccsd},
+    "scf":     {"printer": _print_scf,     "to_json": _json_scf},
+    "mp2":     {"printer": _print_mp2,     "to_json": _json_mp2},
+    "ccsd":    {"printer": _print_ccsd,    "to_json": _json_ccsd},
+    "ccsd_t":  {"printer": _print_ccsd_t,  "to_json": _json_ccsd_t},
 }
 
 
@@ -228,18 +268,18 @@ def main():
                 peak_rss = math.nan
 
                 for _ in range(args.repeats):
-                    wall, energy, nbf, phases, rss_mb, n_iter = run_once(
+                    wall, energy, nbf, phases, rss_mb, n_iter, ccsd_e, ptriples = run_once(
                         system["xyz"], system["basis"], method,
                         system.get("reference", "rhf"),
                         system.get("mult", 1),
                         system.get("charge", 0),
                         args.maxiter, args.econv, args.scheme)
                     if best is None or wall < best[0]:
-                        best = (wall, energy, nbf, phases, n_iter)
+                        best = (wall, energy, nbf, phases, n_iter, ccsd_e, ptriples)
                     if math.isnan(peak_rss) or rss_mb > peak_rss:
                         peak_rss = rss_mb
 
-                wall, energy, nbf, phases, n_iter = best
+                wall, energy, nbf, phases, n_iter, ccsd_e, ptriples = best
                 outputs[label].setdefault("nbf", nbf)
 
                 mref = sys_ref.get(method)
@@ -252,6 +292,22 @@ def main():
                     all_pass = all_pass and ok
                     status   = "PASS" if ok else "FAIL"
 
+                # ccsd_t gives both the CCSD and (T)-corrected energy from one run. The reported |dE|/status 
+                # above tracks CCSD(T) only (matching every other table). The intermediate CCSD is still checked 
+                # against its own Psi4 reference here, only appears as an explicit warning when CCSD(T) matching 
+                # while CCSD itself doesn't - probably wouldn't happen, but just in case.
+                dE_ccsd = math.nan
+                if method == "ccsd_t":
+                    ccsd_ref = sys_ref.get("ccsd")
+                    if ccsd_ref is not None and ccsd_e is not None:
+                        dE_ccsd = abs(ccsd_e - ccsd_ref["energy"])
+                        if dE_ccsd >= args.tol:
+                            logger.info(
+                                f"[mySCF/{method}] {label} WARNING: intermediate CCSD |dE|={dE_ccsd:.2e} "
+                                f"exceeds tol={args.tol:.1e} vs Psi4 (CCSD(T) total status above is unaffected) "
+                                f"-- the CCSD path itself needs checking.")
+                            all_pass = False
+
                 eri_s  = phases.get("ERI build",             {}).get("seconds", math.nan)
                 mo_s   = phases.get("MO Transformation",     {}).get("seconds", math.nan)
                 mp2_ms = phases.get("MP2 Energy Calculation",{}).get("avg_ms",  math.nan)
@@ -260,6 +316,8 @@ def main():
                 cc_phase = _cc_iter_phase(phases)
                 cc_ms    = cc_phase.get("avg_ms", math.nan)
                 cc_iters = cc_phase.get("calls",  math.nan)
+                ptriples_s = phases.get(PTRIPLES_KEY, {}).get("seconds", math.nan)
+                ccsd_only_s = (wall - ptriples_s) if not math.isnan(ptriples_s) else math.nan
 
                 jk_phase = phases.get("JK build")
                 if jk_phase:
@@ -274,6 +332,8 @@ def main():
                     "dE": dE, "ref_wall": ref_wall, "status": status,
                     "eri_s": eri_s, "jk_ms": jk_ms, "mo_s": mo_s, "mp2_ms": mp2_ms,
                     "mo_cc_s": mo_cc_s, "cc_ms": cc_ms, "cc_iters": cc_iters,
+                    "dE_ccsd": dE_ccsd, "ptriples": ptriples, "ptriples_s": ptriples_s,
+                    "ccsd_only_s": ccsd_only_s,
                     "reference": system.get("reference", "rhf"),
                 }
                 collected[label][method] = result
@@ -289,6 +349,8 @@ def main():
                     "dE": math.nan, "ref_wall": math.nan, "status": "ERROR",
                     "eri_s": math.nan, "jk_ms": math.nan, "mo_s": math.nan, "mp2_ms": math.nan,
                     "mo_cc_s": math.nan, "cc_ms": math.nan, "cc_iters": math.nan,
+                    "dE_ccsd": math.nan, "ptriples": math.nan, "ptriples_s": math.nan,
+                    "ccsd_only_s": math.nan,
                     "reference": system.get("reference", "rhf"),
                 }
                 collected[label][method] = result

@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v2.3.0] Added Perbutative Triples for UHF, giving CCSD(T)
+
+- Added the perbutative triples energy calculation from the converged `t1` and `t2` amplitudes, which is calculated once when CCSD converges. The first implementation is the "noddy" version, which is a direct line-by-line port from [Psi4Numpy's spin-orbital CCSD_T module](https://github.com/CrawfordGroup/ProgrammingProjects/tree/master/Project%2306), which cites [Crawford's programming project #6](https://github.com/psi4/psi4numpy/blob/master/Coupled-Cluster/Spin_Orbitals/CCSD/CCSD_T.py)
+- The "noddy" implementation explicitly loops through and adds each term one by one (different permutations of the `ijkabc` rank 6 tensor), which doesn't exploit any symmetry and is very inefficient in wall time and especially memory, which blows up to ~1.5 GB for the small propargyl system. 
+- The benchmark module only runs CCSD(T) because it produces the CCSD energy baseline too, and this quantity (as well as the full CCSD(T) energy) is parsed and compared with the two energies produced by Psi4.
+
 ## [v2.2.0] Wired in DIIS Acceleration for CCSD
 
 - The `diis()` module already existed and used by the SCF algorithm to accelerate convergence, and the same machinery is wired in for the convergence of the amplitudes `t1` and `t2`. The error vectors are flatten and concatenate in a similar fashion to the two error vectors for alpha and beta in UHF SCF. An additional guard is added so that the error vector list size does not exceed the error vector size itself, which would make them linearly dependent, and the produced coefficients are degenerate and incorrect. This is possible for the tinest systems like `h2/sto-3g`.

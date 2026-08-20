@@ -120,10 +120,10 @@ UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alp
 
 Version 2.1.0 introduced CCSD for RHF. The baseline use equations adopted from [Psi4Numpy](https://github.com/psi4/psi4numpy/tree/master/Coupled-Cluster) and [PyCC](https://github.com/CrawfordGroup/pycc/tree/main/pycc). Unlike UHF, there is no canonical baseline contraction schemes/equations for RHF, so the code here uses a mix reference between these two sources. The benchmarking system used here is `pyrimidine/sto-3g` (nbf=34, 42 electrons). The number of occupied electrons increase the calculation complexity significantly, so a medium system with minimal basis set is used here instead of a tiny system with a moderate basis set.
 
-| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | Peak RSS (MB) | Note |
+| version | Total CCSD wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|---|
 | v2.1.0 | 40.207 | 0.110 | 1.0 | 21 | 0.611 | 1229.9 | 32 | 59.1 | RHF CCSD Baseline |
-| v2.1.0 | 20.552 | 0.110 | 1.0 | 21 | 0.614 | 1231.3 | 16 | 62.2 | DIIS-Acceleration addition, doubling the convergence rate. Memory footprint is slightly higher due to the constructed error vectors |
+| v2.2.0 | 20.552 | 0.110 | 1.0 | 21 | 0.614 | 1231.3 | 16 | 62.2 | DIIS-Acceleration addition, doubling the convergence rate. Memory footprint is slightly higher due to the constructed error vectors |
 
 #### UHF
 
@@ -131,7 +131,10 @@ Version 2.0.0 introduced CCSD for UHF. The baseline use the formulated equations
 
 > Note: In version 2.0.0 the benchmark system was chosen to be `o2/6-31g`. However as mentioned above, a larger system with minial system is desired for CCSD testing, so the benchmarking system was changed, and reporting starts from v2.1.0. This update did not change any of the equations for UHF CCSD, only rewiring the driver for RHF CCSD, so there should be no performance difference between these two versions.
 
-| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | Peak RSS (MB) | Note |
-|---|---|---|---|---|---|---|---|---|---|
-| v2.1.0 | 41.909 | 0.011 | 0.1 | 22 | 0.065 | 906.8 | 46 | 51.1 | UHF CCSD Baseline |
-| v2.1.0 | 18.364 | 0.011 | 0.1 | 22 | 0.066 | 908.6 | 20 | 60.3 | DIIS-Acceleration addition, doubling the convergence rate. Memory footprint is slightly higher due to the constructed error vectors |
+| version | Total CCSD wall (s)<sup>(4)</sup> | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | PertT(s) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|---|---|
+| v2.1.0 | 41.909 | 0.011 | 0.1 | 22 | 0.065 | 906.8 | 46 | - | 51.1 | UHF CCSD Baseline |
+| v2.2.0 | 18.364 | 0.011 | 0.1 | 22 | 0.066 | 908.6 | 20 | - | 60.3 | DIIS-Acceleration addition, doubling the convergence rate. Memory footprint is slightly higher due to the constructed error vectors |
+| v2.3.0 | 18.266 | 0.011 | 0.1 | 22 | 0.066 | 903.8 | 20 | 27.846 | 1491.4 | Added perbutative triples with the "noddy" implementation. The full rank 6 tensors were stored explicitly, exploding the memory usage |
+
+> (4) From version v2.3.0: In the benchmark runs that produced these numbers, only CCSD(T) was requested as it prints both the CCSD energy baseline as well as the corrected energy CCSD(T). The timings of all steps are printed, and the total CCSD wall time reported here is the actual total wall time subtracted by the run time of the perbutative triples calculation. This is done to save benchmarking run time.

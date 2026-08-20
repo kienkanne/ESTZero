@@ -67,7 +67,7 @@
     "reference": "uhf",
     "mult": 2,
     "charge": 0,
-    "methods": ["scf", "mp2", "ccsd"]
+    "methods": ["scf", "mp2", "ccsd_t"]
   },
   "o2/sto-3g": {
     "xyz": "input/o2.xyz",
@@ -77,7 +77,7 @@
     "reference": "uhf",
     "mult": 3,
     "charge": 0,
-    "methods": ["scf", "mp2", "ccsd"]
+    "methods": ["scf", "mp2", "ccsd_t"]
   },
   "o2/6-31g": {
     "xyz": "input/o2.xyz",
@@ -127,6 +127,6 @@
     "reference": "uhf",
     "mult": 2,
     "charge": 0,
-    "methods": ["ccsd"]
+    "methods": ["ccsd_t"]
   }
 }

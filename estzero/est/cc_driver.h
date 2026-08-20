@@ -4,6 +4,7 @@
 #include "cc_iter.h"
 #include "cc_spin.h"
 #include "cc_build.h"
+#include "cc_triples.h"
 #include "transmo.h"
 #include "wfn.h"
 #include "einsum.h"
@@ -18,15 +19,18 @@ inline CCResult cc_driver(WaveFunction wfn, SCFResult sr, std::string method, st
     bool spin; 
     bool is_CCD = (method == "ccd");
 
-    const std::array<std::string, 2> METHODS{"ccd", "ccsd"};
+    const int n_occ = wfn.get_n_docc();
+    const int n_alpha = wfn.get_n_alpha();
+    const int n_beta = wfn.get_n_beta();
+    const int nbf = wfn.get_nbf();
+
+    const std::array<std::string, 3> METHODS{"ccd", "ccsd", "ccsd_t"};
     auto it = std::find(std::begin(METHODS), std::end(METHODS), method);
     if (it == std::end(METHODS)) { throw std::runtime_error("Unknown cc method: " + method); }
 
     if (reference == "rhf") {
         spin = false;
-        const int n_occ = wfn.get_n_docc();
-        const int nbf = wfn.get_nbf();
-
+        
         O = Sli{0, n_occ};
         V = Sli{n_occ, nbf};
 
@@ -46,9 +50,7 @@ inline CCResult cc_driver(WaveFunction wfn, SCFResult sr, std::string method, st
 
     else if (reference == "uhf") {
         spin = true;
-        const int n_alpha = wfn.get_n_alpha();
-        const int n_beta = wfn.get_n_beta();
-        const int nbf = wfn.get_nbf();
+
 
         O = Sli {0, n_alpha + n_beta};
         V = Sli {n_alpha + n_beta, nbf*2};
@@ -76,7 +78,13 @@ inline CCResult cc_driver(WaveFunction wfn, SCFResult sr, std::string method, st
         throw std::runtime_error("Unknown reference: " + reference);
     }
 
-    return cc_iterate(econv, max_iter, verbose, Iprqs, DEprqs, FN, Dia, Dijab, O, V, spin, is_CCD);
-};
+    CCResult ccresult = cc_iterate(econv, max_iter, verbose, Iprqs, DEprqs, FN, Dia, Dijab, O, V, spin, is_CCD);
+    if (method == "ccsd_t") {
+        if (reference == "rhf") { throw std::runtime_error("RHF CCSD(T) has not been implemented!"); }
 
+        ccresult.E_pert_t =
+            calc_pert_triples(DEprqs, ccresult.t1, ccresult.t2, FN, nbf, n_alpha+n_beta, O, V);
+    }
+    return ccresult;
+}
 #endif

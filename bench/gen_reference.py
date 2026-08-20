@@ -56,13 +56,21 @@ def main():
 
             mol = psi4.geometry(geom)
             t0 = time.perf_counter()
-            psi4_method = "hf" if method == "scf" else method
+            psi4_method = {"scf": "hf", "ccsd_t": "ccsd(t)"}.get(method, method)
             energy, wfn = psi4.energy(psi4_method, molecule=mol, return_wfn=True)
             wall = time.perf_counter() - t0
 
             entry["nbf"] = int(wfn.basisset().nbf())
             entry[method] = {"energy": float(energy), "wall": wall}
             print(f"  E = {energy:.10f}  nbf = {entry['nbf']}  wall = {wall:.3f}s")
+
+            # A ccsd(t) run computes CCSD along the way, so grab it for free (wall=0.0 flags this
+            # as piggybacked, not an independent timing) instead of a second Psi4 CCSD run.
+            if method == "ccsd_t" and "ccsd" not in entry:
+                ccsd_e = float(psi4.variable("CCSD TOTAL ENERGY"))
+                entry["ccsd"] = {"energy": ccsd_e, "wall": 0.0}
+                print(f"  (piggybacked) CCSD E = {ccsd_e:.10f}")
+
             psi4.core.clean()
 
     ref_path.write_text(json.dumps(references, indent=2))

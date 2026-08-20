@@ -156,7 +156,13 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
 
     else if (method.starts_with("cc")) {
         CCResult ccresult = cc_driver(*this, sr, method, reference, econv, max_iter, verbose);
-        return E_scf + ccresult.E_cc;
+        if (method == "ccsd_t") {
+            // Printed unconditionally (not gated by verbose) so a single ccsd_t run gives both the CCSD and 
+            // CCSD(T) energies, which can be parsed by the benchmarking module, without re-running CCSD.
+            std::println("CCSD energy: {:.8f}", E_scf + ccresult.E_cc);
+            std::println("Perturbative triples correction: {:.8f}", ccresult.E_pert_t);
+        }
+        return E_scf + ccresult.E_cc + ccresult.E_pert_t;
     }
 
     else { throw std::runtime_error(std::format("Unknown method: {}", method)); }

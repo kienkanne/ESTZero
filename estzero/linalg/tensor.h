@@ -307,6 +307,14 @@ public:
         return _unary_assign_op([scalar](double v) { return v * scalar; });
     }
 
+    Tensor operator*(const Tensor& other) const {
+        return _binary_op(other, [](double lhs, double rhs) { return lhs * rhs; });
+    }
+
+    Tensor& operator*=(const Tensor& other) {
+        return _binary_assign_op(other, [](double lhs, double rhs) { return lhs * rhs; });
+    }
+
     Tensor operator/(double scalar) const {
         return _unary_op([scalar](double v) { return v / scalar; });
     }
@@ -319,14 +327,13 @@ public:
         return _unary_assign_op([scalar](double v) { return v / scalar; });
     }
 
-    Tensor operator*(const Tensor& other) const {
-        return _binary_op(other, [](double lhs, double rhs) { return lhs * rhs; });
-    }
-
     Tensor operator/(const Tensor& other) const {
         return _binary_op(other, [](double lhs, double rhs) { return lhs / rhs; });
     }
 
+    Tensor& operator/=(const Tensor& other) {
+        return _binary_assign_op(other, [](double lhs, double rhs) { return lhs / rhs; });
+    }
 
     Tensor operator^(int exp) const {
         return _unary_op([exp](double v) { return power(v, exp); });

@@ -11,8 +11,8 @@ int main(int argc, char* argv[]) {
     std::string eri_scheme_str = "tensor";
     int mult = 1;
     int charge = 0;
-    double econv = 1e-6;
-    int max_iter = 100;
+    double econv = 1e-8;
+    int max_iter = 200;
     int verbose = 2;
 
     for (int i = 1; i < argc; ++i) {
