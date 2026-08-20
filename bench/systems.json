@@ -7,7 +7,7 @@
     "reference": "rhf",
     "mult": 1,
     "charge": 0,
-    "methods": ["scf", "mp2", "ccsd"]
+    "methods": ["scf", "mp2", "ccsd_t"]
   },
   "h2o/sto-3g": {
     "xyz": "input/h2o.xyz",
@@ -17,7 +17,7 @@
     "reference": "rhf",
     "mult": 1,
     "charge": 0,
-    "methods": ["scf", "mp2", "ccsd"]
+    "methods": ["scf", "mp2", "ccsd_t"]
   },
   "h2o/cc-pvdz": {
     "xyz": "input/h2o.xyz",
@@ -117,7 +117,7 @@
     "reference": "rhf",
     "mult": 1,
     "charge": 0,
-    "methods": ["ccsd"]
+    "methods": ["ccsd_t"]
   },
   "propargyl/sto-3g": {
     "xyz": "input/propargyl.xyz",

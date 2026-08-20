@@ -80,10 +80,9 @@ inline CCResult cc_driver(WaveFunction wfn, SCFResult sr, std::string method, st
 
     CCResult ccresult = cc_iterate(econv, max_iter, verbose, Iprqs, DEprqs, FN, Dia, Dijab, O, V, spin, is_CCD);
     if (method == "ccsd_t") {
-        if (reference == "rhf") { throw std::runtime_error("RHF CCSD(T) has not been implemented!"); }
-
-        ccresult.E_pert_t =
-            calc_pert_triples(DEprqs, ccresult.t1, ccresult.t2, FN, nbf, n_alpha+n_beta, O, V);
+        const int n_occ_triples = spin ? (n_alpha + n_beta) : n_occ;
+        ccresult.E_pert_t = calc_pert_triples(Iprqs, DEprqs, ccresult.t1, ccresult.t2, FN, nbf,
+                                               n_occ_triples, O, V, spin);
     }
     return ccresult;
 }

@@ -114,16 +114,17 @@ UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alp
 
 > (3) v1.3.0-v1.5.0 didn't use intermediate 2 of Iaa to build Iab when using the new `einsum`, so performance was heavily impacted. This is fixed in v1.5.1
 
-### CCSD
+### CCSD(T)
 
 #### RHF
 
 Version 2.1.0 introduced CCSD for RHF. The baseline use equations adopted from [Psi4Numpy](https://github.com/psi4/psi4numpy/tree/master/Coupled-Cluster) and [PyCC](https://github.com/CrawfordGroup/pycc/tree/main/pycc). Unlike UHF, there is no canonical baseline contraction schemes/equations for RHF, so the code here uses a mix reference between these two sources. The benchmarking system used here is `pyrimidine/sto-3g` (nbf=34, 42 electrons). The number of occupied electrons increase the calculation complexity significantly, so a medium system with minimal basis set is used here instead of a tiny system with a moderate basis set.
 
-| version | Total CCSD wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | Peak RSS (MB) | Note |
-|---|---|---|---|---|---|---|---|---|---|
-| v2.1.0 | 40.207 | 0.110 | 1.0 | 21 | 0.611 | 1229.9 | 32 | 59.1 | RHF CCSD Baseline |
-| v2.2.0 | 20.552 | 0.110 | 1.0 | 21 | 0.614 | 1231.3 | 16 | 62.2 | DIIS-Acceleration addition, doubling the convergence rate. Memory footprint is slightly higher due to the constructed error vectors |
+| version | Total CCSD wall (s)<sup>(4)</sup> | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | PertT(s) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|---|---|
+| v2.1.0 | 40.207 | 0.110 | 1.0 | 21 | 0.611 | 1229.9 | 32 | - | 59.1 | RHF CCSD Baseline |
+| v2.2.0 | 20.552 | 0.110 | 1.0 | 21 | 0.614 | 1231.3 | 16 | - | 62.2 | DIIS-Acceleration addition, doubling the convergence rate. Memory footprint is slightly higher due to the constructed error vectors |
+| v2.3.2 | 18.334 | 0.113 | 1.0 | 21 | 0.612 | 1234.5 | 16 | 19.367 | 62.3 | Added perbutative triples with the "vikings" implementation |
 
 #### UHF
 

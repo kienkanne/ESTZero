@@ -2,10 +2,16 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v2.3.2] Added Perbutative Triples to the "vikings" algorithm for RHF CCSD(T)
+
+- Implemented the "vikings" algorithm for perbutative triples for RHF, which is the similar formulation but spin-adapted. Peak RSS also stayed at normal levels: 62.3 MB for pyrimidine/sto-3g.
+- This implementation for RHF also adapted the equations from [PyCC's `cctriples.py` module](https://github.com/CrawfordGroup/pycc/blob/main/pycc/cctriples.py), similar to the "vikings" algorithm for UHF.
+
 ## [v2.3.1] Changed Perbutative Triples to the "vikings" algorithm for UHF CCSD(T)
 
-- Implemented the "vikings" algorithm for perbutative triples, which never explicitly store the rank 6 tensors as the "noddy" algorithm did. The loops are written explicitly, and at each index combination (i,j,k) the connected-T3 batch is created temporarily for contractions.
-- Peak RSS returned to normal level at 61.4 MB, which is much expected. Computation time also improved.
+- Implemented the "vikings" algorithm for perbutative triples for UHF, which never explicitly store the rank 6 tensors as the "noddy" algorithm did. The loops are written explicitly, and at each index combination (i,j,k) the connected-T3 batch is created temporarily for contractions.
+- Peak RSS returned to normal level at 60.7 MB for propargyl/sto-3g, which is much expected. Computation time also improved.
+- The implementation is a line-by-line direct port from [PyCC's `cctriples.py` module](https://github.com/CrawfordGroup/pycc/blob/main/pycc/cctriples.py), which cites the original equations in Helgaker-Jorgensen-Olsen "vikings" formulation.
 
 ## [v2.3.0] Added Perbutative Triples for UHF, giving CCSD(T)
 
