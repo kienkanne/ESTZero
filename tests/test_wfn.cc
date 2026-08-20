@@ -61,5 +61,5 @@ TEST_CASE("WaveFunction: get_energy throws on an unknown reference string") {
 TEST_CASE("WaveFunction: get_energy throws on an unknown method string") {
     WaveFunction wfn(std::string(EST_REPO_ROOT) + "/input/h2o.xyz", "sto-3g", 1, 0);
     wfn.get_integrals();
-    CHECK_THROWS_AS(wfn.get_energy("rhf", "ccsd", 1e-10, 200, 0), std::runtime_error);
+    CHECK_THROWS_AS(wfn.get_energy("rhf", "unknown", 1e-10, 200, 0), std::runtime_error);
 }

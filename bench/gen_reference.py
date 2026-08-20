@@ -50,8 +50,9 @@ def main():
                 "guess":        "core",
                 "mp2_type":     "conv",
                 "freeze_core":  "false",
+                "cc_maxiter":   200,
+                "r_convergence": 1e-8,
             })
-
 
             mol = psi4.geometry(geom)
             t0 = time.perf_counter()

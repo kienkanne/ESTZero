@@ -7,7 +7,7 @@
     "reference": "rhf",
     "mult": 1,
     "charge": 0,
-    "methods": ["scf", "mp2"]
+    "methods": ["scf", "mp2", "ccsd"]
   },
   "h2o/sto-3g": {
     "xyz": "input/h2o.xyz",
@@ -17,7 +17,7 @@
     "reference": "rhf",
     "mult": 1,
     "charge": 0,
-    "methods": ["scf", "mp2"]
+    "methods": ["scf", "mp2", "ccsd"]
   },
   "h2o/cc-pvdz": {
     "xyz": "input/h2o.xyz",
@@ -43,16 +43,6 @@
     "xyz": "input/fm.xyz",
     "basis": "def2-tzvp",
     "tier": "medium",
-    "run_by_default": true,
-    "reference": "rhf",
-    "mult": 1,
-    "charge": 0,
-    "methods": ["scf", "mp2"]
-  },
-  "oxazole/6-31g**": {
-    "xyz": "input/oxazole.xyz",
-    "basis": "6-31g**",
-    "tier": "large",
     "run_by_default": true,
     "reference": "rhf",
     "mult": 1,
@@ -89,16 +79,6 @@
     "charge": 0,
     "methods": ["scf", "mp2", "ccsd"]
   },
-  "ch3/3-21g": {
-    "xyz": "input/ch3.xyz",
-    "basis": "3-21g",
-    "tier": "small", 
-    "run_by_default": true,
-    "reference": "uhf",
-    "mult": 2,
-    "charge": 0,
-    "methods": ["scf", "mp2", "ccsd"]
-  },
   "o2/6-31g": {
     "xyz": "input/o2.xyz",
     "basis": "6-31g",
@@ -107,7 +87,7 @@
     "reference": "uhf",
     "mult": 3,
     "charge": 0,
-    "methods": ["scf", "mp2", "ccsd"]
+    "methods": ["scf", "mp2"]
   },
   "o2/def2-tzvppd": {
     "xyz": "input/o2.xyz",
@@ -128,5 +108,25 @@
     "mult": 2,
     "charge": 0,
     "methods": ["scf", "mp2"]
+  },
+  "pyrimidine/sto-3g": {
+    "xyz": "input/pyrimidine.xyz",
+    "basis": "sto-3g",
+    "tier": "large",
+    "run_by_default": true,
+    "reference": "rhf",
+    "mult": 1,
+    "charge": 0,
+    "methods": ["ccsd"]
+  },
+  "propargyl/sto-3g": {
+    "xyz": "input/propargyl.xyz",
+    "basis": "sto-3g",
+    "tier": "large",
+    "run_by_default": true,
+    "reference": "uhf",
+    "mult": 2,
+    "charge": 0,
+    "methods": ["ccsd"]
   }
 }

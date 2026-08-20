@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v2.1.0] Added Restricted HF Coupled Cluster Singles & Doubles (CCSD)
+
+- Fully working RHF CCSD module. The RHF counterpart turned out to be much more complex to implement as there isn't a canonical contraction scheme like in UHF, which are the equations in [Stanton:1991:4334]. The version implemented here references from the scheme from Psi4Numpy and PyCC.
+- Main references: [Psi4Numpy](https://github.com/psi4/psi4numpy/tree/master/Coupled-Cluster), [PyCC](https://github.com/CrawfordGroup/pycc/tree/main/pycc).
+
 ## [v2.0.1] Added UHF CCD (no singles)
 
 - This addition is trivial because `t1` just doesn't get an update. Technically, it can be optimized by dropping unnecessary contractions on the empty `t1` tensor, but this method is limited in accuracy for UHF CCD, and Psi4 does not even implement it. For this reason the optimal CCD path is not coded, it won't be reported as well.

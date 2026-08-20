@@ -116,10 +116,20 @@ UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alp
 
 ### CCSD
 
+#### RHF
+
+Version 2.1.0 introduced CCSD for RHF. The baseline use equations adopted from [Psi4Numpy](https://github.com/psi4/psi4numpy/tree/master/Coupled-Cluster) and [PyCC](https://github.com/CrawfordGroup/pycc/tree/main/pycc). Unlike UHF, there is no canonical baseline contraction schemes/equations for RHF, so the code here uses a mix reference between these two sources. The benchmarking system used here is `pyrimidine/sto-3g` (nbf=34, 42 electrons). The number of occupied electrons increase the calculation complexity significantly, so a medium system with minimal basis set is used here instead of a tiny system with a moderate basis set.
+
+| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|---|
+| v2.1.0 | 40.207 | 0.110 | 1.0 | 21 | 0.611 | 1229.9 | 32 | 59.1 | RHF CCSD Baseline |
+
 #### UHF
 
-Version 2.0.0 introduced CCSD for UHF. The baseline use the formulated equations adopted from [Stanton:1991:4334], all are written in `einsum` and uses the class `Tensor`. The system reported here for benchmarking is `o2/6-31g` (nbf=18, triplet). The system is the appropriate size to use, as it's large enough to expose CC iterations wall time but also keeping the total low (~20s) for quick benchmarking. The MO transformation here transforms every axis over the entire `nbf` range, which is different than in MP2 above, only producing `iajb` (ovov).
+Version 2.0.0 introduced CCSD for UHF. The baseline use the formulated equations adopted from [Stanton:1991:4334], all are written in `einsum` and uses the class `Tensor`. The system reported here for benchmarking is `propargyl/sto-3g` (nbf=18, 21 electrons), or •CH2-C≡CH. Aa classic open-shell system to test for methods like CCSD is the allyl radical, but propargyl is used instead as it has less hydrogens, allowing for faster benchmarking. Similar to RHF, a moderate system is used here instead of a small one like methyl radical for MP2. The MO transformation here transforms every axis over the entire `nbf` range, which is different than in MP2 above, only producing `iajb` (ovov).
 
-| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) |  N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | Peak RSS (MB) | Note |
+> Note: In version 2.0.0 the benchmark system was chosen to be `o2/6-31g`. However as mentioned above, a larger system with minial system is desired for CCSD testing, so the benchmarking system was changed, and reporting starts from v2.1.0. This update did not change any of the equations for UHF CCSD, only rewiring the driver for RHF CCSD, so there should be no performance difference between these two versions.
+
+| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|---|
-| v2.0.0 | 19.770 | 0.006 | 0.1 | 12 | 0.066 | 932.4 | 21 | 51.0 | UHF CCSD Baseline |
+| v2.1.0 | 41.909 | 0.011 | 0.1 | 22 | 0.065 | 906.8 | 46 | 51.1 | UHF CCSD Baseline |
