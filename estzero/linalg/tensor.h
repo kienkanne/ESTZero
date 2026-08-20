@@ -237,6 +237,17 @@ public:
         return Tensor(data, new_shape, new_strides, offset);
     }
 
+    // Fix one axis to a single index, dropping that axis entirely, which is similar to numpy's fancy
+    // indexing (t[..., idx, ...]), returning a smaller zero-copy view `Tensor`. 
+    Tensor select(size_t axis, int index) const {
+        auto new_shape = shape;
+        auto new_strides = strides;
+        size_t new_offset = offset + static_cast<size_t>(index) * static_cast<size_t>(strides[axis]);
+        new_shape.erase(new_shape.begin() + axis);
+        new_strides.erase(new_strides.begin() + axis);
+        return Tensor(data, new_shape, new_strides, new_offset);
+    }
+
     template <typename... Slices>
     Tensor slice(Slices... slices) const {
         if (sizeof...(slices) != ndim()) {

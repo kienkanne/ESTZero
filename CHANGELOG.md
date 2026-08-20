@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v2.3.1] Changed Perbutative Triples to the "vikings" algorithm for UHF CCSD(T)
+
+- Implemented the "vikings" algorithm for perbutative triples, which never explicitly store the rank 6 tensors as the "noddy" algorithm did. The loops are written explicitly, and at each index combination (i,j,k) the connected-T3 batch is created temporarily for contractions.
+- Peak RSS returned to normal level at 61.4 MB, which is much expected. Computation time also improved.
+
 ## [v2.3.0] Added Perbutative Triples for UHF, giving CCSD(T)
 
 - Added the perbutative triples energy calculation from the converged `t1` and `t2` amplitudes, which is calculated once when CCSD converges. The first implementation is the "noddy" version, which is a direct line-by-line port from [Psi4Numpy's spin-orbital CCSD_T module](https://github.com/CrawfordGroup/ProgrammingProjects/tree/master/Project%2306), which cites [Crawford's programming project #6](https://github.com/psi4/psi4numpy/blob/master/Coupled-Cluster/Spin_Orbitals/CCSD/CCSD_T.py)
