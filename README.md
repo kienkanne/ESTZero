@@ -123,6 +123,7 @@ Version 2.1.0 introduced CCSD for RHF. The baseline use equations adopted from [
 | version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|---|
 | v2.1.0 | 40.207 | 0.110 | 1.0 | 21 | 0.611 | 1229.9 | 32 | 59.1 | RHF CCSD Baseline |
+| v2.1.0 | 20.552 | 0.110 | 1.0 | 21 | 0.614 | 1231.3 | 16 | 62.2 | DIIS-Acceleration addition, doubling the convergence rate. Memory footprint is slightly higher due to the constructed error vectors |
 
 #### UHF
 
@@ -133,3 +134,4 @@ Version 2.0.0 introduced CCSD for UHF. The baseline use the formulated equations
 | version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|---|
 | v2.1.0 | 41.909 | 0.011 | 0.1 | 22 | 0.065 | 906.8 | 46 | 51.1 | UHF CCSD Baseline |
+| v2.1.0 | 18.364 | 0.011 | 0.1 | 22 | 0.066 | 908.6 | 20 | 60.3 | DIIS-Acceleration addition, doubling the convergence rate. Memory footprint is slightly higher due to the constructed error vectors |

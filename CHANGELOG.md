@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v2.2.0] Wired in DIIS Acceleration for CCSD
+
+- The `diis()` module already existed and used by the SCF algorithm to accelerate convergence, and the same machinery is wired in for the convergence of the amplitudes `t1` and `t2`. The error vectors are flatten and concatenate in a similar fashion to the two error vectors for alpha and beta in UHF SCF. An additional guard is added so that the error vector list size does not exceed the error vector size itself, which would make them linearly dependent, and the produced coefficients are degenerate and incorrect. This is possible for the tinest systems like `h2/sto-3g`.
+- The DIIS addition accelerated both RHF and UHF CCSD signficantly, cutting the number of iterations by HALF, and so as the wall time (see `README.md`)
+
 ## [v2.1.0] Added Restricted HF Coupled Cluster Singles & Doubles (CCSD)
 
 - Fully working RHF CCSD module. The RHF counterpart turned out to be much more complex to implement as there isn't a canonical contraction scheme like in UHF, which are the equations in [Stanton:1991:4334]. The version implemented here references from the scheme from Psi4Numpy and PyCC.
