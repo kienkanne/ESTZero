@@ -19,6 +19,7 @@ add_library(est_core STATIC
     estzero/est/rhf.cc
     estzero/est/uhf.cc
     estzero/est/mp2.cc
+    estzero/est/mp3.cc
     estzero/est/transmo.cc
     estzero/est/cc_spin.cc
     estzero/est/cc_spat.cc
