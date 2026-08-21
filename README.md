@@ -81,7 +81,7 @@ Version 1.1.0 reorganize the benchmark suite to separate the reference and the m
 
 Version v1.0.0 included MP2 for RHF. The baseline is the 4 step MO transformation written via explicit loops ~ O(N^5). The calculation runs a base SCF first, so ERI build and JK build performance is similar to versions above.
 
-| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) |  N_SCF_iter | MO transform(s) | MP2 energy (ms) | Peak RSS (MB) | Note |
+| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform(s) | MP2 energy (ms) | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|
 | v1.0.0 | 29.570| 1.346 | 407.7 | 16 | 21.666 | 6.9 | 607.4 | MP2 Baseline |
 | v1.3.0 | 30.093 | 1.350 | 400.5 | 16 | 22.287 | 20.6 | 4279.4 | MO transform rewired through a from-scratch `einsum` (CCSD prep). Peak RSS ~7x (see `CHANGELOG.md`) |
@@ -99,7 +99,7 @@ Version v1.0.0 included MP2 for RHF. The baseline is the 4 step MO transformatio
 
 UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alpha-alpha, beta-beta, and alpha-beta MO integral tensors. Baseline version (v1.1.0): the index transform function used is similar to the one used for RHF MP2 to build alpha-alpha and beta-beta tensors; the alpha-beta block is built from the intermediate tensor after index 2 transformation of the alpha-alpha tensor
 
-| version | Total wall (s) | ERI build (s) | JK build<sup>(1)</sup> (per iter) (ms) |  N_SCF_iter | MO transform<sup>(1)</sup> (s) | MP2 energy (ms) | Peak RSS (MB) | Note |
+| version | Total wall (s) | ERI build (s) | JK build<sup>(1)</sup> (per iter) (ms) | N_SCF_iter | MO transform<sup>(1)</sup> (s) | MP2 energy (ms) | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|
 | v1.1.0 | 21.285 | 1.024 | 905.5 | 15 | 6.635 | 0.8 | 393.1 | UHF MP2 Baseline |
 | v1.3.0 | 28.646 | 1.036 | 839.4 | 15 | 14.976<sup>(3)</sup> | 2.1 | 4255.5 | Same `einsum` rewrite as RHF MP2 above. Peak RSS ~11x. |
@@ -113,6 +113,22 @@ UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alp
 | v1.5.5b | 16.105 | 1.457 | 280.7 | 16 | 10.367 | 30.0 | 1466.9 | Wired `einsum` with two operands and intermediates, but also uses `Tensor` operators whenever possible instead of `einsum` |
 
 > (3) v1.3.0-v1.5.0 didn't use intermediate 2 of Iaa to build Iab when using the new `einsum`, so performance was heavily impacted. This is fixed in v1.5.1
+
+### MP3
+
+Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports the cc module directly for the MO transformations and the intermediate builders. MP3 drops the t2 quadratic terms, and uses the same energy evaluation function as CCSD (see below), but done once to obtain the MP3 energy on top of the MP2 energy. The systems used to benchmark here is similar to that of the CCSD but with a larger basis set, which are `pyrimidine/6-31g` (nbf=62, 42 electrons) for RHF and `propargyl/6-31g` (nbf=33, 21 electrons), or •CH2-C≡CH.
+
+#### RHF
+
+| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform(s) | MP3 energy (s) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|
+| v2.4.0 | 47.573 | 0.415 | 10.1 | 21 | 19.772 | 26.043 | 572.7 | RHF MP3 baseline |
+
+#### UHF
+
+| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform(s) | MP3 energy (s) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|
+| v2.4.0 | 25.717 | 0.041 | 0.9 | 24 | 1.342 | 23.043 | 497.1 | UHF MP3 baseline |
 
 ### CCSD(T)
 

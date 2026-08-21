@@ -49,6 +49,7 @@ def main():
                 "maxiter":      200,
                 "guess":        "core",
                 "mp2_type":     "conv",
+                "mp_type":      "conv",
                 "freeze_core":  "false",
                 "cc_maxiter":   200,
                 "r_convergence": 1e-8,

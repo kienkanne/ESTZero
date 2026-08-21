@@ -27,6 +27,7 @@ PHASE_RE     = re.compile(r"^\s*(.*?)\s+(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+(?:\.\d+)?
 CC_ITER_RE   = re.compile(r"^CC\S*\s+Iteration")
 CC_MO_KEY    = "MO Transformation (CC)"
 PTRIPLES_KEY = "Perbutative Triples"
+MP3_KEY      = "MP3 Energy Calculation"
 
 
 def _cc_iter_phase(phases):
@@ -200,9 +201,33 @@ def _json_ccsd_t(d):
             "ptriples(E)": d["ptriples"], "dE_ccsd": d["dE_ccsd"]}
 
 
+def _print_mp3(collected, logger: logging.Logger):
+    hdr = (f"{'system':<20} {'ref':>3} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
+           f" {'psi4(s)':>8} {'wall(s)':>8} {'ERI(s)':>7} {'JK/it(ms)':>10}"
+           f" {'scf_it':>6} {'MO(s)':>7} {'MP3(s)':>8} {'RSS(MB)':>8}")
+    logger.info(f"\n── MP3 {'─' * (len(hdr) - 6)}")
+    logger.info(hdr)
+    logger.info("─" * len(hdr))
+    for label, sys_data in collected.items():
+        if "mp3" not in sys_data:
+            continue
+        d = sys_data["mp3"]
+        logger.info(f"{label:<20} {d['reference']:>3} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
+              f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f} {fmt(d['eri_s'],'7.3f'):>7}"
+              f" {fmt(d['jk_ms'],'10.1f'):>10} {d['n_iter']:>6}"
+              f" {fmt(d['mo_cc_s'],'7.3f'):>7} {fmt(d['mp3_s'],'8.1f'):>8}"
+              f" {fmt(d['peak_rss'],'8.1f'):>8}")
+    logger.info("─" * len(hdr))
+
+def _json_mp3(d):
+    return {"wall(s)": d["wall"], "eri(s)": d["eri_s"], "jk(ms)": d["jk_ms"],
+            "mo(s)": d["mo_cc_s"], "mp3(s)": d["mp3_s"]}
+
+
 METHOD_SPECS = {
     "scf":     {"printer": _print_scf,     "to_json": _json_scf},
     "mp2":     {"printer": _print_mp2,     "to_json": _json_mp2},
+    "mp3":     {"printer": _print_mp3,     "to_json": _json_mp3},
     "ccsd":    {"printer": _print_ccsd,    "to_json": _json_ccsd},
     "ccsd_t":  {"printer": _print_ccsd_t,  "to_json": _json_ccsd_t},
 }
@@ -318,6 +343,7 @@ def main():
                 cc_iters = cc_phase.get("calls",  math.nan)
                 ptriples_s = phases.get(PTRIPLES_KEY, {}).get("seconds", math.nan)
                 ccsd_only_s = (wall - ptriples_s) if not math.isnan(ptriples_s) else math.nan
+                mp3_s = phases.get(MP3_KEY, {}).get("seconds", math.nan)
 
                 jk_phase = phases.get("JK build")
                 if jk_phase:
@@ -333,7 +359,7 @@ def main():
                     "eri_s": eri_s, "jk_ms": jk_ms, "mo_s": mo_s, "mp2_ms": mp2_ms,
                     "mo_cc_s": mo_cc_s, "cc_ms": cc_ms, "cc_iters": cc_iters,
                     "dE_ccsd": dE_ccsd, "ptriples": ptriples, "ptriples_s": ptriples_s,
-                    "ccsd_only_s": ccsd_only_s,
+                    "ccsd_only_s": ccsd_only_s, "mp3_s": mp3_s,
                     "reference": system.get("reference", "rhf"),
                 }
                 collected[label][method] = result
@@ -350,7 +376,7 @@ def main():
                     "eri_s": math.nan, "jk_ms": math.nan, "mo_s": math.nan, "mp2_ms": math.nan,
                     "mo_cc_s": math.nan, "cc_ms": math.nan, "cc_iters": math.nan,
                     "dE_ccsd": math.nan, "ptriples": math.nan, "ptriples_s": math.nan,
-                    "ccsd_only_s": math.nan,
+                    "ccsd_only_s": math.nan, "mp3_s": math.nan,
                     "reference": system.get("reference", "rhf"),
                 }
                 collected[label][method] = result

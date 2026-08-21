@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v2.4.0] Added Third-order Moller-Plesset (MP3) for both RHF & UHF
+
+- "MBPT(3) is obtained by performing one CC iteration where all nonlinear terms are skipped" [Stanton:1991:4334], which is the same paper that provided the CCSD equations. The MP3 module was added by initializing `t1` (as 0) and `t2` in a similar fashion to CCSD first iteration, but all the intermediates are built with `tau` as an 0 tensor, because `tau` here is just `t2` (since `t1` is 0), so those are the quadratic `t2` terms. The energy expression, however, still needs `tau` for evaluation, and `t2` is passed in there instead.
+- The first version here just initializes `tau` as 0, so the equations that require it still does the 0 arithemtic. Unlike CC2, MP3 is a more well validated method, so an attempt to avoid the unnecessary contractions will be attempeted next patch.
+- MP2 energy can also be easily calculated by just not updating `t2`, and is printed out to validate against Psi4 also.
+
 ## [v2.3.2] Added Perbutative Triples to the "vikings" algorithm for RHF CCSD(T)
 
 - Implemented the "vikings" algorithm for perbutative triples for RHF, which is the similar formulation but spin-adapted. Peak RSS also stayed at normal levels: 62.3 MB for pyrimidine/sto-3g.
