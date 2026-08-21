@@ -100,22 +100,20 @@ Tensor build_Wmnij(const Tensor& _prqs, const Tensor& FN, const Tensor& tau,
 
 
 // Stanton Eqn 8
-// UHF uses DEprqs <pr||qs>, while RHF uses Iprqs (the raw ERI tensor). MP3 skips every term that depends on T2
+// UHF uses DEprqs <pr||qs>, while RHF uses Iprqs (the raw ERI tensor)
 Tensor build_Wmbej(const Tensor& _prqs, const Tensor& FN, const Tensor& tau,
-                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin, bool is_MP3) {
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin) {
     Tensor Wmbej = _prqs.slice(O, V, V, O).copy();
 
     Wmbej += einsum("jf,mbef->mbej", {t1, _prqs.slice(O, V, V, V)});
     Wmbej -= einsum("nb,mnej->mbej", {t1, _prqs.slice(O, O, V, O)});
 
-    if (!is_MP3) {
-        Tensor tmp = (0.5 * t2) + einsum("jf,nb->jnfb", {t1, t1});
-        Wmbej -= einsum("jnfb,mnef->mbej", {tmp, _prqs.slice(O, O, V, V)});
+    Tensor tmp = (0.5 * t2) + einsum("jf,nb->jnfb", {t1, t1});
+    Wmbej -= einsum("jnfb,mnef->mbej", {tmp, _prqs.slice(O, O, V, V)});
 
-        if (!spin) {
-            Wmbej += 1.0 * einsum("njfb,mnef->mbej", {t2, _prqs.slice(O, O, V, V)});
-            Wmbej -= 0.5 * einsum("njfb,mnfe->mbej", {t2, _prqs.slice(O, O, V, V)});
-        }
+    if (!spin) {
+        Wmbej += 1.0 * einsum("njfb,mnef->mbej", {t2, _prqs.slice(O, O, V, V)});
+        Wmbej -= 0.5 * einsum("njfb,mnfe->mbej", {t2, _prqs.slice(O, O, V, V)});
     }
 
     return Wmbej;
@@ -134,18 +132,15 @@ Tensor build_Wabef(const Tensor& DEprqs, const Tensor& FN, const Tensor& tau,
     return Wabef;
 }
 
-// This intermediate only appears in spatial orbitals (RHF), which is the
-// spin factorization of Wmbej terms. MP3 skips the T2-quadratic self-term.
+// This intermediate only appears in spatial orbitals (RHF), which is the spin factorization of Wmbej terms.
 Tensor build_Wmbje(const Tensor& Iprqs, const Tensor& FN, const Tensor& tau,
-                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool is_MP3) {
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V) {
     Tensor Wmbje = -1.0 * Iprqs.slice(O, V, O, V).copy();
     Wmbje -= einsum("jf,mbfe->mbje", {t1, Iprqs.slice(O, V, V, V)});
     Wmbje += einsum("nb,mnje->mbje", {t1, Iprqs.slice(O, O, O, V)});
 
-    if (!is_MP3) {
-        Tensor tmp = (0.5 * t2) + einsum("jf,nb->jnfb", {t1, t1});
-        Wmbje += einsum("jnfb,mnfe->mbje", {tmp, Iprqs.slice(O, O, V, V)});
-    }
+    Tensor tmp = (0.5 * t2) + einsum("jf,nb->jnfb", {t1, t1});
+    Wmbje += einsum("jnfb,mnfe->mbje", {tmp, Iprqs.slice(O, O, V, V)});
     return Wmbje;
 }
 

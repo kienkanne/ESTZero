@@ -2,6 +2,10 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v2.4.1] Remove contractions with a zero tensor for MP3
+
+- In the previous version, MP3 was wired in directly using the CCSD intermediates and amplitudes builder. However, since `t1` and `tau` for MP3 are zero tensors, a lot of the contractions were unncessary. The equations for MP3 was written out explicitly, copying the equations from CCSD, but dropping all the zero terms to avoid those arithmetics. The MP3 energy calculation step improved signficantly, as run time dropped from to 26.0s (v2.4.0) to 16.9s for pyrimidine/6-31g.
+
 ## [v2.4.0] Added Third-order Moller-Plesset (MP3) for both RHF & UHF
 
 - "MBPT(3) is obtained by performing one CC iteration where all nonlinear terms are skipped" [Stanton:1991:4334], which is the same paper that provided the CCSD equations. The MP3 module was added by initializing `t1` (as 0) and `t2` in a similar fashion to CCSD first iteration, but all the intermediates are built with `tau` as an 0 tensor, because `tau` here is just `t2` (since `t1` is 0), so those are the quadratic `t2` terms. The energy expression, however, still needs `tau` for evaluation, and `t2` is passed in there instead.

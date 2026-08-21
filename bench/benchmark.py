@@ -215,7 +215,7 @@ def _print_mp3(collected, logger: logging.Logger):
         logger.info(f"{label:<20} {d['reference']:>3} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
               f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f} {fmt(d['eri_s'],'7.3f'):>7}"
               f" {fmt(d['jk_ms'],'10.1f'):>10} {d['n_iter']:>6}"
-              f" {fmt(d['mo_cc_s'],'7.3f'):>7} {fmt(d['mp3_s'],'8.1f'):>8}"
+              f" {fmt(d['mo_cc_s'],'7.3f'):>7} {fmt(d['mp3_s'],'8.3f'):>8}"
               f" {fmt(d['peak_rss'],'8.1f'):>8}")
     logger.info("─" * len(hdr))
 

@@ -26,7 +26,7 @@ Tensor build_Wmnij(const Tensor& _prqs, const Tensor& FN, const Tensor& tau,
 
 // UHF uses DEprqs <pr||qs>, while RHF uses Iprqs (the raw ERI tensor)
 Tensor build_Wmbej(const Tensor& _prqs, const Tensor& FN, const Tensor& tau,
-                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin, bool is_MP3 = false);
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin);
 
 
 // ONLY USED BY UHF
@@ -35,7 +35,7 @@ Tensor build_Wabef(const Tensor& DEprqs, const Tensor& FN, const Tensor& tau,
 
 // ONLY USED BY RHF
 Tensor build_Wmbje(const Tensor& Iprqs, const Tensor& FN, const Tensor& tau,
-                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool is_MP3 = false);
+                const Tensor& t1, const Tensor& t2, Sli O, Sli V);
 
 // ONLY USED BY RHF
 Tensor build_Zmbij(const Tensor& Iprqs, const Tensor& FN, const Tensor& tau,

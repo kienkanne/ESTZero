@@ -123,12 +123,14 @@ Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports t
 | version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform(s) | MP3 energy (s) | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|
 | v2.4.0 | 47.573 | 0.415 | 10.1 | 21 | 19.772 | 26.043 | 572.7 | RHF MP3 baseline |
+| v2.4.1 | 36.886 | 0.415 | 10.1 | 21 | 18.313 | 16.858 | 572.4 | `t1` and `tau` are empty zero tensors feed into CCSD equations for MP3. The equations for MP3 were written to avoid those unnecessary operations, cutting time significantly. |
 
 #### UHF
 
 | version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform(s) | MP3 energy (s) | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|
 | v2.4.0 | 25.717 | 0.041 | 0.9 | 24 | 1.342 | 23.043 | 497.1 | UHF MP3 baseline |
+| v2.4.0 | 15.383 | 0.041 | 0.9 | 24 | 1.340 | 12.813 | 496.4 | `t1` and `tau` are empty zero tensors feed into CCSD equations for MP3. The equations for MP3 were written to avoid those unnecessary operations, cutting time significantly.  |
 
 ### CCSD(T)
 

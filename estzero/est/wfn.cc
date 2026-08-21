@@ -157,12 +157,7 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
 
     else if (method == "mp3") {
         CCInputs in = build_cc_inputs(*this, sr, reference);
-        MP3Result mp3 = calc_mp3_E(in.Iprqs, in.DEprqs, in.FN, in.Dia, in.Dijab, in.O, in.V, in.spin);
-
-        // Printed unconditionally (not gated by verbose), matching the ccsd_t precedent, so one
-        // run gives both the MP2 and MP3 energies for the benchmark harness without a second run.
-        std::println("MP2 energy: {:.8f}", E_scf + mp3.E_mp2);
-        return E_scf + mp3.E_mp3_total;
+        return E_scf + calc_mp3_E(in.Iprqs, in.DEprqs, in.FN, in.Dia, in.Dijab, in.O, in.V, in.spin);
     }
 
     else if (method.starts_with("cc")) {
