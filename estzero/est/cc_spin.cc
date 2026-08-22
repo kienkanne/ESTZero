@@ -152,7 +152,7 @@ Tensor build_spin_T2(const Tensor& DEprqs, const Tensor& tau, // (takes tau, not
     // And here
     Tensor Pijab = einsum("imae,mbej->ijab", {t2, Wmbej});
 
-    tmp = einsum("ie,ma,mbej->ijab", {t1, t1, DEprqs.slice(O, V, V, O)});
+    tmp = einsum("ie,mbej,ma->ijab", {t1, DEprqs.slice(O, V, V, O), t1,});
     Pijab -= tmp;
 
     // P(ij) * P(ab): (ij - ji) * (ab - ba) = ijab - ijba - jiab + jiba

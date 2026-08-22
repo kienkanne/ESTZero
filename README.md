@@ -142,7 +142,8 @@ Version 2.1.0 introduced CCSD for RHF. The baseline use equations adopted from [
 |---|---|---|---|---|---|---|---|---|---|---|
 | v2.1.0 | 40.207 | 0.110 | 1.0 | 21 | 0.611 | 1229.9 | 32 | - | 59.1 | RHF CCSD Baseline |
 | v2.2.0 | 20.552 | 0.110 | 1.0 | 21 | 0.614 | 1231.3 | 16 | - | 62.2 | DIIS-Acceleration addition, doubling the convergence rate. Memory footprint is slightly higher due to the constructed error vectors |
-| v2.3.2 | 18.334 | 0.113 | 1.0 | 21 | 0.612 | 1234.5 | 16 | 19.367 | 62.3 | Added perbutative triples with the "vikings" implementation |
+| v2.3.2 | 20.606 | 0.113 | 1.0 | 21 | 0.612 | 1234.5 | 16 | 19.367 | 62.3 | Added perbutative triples with the "vikings" implementation |
+| v2.4.2 | 18.458 | 0.110 | 1.0 | 21 | 0.624 | 1099.3 | 16 | 19.516 | 62.8 | Added pairwise evaluation for einsum, saving FLOPs for the triple contractions like `ie,mbej,ma->ijab` |
 
 #### UHF
 
@@ -156,5 +157,6 @@ Version 2.0.0 introduced CCSD for UHF. The baseline use the formulated equations
 | v2.2.0 | 18.364 | 0.011 | 0.1 | 22 | 0.066 | 908.6 | 20 | - | 60.3 | DIIS-Acceleration addition, doubling the convergence rate. Memory footprint is slightly higher due to the constructed error vectors |
 | v2.3.0 | 18.266 | 0.011 | 0.1 | 22 | 0.066 | 903.8 | 20 | 27.846 | 1491.4 | Added perbutative triples with the "noddy" implementation. The full rank 6 tensors were stored explicitly, exploding the memory usage |
 | v2.3.1 | 18.334 | 0.012 | 0.1 | 22 | 0.065 | 907.1 | 20 | 21.093 | 60.5 | Added perbutative triples with the "vikings" implementation. It avoids storing the rank 6 tensors, so memory returned to normal levels. The algorithm is also more efficient, reducing wall time by ~25% |
+| v2.4.2 | 16.325 | 0.011 | 0.1 | 22 | 0.065 | 806.2 | 20 | 16.325 | 60.8 | Added pairwise evaluation for einsum, saving FLOPs for the triple contractions like `ie,mbej,ma->ijab` |
 
 > (4) From version v2.3.0: In the benchmark runs that produced these numbers, only CCSD(T) was requested as it prints both the CCSD energy baseline as well as the corrected energy CCSD(T). The timings of all steps are printed, and the total CCSD wall time reported here is the actual total wall time subtracted by the run time of the perbutative triples calculation. This is done to save benchmarking run time.

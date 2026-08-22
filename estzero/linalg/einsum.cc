@@ -123,7 +123,7 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
 }
 
 
-Tensor einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
+Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
     auto [terms_strings, char_to_dim, char_to_col] = parse_subscripts(subscripts, operands);
 
     std::vector<int> result_shape;
@@ -191,4 +191,73 @@ Tensor einsum(const std::string& subscripts, const std::vector<Tensor>& operands
     }
 
     return result;
+}
+
+
+std::string multi_union(const std::vector<std::string>& terms_strings) {
+    std::string combined;
+
+    for (const auto& s : terms_strings) {
+        combined += s;
+    }
+    std::sort(combined.begin(), combined.end());
+
+    // Remove duplicate characters to get the unique set union
+    auto last = std::unique(combined.begin(), combined.end());
+    combined.erase(last, combined.end());
+
+    return combined;
+}
+
+std::string str_intersect(std::string term1, std::string term2) {
+    std::sort(term1.begin(), term1.end());
+    std::sort(term2.begin(), term2.end());
+
+    std::string result;
+    // 2. Perform the set operation on the sorted copies
+    std::set_intersection(term1.begin(), term1.end(), 
+            term2.begin(), term2.end(), std::back_inserter(result));
+
+    return result;
+}
+
+std::string get_output_string(int output_idx, std::vector<std::string> terms_strings, 
+                            std::string term1_str, std::string term2_str){
+    std::string term12_union = multi_union({term1_str, term2_str});
+
+    std::vector<std::string> remaining_terms(terms_strings.begin()+output_idx, terms_strings.end());
+    std::string remaining_union = multi_union(remaining_terms);
+
+    return str_intersect(term12_union, remaining_union);  
+}
+
+
+Tensor einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
+    if (operands.size() == 1 || operands.size() == 2) {
+        return pairwise_einsum(subscripts, operands);
+    }
+
+    // Handle cases with 3 or more operands only
+    auto [terms_strings, char_to_dim, char_to_col] = parse_subscripts(subscripts, operands);
+
+    Tensor output = operands[0];
+    std::string output_str = terms_strings[0];
+
+    for (size_t next_operand = 1; next_operand < operands.size(); ++next_operand) {
+        std::string next_output_str;
+
+        if (next_operand == operands.size() - 1) {
+            next_output_str = terms_strings.back();   // exact requested order, not a sorted intersection
+        } else {
+            const size_t output_idx = next_operand + 1;
+            next_output_str = get_output_string(output_idx, terms_strings, output_str, terms_strings[next_operand]);
+        }
+
+        const size_t output_idx = next_operand + 1;
+        output = pairwise_einsum(
+            output_str + "," + terms_strings[next_operand] + "->" + next_output_str,
+            {output, operands[next_operand]});
+        output_str = next_output_str;
+    }
+    return output;
 }

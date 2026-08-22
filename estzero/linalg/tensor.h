@@ -229,6 +229,25 @@ public:
 
     // == VIEW & COPY METHODS =============================================================
 
+    Tensor contiguous() const { return _is_contiguous() ? *this : copy(); }
+
+    template <typename... Idx>
+    Tensor permute(Idx... idx) const {
+        if (sizeof...(idx) != ndim()) {
+            throw std::invalid_argument("Number of indices must be equal to ndim");
+        }
+        const size_t ind[] = { static_cast<size_t>(idx)... };
+        std::vector<int> new_shape(shape.size());
+        std::vector<int> new_strides(strides.size());
+
+        for (size_t i = 0; i < ndim(); ++i) {
+            size_t new_idx = ind[i];
+            new_shape[i] = shape[new_idx];
+            new_strides[i] = strides[new_idx];
+        }
+        return Tensor(data, new_shape, new_strides, offset);
+    }
+
     Tensor swapaxes(size_t ax1, size_t ax2) const {
         auto new_shape = shape;
         auto new_strides = strides;
@@ -246,6 +265,29 @@ public:
         new_shape.erase(new_shape.begin() + axis);
         new_strides.erase(new_strides.begin() + axis);
         return Tensor(data, new_shape, new_strides, new_offset);
+    }
+
+    template <typename... Idx>
+    Tensor reshape(Idx... idx) const {
+        const std::vector<int> new_shape = { static_cast<int>(idx)... };
+        int new_size = 1;
+        for (int i=0; i < new_shape.size(); ++i) {
+            new_size *= new_shape[i];
+        }
+        if (new_size != this->size()) { 
+            throw std::invalid_argument("New shape is not compatible with current tensor!"); 
+        }
+        Tensor t = contiguous();
+
+        std::vector<int> new_strides(new_shape.size());
+        size_t total_size = 1;
+        for (int i = static_cast<int>(new_shape.size()) - 1; i >= 0; --i) {
+            new_strides[i] = static_cast<int>(total_size);
+            total_size *= static_cast<size_t>(new_shape[i]);
+        }
+            
+        return Tensor(t.data, new_shape, new_strides, t.offset);
+        
     }
 
     template <typename... Slices>
@@ -369,7 +411,7 @@ public:
     }
 
     // LEGACY: Access raw data pointer, used by TensorView
-    const double* data_ptr() const { return data->data(); }
+    const double* data_ptr() const { return data->data() + offset; }
 };
 
 

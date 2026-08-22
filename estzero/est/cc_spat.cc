@@ -57,9 +57,9 @@ Tensor build_spat_T2(const Tensor& Iprqs, const Tensor& tau, // (takes tau, not 
     tmp = einsum("mjae,mbie->ijab", {t2, Wmbje});
     add_pair(tmp);
 
-    tmp = einsum("ie,ma,mbej->ijab", {t1, t1, Iprqs.slice(O, V, V, O)});
+    tmp = einsum("ie,mbej,ma->ijab", {t1, Iprqs.slice(O, V, V, O), t1});
     add_pair(-1.0 * tmp);
-    tmp = einsum("ie,mb,maje->ijab", {t1, t1, Iprqs.slice(O, V, O, V)});
+    tmp = einsum("ie,maje,mb->ijab", {t1, Iprqs.slice(O, V, O, V), t1});
     add_pair(-1.0 * tmp);
     add_pair(einsum("ie,abej->ijab", {t1, Iprqs.slice(V, V, V, O)}));
     add_pair(-1.0 * einsum("ma,mbij->ijab", {t1, Iprqs.slice(O, V, O, O)}));

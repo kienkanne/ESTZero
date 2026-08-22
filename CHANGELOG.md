@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v2.4.2] Added pairwise evaluation for `einsum`
+
+- Three CCSD contractions contain three operands (`ijab,ia,jb->`, `ie,ma,mbej->ijab`, `ie,mb,maje->ijab`), and the current implementation of `einsum` contracts all indices at the same time, but evaluating them pairwise would be less FLOPs. The pairwise summation is added for `einsum`, and it does so strictly from left to right without searching for an optimal path, which is overkill for just those three contractions. The three contractions that involved 3 operands were re-ordered manually to minimize the arithemtic.
+- For RHF CCSD on propargyl/sto-3g (nbf=34, ndocc=21): Contracting `ie,ma,mbej->ijab` all at once takes $3O^3V^3$ (61,039,251) FLOPs, and doing it pairwise with reordering `ie,mbej,ma->ijab` is $2(O^2V^3 + O^3V^2)$ (5,067,972) FLOPs. This (and another triple contraction re-ordering with about the same FLOPs saving) actually saved about ~135ms per CCSD iteration for this system compared to v2.3.2 (1234.5ms to 1099.3ms).
+
 ## [v2.4.1] Remove contractions with a zero tensor for MP3
 
 - In the previous version, MP3 was wired in directly using the CCSD intermediates and amplitudes builder. However, since `t1` and `tau` for MP3 are zero tensors, a lot of the contractions were unncessary. The equations for MP3 was written out explicitly, copying the equations from CCSD, but dropping all the zero terms to avoid those arithmetics. The MP3 energy calculation step improved signficantly, as run time dropped from to 26.0s (v2.4.0) to 16.9s for pyrimidine/6-31g.
