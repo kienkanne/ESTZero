@@ -10,6 +10,16 @@ find_package(Eigen3 REQUIRED)
 
 set(LIBINT_ROOT "/localscratch/kbui/CPP/libint_install")
 
+set(OPENBLAS_ROOT "/localscratch/kbui/CPP/OpenBLAS")
+find_path(OPENBLAS_INCLUDE_DIR cblas.h
+    HINTS ${OPENBLAS_ROOT}/include ${OPENBLAS_ROOT}
+    REQUIRED
+)
+find_library(OPENBLAS_LIBRARY NAMES openblas
+    HINTS ${OPENBLAS_ROOT}/lib ${OPENBLAS_ROOT}
+    REQUIRED
+)
+
 option(EST_BUILD_TESTS "Build unit tests" ON)
 
 add_library(est_core STATIC
@@ -31,17 +41,19 @@ add_library(est_core STATIC
 
 target_include_directories(est_core PUBLIC
     ${LIBINT_ROOT}/include
+    ${OPENBLAS_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/est
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/linalg
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/utils
 )
 target_link_directories(est_core PUBLIC ${LIBINT_ROOT}/lib)
-target_link_libraries(est_core PUBLIC Eigen3::Eigen int2)
+target_link_libraries(est_core PUBLIC Eigen3::Eigen int2 ${OPENBLAS_LIBRARY})
 
 target_compile_options(est_core PUBLIC
     -O3
     -g
     -fno-omit-frame-pointer
+    -march=native
 )
 
 add_executable(ESTZero estzero/est/main.cc)

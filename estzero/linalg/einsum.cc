@@ -126,6 +126,11 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
 bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands, Tensor& result) {
     if (operands.size() != 2) return false;
 
+    // Add a guard on minimum tensor size to avoid doing large overhead for very small systems (go to odometer instead)
+    for (const auto& t : operands) {
+        if (t.size() < 1024) { return false; }
+    }
+
     const std::string& A = terms_strings[0];
     const std::string& B = terms_strings[1];
     const std::string& C = terms_strings[2]; // requested output order, used for final permutation

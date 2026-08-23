@@ -2,6 +2,10 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.0.1] Added `Tensor` minimum size requirement to call GEMM
+
+- A guardrail is added that declines to call GEMM if any `Tensor` operand has size (total number of elements) less that 1024, and defaults to the odometer scheme. This change targets the repeated small `einsum` calls in the vikings algorithm for perbutative triples for small systems to avoid the overhead for small contractions. The guard successfully lowered the PertT run time of the small systems, for example o2/sto-3g (nbf=10, n_alpha=9, n_beta=7) goes back to 0.182s, which is similar to v2.4.2, compared to 0.327s in v2.5.0.
+
 ## [v3.0.0] Added GEMM (General Matrix Multiply) via Eigen for `einsum`
 
 - `einsum` now has a route to build Eigen matrices to call for GEMM (General Matrix Multiply), which works for most contractions. Those who don't fall back to the original odometer scheme.
