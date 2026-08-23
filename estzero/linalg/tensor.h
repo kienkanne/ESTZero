@@ -248,6 +248,19 @@ public:
         return Tensor(data, new_shape, new_strides, offset);
     }
 
+    // permute version to take in std::vector alongside the variadic template version above for flexibility
+    Tensor permute(const std::vector<int>& perm) const {
+        if (perm.size() != static_cast<size_t>(ndim())) {
+            throw std::invalid_argument("Number of indices must be equal to ndim");
+        }
+        std::vector<int> new_shape(ndim()), new_strides(ndim());
+        for (int i = 0; i < ndim(); ++i) {
+            new_shape[i] = shape[perm[i]];
+            new_strides[i] = strides[perm[i]];
+        }
+        return Tensor(data, new_shape, new_strides, offset);
+    }
+
     Tensor swapaxes(size_t ax1, size_t ax2) const {
         auto new_shape = shape;
         auto new_strides = strides;
@@ -285,9 +298,27 @@ public:
             new_strides[i] = static_cast<int>(total_size);
             total_size *= static_cast<size_t>(new_shape[i]);
         }
-            
         return Tensor(t.data, new_shape, new_strides, t.offset);
-        
+    }
+
+    // reshape version to take in std::vector alongside the variadic template version above for flexibility
+    Tensor reshape(const std::vector<int>& new_shape) const {
+        int new_size = 1;
+        for (int i=0; i < new_shape.size(); ++i) {
+            new_size *= new_shape[i];
+        }
+        if (new_size != this->size()) { 
+            throw std::invalid_argument("New shape is not compatible with current tensor!"); 
+        }
+        Tensor t = contiguous();
+
+        std::vector<int> new_strides(new_shape.size());
+        size_t total_size = 1;
+        for (int i = static_cast<int>(new_shape.size()) - 1; i >= 0; --i) {
+            new_strides[i] = static_cast<int>(total_size);
+            total_size *= static_cast<size_t>(new_shape[i]);
+        }
+        return Tensor(t.data, new_shape, new_strides, t.offset);
     }
 
     template <typename... Slices>
@@ -328,6 +359,18 @@ public:
 
     Tensor& assign(const Tensor& other) {
         return _binary_assign_op(other, [](double, double new_val) { return new_val; });
+    }
+
+    // Zero-copy view of a contiguous Tensor's buffer as an row-major Eigen matrix, for GEMM.
+    // WARNING: Only safe to use when this this is already packed row-major (straight out of reshape())
+    Eigen::Map<const Matrix> as_matrix(int rows, int cols) const {
+        if (!_is_contiguous()) {
+            throw std::runtime_error("Current Tensor view is not contiguous! Data might mismatch!");
+        }
+        if (rows * cols != size()) {
+            throw std::runtime_error("Requested rows and cols do not match Tensor size!");
+        }
+        return Eigen::Map<const Matrix>(data->data() + offset, rows, cols);
     }
 
     // == ARITHMETIC OPERATIONS =============================================================

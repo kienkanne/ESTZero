@@ -123,6 +123,83 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
 }
 
 
+bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands, Tensor& result) {
+    if (operands.size() != 2) return false;
+
+    const std::string& A = terms_strings[0];
+    const std::string& B = terms_strings[1];
+    const std::string& C = terms_strings[2]; // requested output order, used for final permutation
+
+    // Check for repeated indices in a single operand (i.e. "piqi")
+    auto has_repeat = [](const std::string& s) {
+        std::unordered_set<char> seen;
+        for (char c : s) if (!seen.insert(c).second) return true;
+        return false;
+    };
+    if (has_repeat(A) || has_repeat(B)) return false;
+
+    std::unordered_set<char> a_set(A.begin(), A.end());
+    std::unordered_set<char> b_set(B.begin(), B.end());
+    std::unordered_set<char> c_set(C.begin(), C.end());
+
+    // Batch index check (index in A is not in B and C, or same for B)
+    // This doesn't occur in this codebase, but just decline for simplcity here, not doing GEMM-supported batch
+    for (char c : A) {
+        if (b_set.count(c) && c_set.count(c)) return false;              
+        if (!c_set.count(c) && !b_set.count(c)) return false;
+    }
+    for (char c : B) {
+        if (!c_set.count(c) && !a_set.count(c)) return false;
+    }
+
+    // Walk A once: kept-left axes (C have it) summed axes (C doesn't have it).
+    // summed_labels must is the same for both A and B, so create one here and B reuses it
+    std::vector<int> left_axes, summed_axes_A;
+    std::string summed_labels;
+    for (int i = 0; i < static_cast<int>(A.size()); ++i) {
+        if (c_set.count(A[i])) left_axes.push_back(i);
+        else { summed_axes_A.push_back(i); summed_labels += A[i]; }
+    }
+
+    std::vector<int> right_axes;
+    for (int i = 0; i < static_cast<int>(B.size()); ++i) {
+        if (c_set.count(B[i])) right_axes.push_back(i);
+    }
+    std::vector<int> summed_axes_B(summed_labels.size());
+    for (size_t k = 0; k < summed_labels.size(); ++k) {
+        summed_axes_B[k] = static_cast<int>(B.find(summed_labels[k])); // reuse
+    }
+
+    std::vector<int> permA = left_axes;
+    permA.insert(permA.end(), summed_axes_A.begin(), summed_axes_A.end());
+    std::vector<int> permB = summed_axes_B;
+    permB.insert(permB.end(), right_axes.begin(), right_axes.end());
+
+    int left_size = 1; for (int i : left_axes) left_size *= operands[0].shape[i];
+    int summed_size = 1; for (int i : summed_axes_A) summed_size *= operands[0].shape[i]; // only takes A to compute, same if takes B
+    int right_size = 1; for (int i : right_axes) right_size *= operands[1].shape[i];
+
+    Tensor M = operands[0].permute(permA).reshape(left_size, summed_size);
+    Tensor N = operands[1].permute(permB).reshape(summed_size, right_size);
+    Matrix result_mat = M.as_matrix(left_size, summed_size) * N.as_matrix(summed_size, right_size);
+
+    // combined_labels: left_axes + right_axes (what GEMM produced)
+    std::string combined_labels;
+    std::vector<int> combined_shape;
+    for (int i : left_axes)  { combined_labels += A[i]; combined_shape.push_back(operands[0].shape[i]); }
+    for (int i : right_axes) { combined_labels += B[i]; combined_shape.push_back(operands[1].shape[i]); }
+
+    Tensor combined = mat_to_tensor(result_mat).reshape(combined_shape);
+
+    // Reorder combined's axes into the caller's actual requested order
+    std::vector<int> perm_out(C.size());
+    for (size_t i = 0; i < C.size(); ++i) {
+        perm_out[i] = static_cast<int>(combined_labels.find(C[i]));
+    }
+    result = combined.permute(perm_out);
+    return true;
+}
+
 Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
     auto [terms_strings, char_to_dim, char_to_col] = parse_subscripts(subscripts, operands);
 
@@ -131,6 +208,10 @@ Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>&
         result_shape.push_back(char_to_dim[c]);
     }
     Tensor result(result_shape); // constructor already computes correct natural strides
+
+    // GEMM Route
+    bool gemm = try_gemm(terms_strings, operands, result); // modify `Tensor result` directly
+    if (gemm) { return result; }
 
     const int n_labels = static_cast<int>(char_to_dim.size());
     std::vector<int> dim_sizes(n_labels);

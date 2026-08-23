@@ -2,6 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.0.0] Added GEMM (General Matrix Multiply) via Eigen for `einsum`
+
+- `einsum` now has a route to build Eigen matrices to call for GEMM (General Matrix Multiply), which works for most contractions. Those who don't fall back to the original odometer scheme.
+- The speed up is up to 8.46x for larger systems (MP3, pyrimidine/6-31g (nbf=62)). The previous odometer, despite being optimized with the O(1) complexity to walk naturally along the strides, did not have any vectorization, and didn't come close to GEMM. The GEMM setup, however, require the contiguous buffer from Tensor, and in some cases it creates copies, so the memory footprint is higher.
+- The GEMM route also have quite high memory overhead per `einsum` call as it has to set up maps, strings, the correct indices, and permutate to finally call GEMM. The speed up seen above decreases with system size, and for the smallest systems performance actually degraded: h2o/sto-3g (nbf=7) slowed down ~0.5x.
+- The perbutative triples calculation in CCSD(T) still takes a significant amount of time (19.197s in v2.4.2 to 21.243s in v2.5.0) due to many small `einsum` call in an explicit loop built following the vikings algorithm to reduce memory footprint.
+
 ## [v2.4.2] Added pairwise evaluation for `einsum`
 
 - Three CCSD contractions contain three operands (`ijab,ia,jb->`, `ie,ma,mbej->ijab`, `ie,mb,maje->ijab`), and the current implementation of `einsum` contracts all indices at the same time, but evaluating them pairwise would be less FLOPs. The pairwise summation is added for `einsum`, and it does so strictly from left to right without searching for an optimal path, which is overkill for just those three contractions. The three contractions that involved 3 operands were re-ordered manually to minimize the arithemtic.

@@ -45,6 +45,8 @@ This log tracks the update in features and their performance in the most computa
 
 > v1.5.2 switched `Tensor`'s element access (`operator()`/`flat_index`) to bounds-checked `std::vector::at()` as part of the shared_ptr-backed zero-copy view rewrite (`swapaxes`/`slice`). Since `Tensor` is the storage type behind the ERI tensor scheme, `build_JK`, and the `einsum`-driven MO transform, this regressed every section below that touches it — most visibly UHF MP2's MO transform, which lost the v1.5.1 fix's gains. v1.5.3 replaces `.at()` with unchecked indexing (safe here, since every call site already guarantees in-bounds access), restoring MP2 to v1.5.1 levels and improving ERI/JK further; the remaining ERI gap vs. the v1.5.0 vector scheme is now fully explained by the tensor scheme's inherent 8-fold permutation writes per integral, not indexing overhead.
 
+> v3.0.0 added **Eigen GEMM for `einsum`**, which is a major speed up for post-HF algorithms like MP2, MP3 and CCSD/CCSD(T). These methods depend heavily on `einsum` for tensor contractions. The GEMM setup, however, require the contiguous buffer from Tensor, and in some cases it creates copies, so the memory footprint is higher. 
+
 ### SCF
 
 For RHF, the test used to track through different versions is benzene/def2-svp (nbf=114), as it has a sufficiently large number of basis functions for testing. The baseline version, v0.1.0, uses in-core 4-index ERIs (no permutational symmetry, no screening), dense N^4 JK build, DIIS, symmetric orthogonalization, core guess.
@@ -79,7 +81,7 @@ Version 1.1.0 reorganize the benchmark suite to separate the reference and the m
 
 ### MP2
 
-Version v1.0.0 included MP2 for RHF. The baseline is the 4 step MO transformation written via explicit loops ~ O(N^5). The calculation runs a base SCF first, so ERI build and JK build performance is similar to versions above.
+Version v1.0.0 included MP2 for RHF. The baseline is the 4 step MO transformation written via explicit loops ~ O(N^5). The calculation runs a base SCF first, so ERI build and JK build performance is similar to versions above. The benchmarking system used here is similar to SCF, which is benzene/def2-svp (nbf=114).
 
 | version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform(s) | MP2 energy (ms) | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|
@@ -92,12 +94,13 @@ Version v1.0.0 included MP2 for RHF. The baseline is the 4 step MO transformatio
 | v1.5.3 | 27.308 | 1.764 | 136.2 | 16 | 23.332 | 5.8 | 1732.1 | Fix restores MO transform/MP2 to v1.5.1-level speed; see SCF note above |
 | v1.5.5a | 28.592 | 1.762 | 136.8 | 16 | 24.527 | 215.5 | 1732.3 | Wired in `einsum` for MP2 energy evaluation. ~40x slow down due to `einsum` not having pairwise evaluation, so *`iajb,iajb,iajb->` is extremely slow* (Correction below) |
 | v1.5.5b<sup>(2)</sup> | 28.585 | 1.764 | 136.9 | 16 | 24.375 | 227.0 | 1732.3 | Wired `einsum` with two operands and intermediates. Performance is slightly worse, `einsum` wasn't a problem for this case the 4 indices are the same; `Tensor` setup fixed cost is what hit |
+| v3.0.0 | 6.340 | 1.734 | 135.6 | 13 | 2.320 | 498.5 | 2551.6 | **Eigen GEMM for `einsum`** |
 
 > (2) Version v1.5.5c tried replacing all `einsum` with `Tensor` arithemic operators, but performance is identical, showing the fixed cost lie in `Tensor` setups.
 
 #### UHF
 
-UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alpha-alpha, beta-beta, and alpha-beta MO integral tensors. Baseline version (v1.1.0): the index transform function used is similar to the one used for RHF MP2 to build alpha-alpha and beta-beta tensors; the alpha-beta block is built from the intermediate tensor after index 2 transformation of the alpha-alpha tensor
+UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alpha-alpha, beta-beta, and alpha-beta MO integral tensors. Baseline version (v1.1.0): the index transform function used is similar to the one used for RHF MP2 to build alpha-alpha and beta-beta tensors; the alpha-beta block is built from the intermediate tensor after index 2 transformation of the alpha-alpha tensor. The benchmarking system used here is similar to SCF, which is •CH3 methyl radical/aug-cc-pvtz (nbf=115).
 
 | version | Total wall (s) | ERI build (s) | JK build<sup>(1)</sup> (per iter) (ms) | N_SCF_iter | MO transform<sup>(1)</sup> (s) | MP2 energy (ms) | Peak RSS (MB) | Note |
 |---|---|---|---|---|---|---|---|---|
@@ -111,6 +114,7 @@ UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alp
 | v1.5.3 | 15.568 | 1.458 | 280.9 | 15 | 9.855 | 0.8 | 1466.5 | Fix restores MO transform/MP2 to v1.5.1 level |
 | v1.5.5a | 16.173 | 1.464 | 282.6 | 16 | 10.375 | 52.8 | 1466.9 | Same as in RHF MP2. ~66x slow down, which is worst than RHF MP2 due to the additional alpha beta mixing terms |
 | v1.5.5b | 16.105 | 1.457 | 280.7 | 16 | 10.367 | 30.0 | 1466.9 | Wired `einsum` with two operands and intermediates, but also uses `Tensor` operators whenever possible instead of `einsum` |
+| v3.0.0 | 6.871 | 1.442 | 140.2 | 14 | 1.429 | 33.6 | 1695.9 | **Eigen GEMM for `einsum`** |
 
 > (3) v1.3.0-v1.5.0 didn't use intermediate 2 of Iaa to build Iab when using the new `einsum`, so performance was heavily impacted. This is fixed in v1.5.1
 
@@ -124,6 +128,7 @@ Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports t
 |---|---|---|---|---|---|---|---|---|
 | v2.4.0 | 47.573 | 0.415 | 10.1 | 21 | 19.772 | 26.043 | 572.7 | RHF MP3 baseline |
 | v2.4.1 | 36.886 | 0.415 | 10.1 | 21 | 18.313 | 16.858 | 572.4 | `t1` and `tau` are empty zero tensors feed into CCSD equations for MP3. The equations for MP3 were written to avoid those unnecessary operations, cutting time significantly. |
+| v3.0.0 | 4.301 | 0.415 | 10.2 | 21 | 1.572 | 0.833 | 798.2 | **Eigen GEMM for `einsum`** |
 
 #### UHF
 
@@ -131,6 +136,7 @@ Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports t
 |---|---|---|---|---|---|---|---|---|
 | v2.4.0 | 25.717 | 0.041 | 0.9 | 24 | 1.342 | 23.043 | 497.1 | UHF MP3 baseline |
 | v2.4.0 | 15.383 | 0.041 | 0.9 | 24 | 1.340 | 12.813 | 496.4 | `t1` and `tau` are empty zero tensors feed into CCSD equations for MP3. The equations for MP3 were written to avoid those unnecessary operations, cutting time significantly.  |
+| v3.0.0 | 2.216 | 0.040 | 0.9 | 24 | 0.311 | 0.592 | 532.9 | **Eigen GEMM for `einsum`** |
 
 ### CCSD(T)
 
@@ -144,6 +150,7 @@ Version 2.1.0 introduced CCSD for RHF. The baseline use equations adopted from [
 | v2.2.0 | 20.552 | 0.110 | 1.0 | 21 | 0.614 | 1231.3 | 16 | - | 62.2 | DIIS-Acceleration addition, doubling the convergence rate. Memory footprint is slightly higher due to the constructed error vectors |
 | v2.3.2 | 20.606 | 0.113 | 1.0 | 21 | 0.612 | 1234.5 | 16 | 19.367 | 62.3 | Added perbutative triples with the "vikings" implementation |
 | v2.4.2 | 18.458 | 0.110 | 1.0 | 21 | 0.624 | 1099.3 | 16 | 19.516 | 62.8 | Added pairwise evaluation for einsum, saving FLOPs for the triple contractions like `ie,mbej,ma->ijab` |
+| v3.0.0 | 4.974 | 0.113 | 1.0 | 21 | 0.131 | 287.2 | 16 | 21.243 | 79.4 | **Eigen GEMM for `einsum`** |
 
 #### UHF
 
@@ -158,5 +165,6 @@ Version 2.0.0 introduced CCSD for UHF. The baseline use the formulated equations
 | v2.3.0 | 18.266 | 0.011 | 0.1 | 22 | 0.066 | 903.8 | 20 | 27.846 | 1491.4 | Added perbutative triples with the "noddy" implementation. The full rank 6 tensors were stored explicitly, exploding the memory usage |
 | v2.3.1 | 18.334 | 0.012 | 0.1 | 22 | 0.065 | 907.1 | 20 | 21.093 | 60.5 | Added perbutative triples with the "vikings" implementation. It avoids storing the rank 6 tensors, so memory returned to normal levels. The algorithm is also more efficient, reducing wall time by ~25% |
 | v2.4.2 | 16.325 | 0.011 | 0.1 | 22 | 0.065 | 806.2 | 20 | 16.325 | 60.8 | Added pairwise evaluation for einsum, saving FLOPs for the triple contractions like `ie,mbej,ma->ijab` |
+| v3.0.0 | 4.523 | 0.011 | 0.1 | 22 | 0.028 | 218.4 | 20 | 17.872 | 62.7 | **Eigen GEMM for `einsum`** |
 
 > (4) From version v2.3.0: In the benchmark runs that produced these numbers, only CCSD(T) was requested as it prints both the CCSD energy baseline as well as the corrected energy CCSD(T). The timings of all steps are printed, and the total CCSD wall time reported here is the actual total wall time subtracted by the run time of the perbutative triples calculation. This is done to save benchmarking run time.

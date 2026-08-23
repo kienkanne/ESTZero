@@ -8,12 +8,15 @@
 namespace {
 
 // doctest has no Tensor comparison; compare element-wise over the flat storage.
+// ADDED the new contiguous() method. flat_index already got a warning for its uses cases,
+// so contiguous is required here for using flat_index() to validate
 void check_tensor_approx(const Tensor& a, const Tensor& b, double eps) {
     REQUIRE(a.shape == b.shape);
-    int count = 1;
-    for (int d : a.shape) count *= d;
-    for (int i = 0; i < count; ++i)
-        CHECK(a.flat_index(i) == doctest::Approx(b.flat_index(i)).epsilon(eps));
+    Tensor ac = a.contiguous();
+    Tensor bc = b.contiguous();
+
+    for (int i = 0; i < ac.size(); ++i)
+        CHECK(ac.flat_index(i) == doctest::Approx(bc.flat_index(i)).epsilon(eps));
 }
 
 } // namespace
