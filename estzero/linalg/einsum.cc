@@ -124,7 +124,7 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
 }
 
 
-bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands, Tensor& result, bool eigen) {
+bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands, Tensor& result) {
     if (operands.size() != 2) return false;
 
     // Add a guard on minimum tensor size to avoid doing large overhead for very small systems (go to odometer instead)
@@ -197,11 +197,11 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
 
     Tensor combined;
     
-    if (eigen) {
+    if (gs == GEMMScheme::EIGEN) {
         // Eigen route
         Matrix result_mat = M.as_matrix(left_size, summed_size) * N.as_matrix(summed_size, right_size);
         combined = mat_to_tensor(result_mat).reshape(combined_shape);
-    } else {
+    } else if (gs == GEMMScheme::BLAS) {
         // OpenBLAS route
         std::vector<double> result_data(left_size * right_size);
 
@@ -225,7 +225,7 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
     return true;
 }
 
-Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>& operands, bool eigen = true) {
+Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
     auto [terms_strings, char_to_dim, char_to_col] = parse_subscripts(subscripts, operands);
 
     std::vector<int> result_shape;
@@ -235,7 +235,7 @@ Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>&
     Tensor result(result_shape); // constructor already computes correct natural strides
 
     // GEMM Route
-    bool gemm = try_gemm(terms_strings, operands, result, eigen); // modify `Tensor result` directly
+    bool gemm = try_gemm(terms_strings, operands, result); // modify `Tensor result` directly
     if (gemm) { return result; }
 
     const int n_labels = static_cast<int>(char_to_dim.size());
@@ -340,7 +340,7 @@ std::string get_output_string(int output_idx, std::vector<std::string> terms_str
 
 Tensor einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
     if (operands.size() == 1 || operands.size() == 2) {
-        return pairwise_einsum(subscripts, operands, false);
+        return pairwise_einsum(subscripts, operands);
     }
 
     // Handle cases with 3 or more operands only

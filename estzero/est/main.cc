@@ -1,6 +1,8 @@
 #include "libint2/initialize.h"
 #include "wfn.h"
 #include "timer.h"
+#include "einsum.h"
+#include <cblas.h>
 
 int main(int argc, char* argv[]) {
     std::string xyz_file;
@@ -9,6 +11,7 @@ int main(int argc, char* argv[]) {
     std::string reference = "rhf";
     std::string method = "scf";
     std::string eri_scheme_str = "tensor";
+    std::string gemm_scheme_str = "blas";
     int mult = 1;
     int charge = 0;
     double econv = 1e-8;
@@ -21,6 +24,7 @@ int main(int argc, char* argv[]) {
         if ((arg == "--reference") && i + 1 < argc) { reference = argv[++i]; }
         else if ((arg == "--method") && i + 1 < argc) { method = argv[++i]; }
         else if ((arg == "--eri-scheme") && i + 1 < argc) { eri_scheme_str = argv[++i]; }
+        else if ((arg == "--gemm-scheme") && i + 1 < argc) { gemm_scheme_str = argv[++i]; }
         else if ((arg == "--mult") && i + 1 < argc) { mult = std::stoi(argv[++i]); }
         else if ((arg == "--charge") && i + 1 < argc) { charge = std::stoi(argv[++i]); }
         else if ((arg == "--econv") && i + 1 < argc) { econv = std::stod(argv[++i]); }
@@ -37,12 +41,16 @@ int main(int argc, char* argv[]) {
     // Validate required arguments
     if (xyz_file.empty() || basis.empty()) {
         std::println(R"(Usage: {} <xyz-file> <basis> [--reference <val>] [--method <val>] 
-            [--eri-scheme <vector|tensor>] [--mult <val>] [--charge <val>] [--econv <val>] 
-            [--max-iter <val>] [--verbose <val>])", argv[0]);
+            [--mult <val>] [--charge <val>] 
+            [--eri-scheme <vector|tensor>] [--gemm-scheme <eigen|blas>] 
+            [--econv <val>] [--max-iter <val>] [--verbose <val>])", argv[0]);
         return EXIT_FAILURE;
     }
 
     try {
+        openblas_set_num_threads(1);
+        set_gemm_scheme(gemm_scheme_str);
+
         timing::Scoped _t("Total time", true);
         libint2::initialize();
 

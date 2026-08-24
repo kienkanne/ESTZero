@@ -48,6 +48,7 @@ This log tracks the update in features and their performance in the most computa
 > Starting from version v3.0.0, the optimization are focused on the backend of `einsum`, so it will impact post-HF algorithms about equally, depending on the intensity of the number of `einsum` calls. This is a major speed up for methos like MP2, MP3 and CCSD/CCSD(T). These changes are summarized here in short instead of given in the notes below. To see the full changes, see `CHANGELOG.md`
 > - v3.0.0 added **Eigen GEMM for `einsum`**. The GEMM setup, however, require the contiguous buffer from Tensor, and in some cases it creates copies, so the memory footprint is higher. 
 > - v3.0.2 added **OpenBLAS GEMM for `einsum`**. The performance is still superior to pre v3.0.0, compared to Eigen it's generally worse, especially for CCSD(T) with high intensity of `einsum` calls.
+> - v3.0.2a fixed **threading=1 for OpenBLAS GEMM**. The allowed threading by default for OpenBLAS in the previous version created significant overhead, relative to the small system size used here.
 
 ### SCF
 
@@ -98,6 +99,7 @@ Version v1.0.0 included MP2 for RHF. The baseline is the 4 step MO transformatio
 | v1.5.5b<sup>(2)</sup> | 28.585 | 1.764 | 136.9 | 16 | 24.375 | 227.0 | 1732.3 | Wired `einsum` with two operands and intermediates. Performance is slightly worse, `einsum` wasn't a problem for this case the 4 indices are the same; `Tensor` setup fixed cost is what hit |
 | v3.0.0 | 6.340 | 1.734 | 135.6 | 13 | 2.320 | 498.5 | 2551.6 | **Eigen GEMM for `einsum`** |
 | v3.0.2 | 6.052 | 1.749 | 136.4 | 13 | 1.976 | 521.9 | 2452.0 | **OpenBLAS GEMM for `einsum`** |
+| v3.0.2a | 6.144 | 1.724 | 137.3 | 13 | 2.127 | 481.2 | 2363.6 | **Fix threading=1 for OpenBLAS GEMM** |
 
 > (2) Version v1.5.5c tried replacing all `einsum` with `Tensor` arithemic operators, but performance is identical, showing the fixed cost lie in `Tensor` setups.
 
@@ -119,6 +121,7 @@ UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alp
 | v1.5.5b | 16.105 | 1.457 | 280.7 | 16 | 10.367 | 30.0 | 1466.9 | Wired `einsum` with two operands and intermediates, but also uses `Tensor` operators whenever possible instead of `einsum` |
 | v3.0.0 | 6.871 | 1.442 | 140.2 | 14 | 1.429 | 33.6 | 1695.9 | **Eigen GEMM for `einsum`** |
 | v3.0.2 | 11.008 | 1.446 | 140.5 | 14 | 5.532 | 46.4 | 1737.1 | **OpenBLAS GEMM for `einsum`** |
+| v3.0.2a | 10.926 | 1.431 | 140.6 | 14 | 5.478 | 34.7 | 1644.4 | **Fix threading=1 for OpenBLAS GEMM** |
 
 > (3) v1.3.0-v1.5.0 didn't use intermediate 2 of Iaa to build Iab when using the new `einsum`, so performance was heavily impacted. This is fixed in v1.5.1
 
@@ -134,6 +137,7 @@ Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports t
 | v2.4.1 | 36.886 | 0.415 | 10.1 | 21 | 18.313 | 16.858 | 572.4 | `t1` and `tau` are empty zero tensors feed into CCSD equations for MP3. The equations for MP3 were written to avoid those unnecessary operations, cutting time significantly. |
 | v3.0.0 | 4.301 | 0.415 | 10.2 | 21 | 1.572 | 0.833 | 798.2 | **Eigen GEMM for `einsum`** |
 | v3.0.2 | 4.163 | 0.439 | 10.4 | 21 | 1.488 | 0.882 | 771.5 | **OpenBLAS GEMM for `einsum`** |
+| v3.0.2a | 4.042 | 0.427 | 10.1 | 21 | 1.473 | 0.818 | 691.2 | **Fix threading=1 for OpenBLAS GEMM** |
 
 #### UHF
 
@@ -142,7 +146,8 @@ Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports t
 | v2.4.0 | 25.717 | 0.041 | 0.9 | 24 | 1.342 | 23.043 | 497.1 | UHF MP3 baseline |
 | v2.4.0 | 15.383 | 0.041 | 0.9 | 24 | 1.340 | 12.813 | 496.4 | `t1` and `tau` are empty zero tensors feed into CCSD equations for MP3. The equations for MP3 were written to avoid those unnecessary operations, cutting time significantly.  |
 | v3.0.0 | 2.216 | 0.040 | 0.9 | 24 | 0.311 | 0.592 | 532.9 | **Eigen GEMM for `einsum`** |
-| v3.0.2 | 2.202 | 0.055 | 0.9 | - | 0.379 | 0.570 | 604.3 | **OpenBLAS GEMM for `einsum`** |
+| v3.0.2 | 2.202 | 0.055 | 0.9 | 24 | 0.379 | 0.570 | 604.3 | **OpenBLAS GEMM for `einsum`** |
+| v3.0.2a | 2.220 | 0.041 | 0.9 | 24 | 0.304 | 0.612 | 529.7 | **Fix threading=1 for OpenBLAS GEMM** |
 
 ### CCSD(T)
 
@@ -157,7 +162,8 @@ Version 2.1.0 introduced CCSD for RHF. The baseline use equations adopted from [
 | v2.3.2 | 20.606 | 0.113 | 1.0 | 21 | 0.612 | 1234.5 | 16 | 19.367 | 62.3 | Added perbutative triples with the "vikings" implementation |
 | v2.4.2 | 18.458 | 0.110 | 1.0 | 21 | 0.624 | 1099.3 | 16 | 19.516 | 62.8 | Added pairwise evaluation for einsum, saving FLOPs for the triple contractions like `ie,mbej,ma->ijab` |
 | v3.0.0 | 4.974 | 0.113 | 1.0 | 21 | 0.131 | 287.2 | 16 | 21.243 | 79.4 | **Eigen GEMM for `einsum`** |
-| v3.0.2 | 5.923 | 0.130 | 1.0 | - | 0.168 | 342.2 | 16 | 18.614 | 203.8 | **OpenBLAS GEMM for `einsum`** |
+| v3.0.2 | 5.923 | 0.130 | 1.0 | 21 | 0.168 | 342.2 | 16 | 18.614 | 203.8 | **OpenBLAS GEMM for `einsum`** |
+| v3.0.2a | 4.587 | 0.114 | 1.0 | 20 | 0.127 | 263.4 | 16 | 18.318 | 75.1 | **Fix threading=1 for OpenBLAS GEMM** |
 
 #### UHF
 
@@ -174,5 +180,6 @@ Version 2.0.0 introduced CCSD for UHF. The baseline use the formulated equations
 | v2.4.2 | 16.325 | 0.011 | 0.1 | 22 | 0.065 | 806.2 | 20 | 16.325 | 60.8 | Added pairwise evaluation for einsum, saving FLOPs for the triple contractions like `ie,mbej,ma->ijab` |
 | v3.0.0 | 4.523 | 0.011 | 0.1 | 22 | 0.028 | 218.4 | 20 | 17.872 | 62.7 | **Eigen GEMM for `einsum`** |
 | v3.0.2 | 5.384 | 0.015 | 0.1 | 22 | 0.079 | 258.5 | 20 | 21.087 | 193.7 | **OpenBLAS GEMM for `einsum`** |
+| v3.0.2a | 4.398 | 0.012 | 0.1 | 22 | 0.062 | 210.0 | 20 | 21.134 | 65.4 | **Fix threading=1 for OpenBLAS GEMM** |
 
 > (4) From version v2.3.0: In the benchmark runs that produced these numbers, only CCSD(T) was requested as it prints both the CCSD energy baseline as well as the corrected energy CCSD(T). The timings of all steps are printed, and the total CCSD wall time reported here is the actual total wall time subtracted by the run time of the perbutative triples calculation. This is done to save benchmarking run time.

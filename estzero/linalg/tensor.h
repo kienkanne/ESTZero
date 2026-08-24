@@ -189,7 +189,7 @@ public:
         if (values.size() != total_size) {
             throw std::invalid_argument("Tensor data size does not match shape.");
         }
-        data = std::make_shared<std::vector<double>>(values);
+        data = std::make_shared<std::vector<double>>(std::move(values));
     }
 
     // == ELEMENT ACCESS ==================================================================

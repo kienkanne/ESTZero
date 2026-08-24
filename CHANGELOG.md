@@ -2,10 +2,15 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.0.2a] Set num threads of openblas to 1
+
+- Disabling threading for openblas significantly improved the performance throughout, and importantly moved the peak RSS to the normal level, about the same as Eigen, even more efficient. Per CCSD iteration, pyrimidine/sto-3g (nbf=34): 263.4ms, 74.8 MB (OpenBLAS, v3.0.2a), compared to 272.1ms, 85.1 MB (Eigen, v3.0.1). 
+- GEMM is declined for `Tensor` with less than 1024 elements, but slightly bigger than that the number of operations are still very small, so the threading overhead dominated, and each of them has its own buffer so the memory usage also increased substantially. The system used here are small, so disabling it here helps with performance.
+
 ## [v3.0.2] Added `cblas_dgemm` route for `einsum`
 
 - An additional backend GEMM engine is added for `einsum` via OpenBLAS. This wiring uses the raw data pointers of `Tensor` directly to perform GEMM without calling Eigen for mapping to its matrix. Both routes, OpenBLAS and Eigen, have similar memory allocation and copy assignment steps, so performance should not differ here.
-- However, the OpenBLAS route saw some slowdown and additional memory usage: per CCSD iteration, pyrimidine/sto-3g (nbf=34) went from 344.5ms (Eigen, v3.0.1), peakRSS 85.1 MB to 272.1ms (OpenBLAS, v3.0.2), peak RSS 203.8 MB. MP2 and MP3 suffered much less, so this is attributed to the high intensity of `einsum` calls in CCSD(T). This will be investigated next patch.
+- However, the OpenBLAS route saw some slowdown and additional memory usage: per CCSD iteration, pyrimidine/sto-3g (nbf=34) went from 272.1ms, peakRSS 85.1 MB (Eigen, v3.0.1) to 342.2ms, peak RSS 203.8 MB (OpenBLAS, v3.0.2). MP2 and MP3 suffered much less, so this is attributed to the high intensity of `einsum` calls in CCSD(T). This will be investigated next patch.
 
 ## [v3.0.1] Added `Tensor` minimum size requirement to call GEMM
 
