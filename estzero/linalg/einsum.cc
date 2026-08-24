@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <algorithm>
 #include <stdexcept>
+#include <cblas.h>
 
 #include "einsum.h"
 #include "odometer.h"
@@ -123,7 +124,7 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
 }
 
 
-bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands, Tensor& result) {
+bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands, Tensor& result, bool eigen) {
     if (operands.size() != 2) return false;
 
     // Add a guard on minimum tensor size to avoid doing large overhead for very small systems (go to odometer instead)
@@ -184,9 +185,9 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
     int summed_size = 1; for (int i : summed_axes_A) summed_size *= operands[0].shape[i]; // only takes A to compute, same if takes B
     int right_size = 1; for (int i : right_axes) right_size *= operands[1].shape[i];
 
+    // Freshly built Tensor, guaranteed to be contiguous
     Tensor M = operands[0].permute(permA).reshape(left_size, summed_size);
     Tensor N = operands[1].permute(permB).reshape(summed_size, right_size);
-    Matrix result_mat = M.as_matrix(left_size, summed_size) * N.as_matrix(summed_size, right_size);
 
     // combined_labels: left_axes + right_axes (what GEMM produced)
     std::string combined_labels;
@@ -194,7 +195,26 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
     for (int i : left_axes)  { combined_labels += A[i]; combined_shape.push_back(operands[0].shape[i]); }
     for (int i : right_axes) { combined_labels += B[i]; combined_shape.push_back(operands[1].shape[i]); }
 
-    Tensor combined = mat_to_tensor(result_mat).reshape(combined_shape);
+    Tensor combined;
+    
+    if (eigen) {
+        // Eigen route
+        Matrix result_mat = M.as_matrix(left_size, summed_size) * N.as_matrix(summed_size, right_size);
+        combined = mat_to_tensor(result_mat).reshape(combined_shape);
+    } else {
+        // OpenBLAS route
+        std::vector<double> result_data(left_size * right_size);
+
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+            left_size, right_size, summed_size, // M, N, K
+            1.0, // alpha
+            M.data_ptr(), summed_size, // lda = K
+            N.data_ptr(), right_size, // ldb = N
+            0.0, //beta
+            result_data.data(), right_size); // ldc = N
+        
+        combined = Tensor(combined_shape, result_data);
+    }
 
     // Reorder combined's axes into the caller's actual requested order
     std::vector<int> perm_out(C.size());
@@ -205,7 +225,7 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
     return true;
 }
 
-Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
+Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>& operands, bool eigen = true) {
     auto [terms_strings, char_to_dim, char_to_col] = parse_subscripts(subscripts, operands);
 
     std::vector<int> result_shape;
@@ -215,7 +235,7 @@ Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>&
     Tensor result(result_shape); // constructor already computes correct natural strides
 
     // GEMM Route
-    bool gemm = try_gemm(terms_strings, operands, result); // modify `Tensor result` directly
+    bool gemm = try_gemm(terms_strings, operands, result, eigen); // modify `Tensor result` directly
     if (gemm) { return result; }
 
     const int n_labels = static_cast<int>(char_to_dim.size());
@@ -320,7 +340,7 @@ std::string get_output_string(int output_idx, std::vector<std::string> terms_str
 
 Tensor einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
     if (operands.size() == 1 || operands.size() == 2) {
-        return pairwise_einsum(subscripts, operands);
+        return pairwise_einsum(subscripts, operands, false);
     }
 
     // Handle cases with 3 or more operands only

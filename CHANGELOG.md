@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.0.2] Added `cblas_dgemm` route for `einsum`
+
+- An additional backend GEMM engine is added for `einsum` via OpenBLAS. This wiring uses the raw data pointers of `Tensor` directly to perform GEMM without calling Eigen for mapping to its matrix. Both routes, OpenBLAS and Eigen, have similar memory allocation and copy assignment steps, so performance should not differ here.
+- However, the OpenBLAS route saw some slowdown and additional memory usage: per CCSD iteration, pyrimidine/sto-3g (nbf=34) went from 344.5ms (Eigen, v3.0.1), peakRSS 85.1 MB to 272.1ms (OpenBLAS, v3.0.2), peak RSS 203.8 MB. MP2 and MP3 suffered much less, so this is attributed to the high intensity of `einsum` calls in CCSD(T). This will be investigated next patch.
+
 ## [v3.0.1] Added `Tensor` minimum size requirement to call GEMM
 
 - A guardrail is added that declines to call GEMM if any `Tensor` operand has size (total number of elements) less that 1024, and defaults to the odometer scheme. This change targets the repeated small `einsum` calls in the vikings algorithm for perbutative triples for small systems to avoid the overhead for small contractions. The guard successfully lowered the PertT run time of the small systems, for example o2/sto-3g (nbf=10, n_alpha=9, n_beta=7) goes back to 0.182s, which is similar to v2.4.2, compared to 0.327s in v2.5.0.

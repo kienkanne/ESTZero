@@ -373,6 +373,13 @@ public:
         return Eigen::Map<const Matrix>(data->data() + offset, rows, cols);
     }
 
+    // Get raw data pointer (+ offset). Contiguous is still checked for safety
+    double* data_ptr() const { 
+        if (!_is_contiguous()) {
+            throw std::runtime_error("Current Tensor view is not contiguous! Data might mismatch!");
+        }
+        return data->data() + offset; }
+
     // == ARITHMETIC OPERATIONS =============================================================
 
     Tensor operator+(const Tensor& other) const {
@@ -452,9 +459,6 @@ public:
         }
         return total;
     }
-
-    // LEGACY: Access raw data pointer, used by TensorView
-    const double* data_ptr() const { return data->data() + offset; }
 };
 
 
