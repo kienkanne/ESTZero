@@ -2,6 +2,14 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.0.3] Fixed the v3.0.1 GEMM size guard
+
+- `try_gemm`'s minimum size guard (introduced in v3.0.1) declined GEMM if any operand had fewer than 1024 elements, defaulting to the odometer scheme instead. However, a contraction between a small coefficient matrix and a large tensor would still benefited from GEMM pays off most, but this would get declined.
+- This was spotted on UHF MP2's quarter-transform for a system with a small occupied-orbital count: CH3/aug-cc-pvtz (nbf=115, doublet, `n_alpha=5`/`n_beta=4`). Both Eigen and OpenBLAS routes fell back to the odometer path for the previous version v3.0.1-v3.0.2a range. MO transform went from 1.429s (v3.0.0, pre-guard) to 5.5s (v3.0.2/v3.0.2a, guard present, either GEMM backend)
+- Fix: checks the contraction's total work (`left_size * summed_size * right_size` < 1024). UHF MP2 (ch3/aug-cc-pvtz) MO transform is back to 1.429s (Eigen) / 1.271s (OpenBLAS). However "vikings" perturbative triples loop's many small `einsum` calls are also affected, since the fix widens GEMM criteria, but this was system-dependent: pyrimidine/sto-3g (RHF) got ~20% slower, propargyl/sto-3g (UHF) got ~10% faster.
+- `bench/benchmark.py` now logs the run's CLI parameters as a final line in each run's log, including GEMM scheme (Eigen/BLAS). 
+- v3.0.1 through v3.0.2a's Eigen-vs-OpenBLAS comparisons are unreliable due to the guard bug above (see `README.md`).
+
 ## [v3.0.2a] Set num threads of openblas to 1
 
 - Disabling threading for openblas significantly improved the performance throughout, and importantly moved the peak RSS to the normal level, about the same as Eigen, even more efficient. Per CCSD iteration, pyrimidine/sto-3g (nbf=34): 263.4ms, 74.8 MB (OpenBLAS, v3.0.2a), compared to 272.1ms, 85.1 MB (Eigen, v3.0.1). 

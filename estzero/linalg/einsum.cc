@@ -127,11 +127,6 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
 bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands, Tensor& result) {
     if (operands.size() != 2) return false;
 
-    // Add a guard on minimum tensor size to avoid doing large overhead for very small systems (go to odometer instead)
-    for (const auto& t : operands) {
-        if (t.size() < 1024) { return false; }
-    }
-
     const std::string& A = terms_strings[0];
     const std::string& B = terms_strings[1];
     const std::string& C = terms_strings[2]; // requested output order, used for final permutation
@@ -184,6 +179,13 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
     int left_size = 1; for (int i : left_axes) left_size *= operands[0].shape[i];
     int summed_size = 1; for (int i : summed_axes_A) summed_size *= operands[0].shape[i]; // only takes A to compute, same if takes B
     int right_size = 1; for (int i : right_axes) right_size *= operands[1].shape[i];
+
+    // Guard on the contraction's total work (FLOPs ~ left*summed*right) instead of raw element count. 
+    // v3.0.1-v3.0.2a declined GEMM whenever any operand alone was small, and this caused problems for UHF
+    // MP2, where the full AO ERI tensor is contracted with a small matrix (C_occ), so the contraction work
+    // is still large, and should be routed through GEMM. Its performance dropped substantially. See CHANGELOG v3.0.3.
+    size_t total_work = static_cast<size_t>(left_size) * static_cast<size_t>(summed_size) * static_cast<size_t>(right_size);
+    if (total_work < 1024) { return false; }
 
     // Freshly built Tensor, guaranteed to be contiguous
     Tensor M = operands[0].permute(permA).reshape(left_size, summed_size);

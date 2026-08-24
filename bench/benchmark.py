@@ -69,13 +69,14 @@ def parse_output(text):
     return energy, nbf, phases, rss_mb, n_iter, ccsd_e, ptriples
 
 
-def run_once(xyz, basis, method, reference, mult, charge, maxiter, econv, scheme):
+def run_once(xyz, basis, method, reference, mult, charge, maxiter, econv, erischeme, gemmscheme):
     t0   = time.perf_counter()
     proc = subprocess.run(
         [BINARY, os.path.join(ROOT, xyz), basis,
          "--reference", reference, "--method", method,
          "--mult", str(mult), "--charge", str(charge),
-         "--max-iter", str(maxiter), "--econv", str(econv), "--eri-scheme", scheme],
+         "--max-iter", str(maxiter), "--econv", str(econv), 
+         "--eri-scheme", erischeme, "--gemm-scheme", gemmscheme],
         capture_output=True, text=True,
     )
     wall = time.perf_counter() - t0
@@ -246,8 +247,10 @@ def main():
     ap.add_argument("--tol", type=float, default=1e-6)
     ap.add_argument("--maxiter", type=int, default=200)
     ap.add_argument("--econv", type=float, default=1e-8)
-    ap.add_argument("--scheme", choices=["vector", "tensor"], default="tensor",
+    ap.add_argument("--erischeme", choices=["vector", "tensor"], default="tensor",
                     help="ERI storage scheme (default: tensor)")
+    ap.add_argument("--gemmscheme", choices=["eigen", "blas"], default="blas",
+                    help="GEMM scheme for einsum (default: blas)")
     args = ap.parse_args()
 
     with open(ROOT / "bench" / "systems.json") as fh:
@@ -298,7 +301,7 @@ def main():
                         system.get("reference", "rhf"),
                         system.get("mult", 1),
                         system.get("charge", 0),
-                        args.maxiter, args.econv, args.scheme)
+                        args.maxiter, args.econv, args.erischeme, args.gemmscheme)
                     if best is None or wall < best[0]:
                         best = (wall, energy, nbf, phases, n_iter, ccsd_e, ptriples)
                     if math.isnan(peak_rss) or rss_mb > peak_rss:
@@ -388,6 +391,9 @@ def main():
             spec["printer"](collected, logger)
 
     logger.info(f"\ntol = {args.tol:.1e} vs Psi4; wall = best of {args.repeats} runs")
+
+    run_params = " ".join(f"{k}={v}" for k, v in vars(args).items() if k != "name")
+    logger.info(f"params: {run_params}")
 
     (OUT_DIR / f"{args.name}.json").write_text(json.dumps(nan_to_null(outputs), indent=2))
 
