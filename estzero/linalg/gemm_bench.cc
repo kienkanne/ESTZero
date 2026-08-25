@@ -21,12 +21,8 @@ struct Route {
 };
 
 // Computes C = A*B into a zeroed C (alpha=1, beta=0)
-static std::vector<Route> make_routes() {
-    return {
-        {"gemm_naive1", [](int M, int N, int K, const double* A, const double* B, double* C) {
-                      gemm_naive1(M, N, K, 1.0, 0.0, A, B, C); }},
-        {"gemm_naive2", [](int M, int N, int K, const double* A, const double* B, double* C) {
-                      gemm_naive2(M, N, K, 1.0, 0.0, A, B, C); }},
+static std::vector<Route> make_routes(bool enable_naive) {
+    std::vector<Route> routes = {
         {"gemm_reorder", [](int M, int N, int K, const double* A, const double* B, double* C) {
                       gemm_reorder(M, N, K, 1.0, 0.0, A, B, C); }},
         {"openblas", [](int M, int N, int K, const double* A, const double* B, double* C) {
@@ -35,8 +31,17 @@ static std::vector<Route> make_routes() {
         {"eigen", [](int M, int N, int K, const double* A, const double* B, double* C) {
                       Eigen::Map<Matrix>(C, M, N).noalias() =
                           Eigen::Map<const Matrix>(A, M, K) *
-                          Eigen::Map<const Matrix>(B, K, N); }},
-    };
+                          Eigen::Map<const Matrix>(B, K, N); }} };
+
+    if (enable_naive) {
+        routes.push_back({"gemm_naive1", [](int M, int N, int K, const double* A, const double* B, double* C) {
+                      gemm_naive1(M, N, K, 1.0, 0.0, A, B, C); }});
+                      
+        routes.push_back({"gemm_naive2", [](int M, int N, int K, const double* A, const double* B, double* C) {
+                      gemm_naive2(M, N, K, 1.0, 0.0, A, B, C); }});
+    }
+
+    return routes;
 }
 
 static std::vector<int> parse_sizes(const char* arg) {
@@ -55,18 +60,20 @@ static std::vector<int> parse_sizes(const char* arg) {
 int main(int argc, char** argv) {
     std::vector<int> sizes = {256, 512, 1024};
     int repeats = 5;
+    bool enable_naive = false;
 
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--sizes") == 0 && i + 1 < argc) {
             sizes = parse_sizes(argv[++i]);
         } else if (std::strcmp(argv[i], "--repeats") == 0 && i + 1 < argc) {
             repeats = std::stoi(argv[++i]);
-        }
+        } else if (std::strcmp(argv[i], "--enable-naive") == 0) {
+            enable_naive = true; }
     }
 
     openblas_set_num_threads(1);
 
-    auto routes = make_routes();
+    auto routes = make_routes(enable_naive);
 
     // Fixed seed
     std::mt19937 rng(12345);

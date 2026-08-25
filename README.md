@@ -37,9 +37,24 @@ mp2_type conv
 freeze_core false
 ```
 
-## Performance log
+## 1. GEMM Microbenchmark
 
-This log tracks the update in features and their performance in the most computationally costly steps. Versions without algorithm update for each section is not documented. See `bench/outputs` for full version peformance logs.
+Starting from version 3.0.0, the focus shifted to optimizing the backend of the manually implemented `einsum`, which is the backbone of the post-HF methods implemented here. This update wired Eigen to call GEMM instead of the previous odometer scheme for `einsum` contractions. Version 3.1.0 introduced a specialized microbenchmark for GEMM, with the intention to walk up the optimization ladder starting from the naive baseline GEMM. See `bench/gemm` for full results.
+
+The results reported here are timings for a matrix multiplcation task: C = alpha\*\(A\*\B) + beta\*\C. Single-core peak GFLOPs on this machine (AMD Ryzen 9 7950X) = ~4.5 clock(GHz) * 8 doubles/zmm * 2 FMA units * 2 flops/FMA = 144 GFLOPs. GFLOPs of each run is calculated as (2.0 * M * N * K) / (avg_ms * 1e6).
+
+Shape: 1024x1024x1024
+| Route | Avg(ms) | %OpenBLAS | GFLOP/s | %Peak | Note |
+| --- | --- | --- | --- | --- | --- |
+| Eigen | 26.0580 | 100.7 | 82.41 | 57.2 | - |
+| OpenBLAS | 26.2530 | 100.0 | 81.80 | 56.8 | - |
+| gemm_reorder | 98.7280 | 26.6 | 21.75 | 15.1 | loops through `m-k-n`, striding along a single row for B and C in the innermost loop |
+| gemm_naive2 | 4323.7940 | 0.6| 0.50 | 0.3 | accumulates into a temporary sum first inside `k` loop then accumulates to C outside the loop |
+| gemm_naive1 | 4679.6640 | 0.6 | 0.46 | 0.3 | loops in `m-n-k` and has a single accumulate operation directly to C inside the inner most loop |
+
+## 2. EST Performance log
+
+This log tracks the update in features and their performance in the most computationally costly steps of different electronic structure theory methods. Versions without algorithm update for each section is not documented. See `bench/outputs` for full version peformance logs.
 
 > v1.5.0 added the ERI tensor building scheme alongside the original ERI vector building, so for this version both schemes are shown for direct comparison. From this version onward, only ERI tensor performance is shown.
 

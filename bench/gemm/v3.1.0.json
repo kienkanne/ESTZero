@@ -1,0 +1,98 @@
+{
+  "256x256x256": {
+    "gemm_naive1": {
+      "avg_ms": 27.167,
+      "gflops": 1.2351173114440313,
+      "ok": true,
+      "max_diff": 1.066e-14
+    },
+    "gemm_naive2": {
+      "avg_ms": 24.008,
+      "gflops": 1.3976354548483838,
+      "ok": true,
+      "max_diff": 1.066e-14
+    },
+    "gemm_reorder": {
+      "avg_ms": 1.7,
+      "gflops": 19.737901176470587,
+      "ok": true,
+      "max_diff": 0.0
+    },
+    "openblas": {
+      "avg_ms": 0.461,
+      "gflops": 72.78618655097614,
+      "ok": true,
+      "max_diff": 0.0
+    },
+    "eigen": {
+      "avg_ms": 0.456,
+      "gflops": 73.58428070175438,
+      "ok": true,
+      "max_diff": 0.0
+    }
+  },
+  "512x512x512": {
+    "gemm_naive1": {
+      "avg_ms": 481.572,
+      "gflops": 0.5574149992109175,
+      "ok": true,
+      "max_diff": 2.132e-14
+    },
+    "gemm_naive2": {
+      "avg_ms": 354.601,
+      "gflops": 0.7570070473574525,
+      "ok": true,
+      "max_diff": 2.132e-14
+    },
+    "gemm_reorder": {
+      "avg_ms": 13.537,
+      "gflops": 19.829759621777352,
+      "ok": true,
+      "max_diff": 0.0
+    },
+    "openblas": {
+      "avg_ms": 3.284,
+      "gflops": 81.7403946406821,
+      "ok": true,
+      "max_diff": 0.0
+    },
+    "eigen": {
+      "avg_ms": 3.301,
+      "gflops": 81.3194353226295,
+      "ok": true,
+      "max_diff": 5.684e-14
+    }
+  },
+  "1024x1024x1024": {
+    "gemm_naive1": {
+      "avg_ms": 4679.664,
+      "gflops": 0.45889697379982836,
+      "ok": true,
+      "max_diff": 1.279e-13
+    },
+    "gemm_naive2": {
+      "avg_ms": 4323.794,
+      "gflops": 0.4966665035383277,
+      "ok": true,
+      "max_diff": 1.279e-13
+    },
+    "gemm_reorder": {
+      "avg_ms": 98.728,
+      "gflops": 21.751515760473218,
+      "ok": true,
+      "max_diff": 1.35e-13
+    },
+    "openblas": {
+      "avg_ms": 26.253,
+      "gflops": 81.79955235592122,
+      "ok": true,
+      "max_diff": 0.0
+    },
+    "eigen": {
+      "avg_ms": 26.058,
+      "gflops": 82.41168347532428,
+      "ok": true,
+      "max_diff": 8.171e-14
+    }
+  }
+}

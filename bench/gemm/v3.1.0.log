@@ -1,0 +1,27 @@
+
+Shape: 256x256x256
+route             avg_ms  %OpenBLAS    GFLOP/s    %peak  check
+──────────────────────────────────────────────────────────────────────
+eigen             0.4560      101.1      73.58     51.1   PASS
+openblas          0.4610      100.0      72.79     50.5   PASS
+gemm_reorder      1.7000       27.1      19.74     13.7   PASS
+gemm_naive2      24.0080        1.9       1.40      1.0   PASS
+gemm_naive1      27.1670        1.7       1.24      0.9   PASS
+
+Shape: 512x512x512
+route             avg_ms  %OpenBLAS    GFLOP/s    %peak  check
+──────────────────────────────────────────────────────────────────────
+openblas          3.2840      100.0      81.74     56.8   PASS
+eigen             3.3010       99.5      81.32     56.5   PASS
+gemm_reorder     13.5370       24.3      19.83     13.8   PASS
+gemm_naive2     354.6010        0.9       0.76      0.5   PASS
+gemm_naive1     481.5720        0.7       0.56      0.4   PASS
+
+Shape: 1024x1024x1024
+route             avg_ms  %OpenBLAS    GFLOP/s    %peak  check
+──────────────────────────────────────────────────────────────────────
+eigen            26.0580      100.7      82.41     57.2   PASS
+openblas         26.2530      100.0      81.80     56.8   PASS
+gemm_reorder     98.7280       26.6      21.75     15.1   PASS
+gemm_naive2    4323.7940        0.6       0.50      0.3   PASS
+gemm_naive1    4679.6640        0.6       0.46      0.3   PASS

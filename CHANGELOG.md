@@ -2,6 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.1.0] Added Microbenchmark for GEMM (manual GEMM optimization prep)
+
+- This update added a manually written GEMM with the intention of gradually walking up the optimization ladder. To measure the performance independently from the main EST pipeline (the naive baseline GEMM version would also be too slow to wire in the main runs), a microbenchmark is added: `gemm_bench` executable that runs the different size matrix multiplications on all routes, and `gemm_bench.py` to parse and format the data.
+- Notation: A(M x K) x B(K x N) = C(M x N), all row-major; C = alpha\*\(A\*\B) + beta\*\C.
+- Three first three versions of manually written GEMM are added: `gemm_naive1` loops in `m-n-k` and has a single accumulate operation directly to C inside the inner most loop, `gemm_naive2` accumulates into a temporary sum first inside `k` loop then accumulates to C outside the loop, and `gemm_reorder` loops through `m-k-n`, striding along a single row for B and C in the innermost loop, preserving cache locality.
+- Both `gemm_naive1` and `gemm_naive2` are inferior to the rest, with the latter isn't much better. `gemm_reorder` significantly improved the performance: on the 1024x1024x1024 system, it was ~45x faster the naive implementations, and it's ~4x slower than Eigen/OpenBLAS (see `README.md`).
+
 ## [v3.0.3] Fixed the v3.0.1 GEMM size guard
 
 - `try_gemm`'s minimum size guard (introduced in v3.0.1) declined GEMM if any operand had fewer than 1024 elements, defaulting to the odometer scheme instead. However, a contraction between a small coefficient matrix and a large tensor would still benefited from GEMM pays off most, but this would get declined.
