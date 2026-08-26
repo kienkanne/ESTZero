@@ -1,6 +1,6 @@
 # ESTZero: Electronic Structure Theory implementations from scratch
 
-An electronic structure engine built using C++ that is optimized over time. The current repository supports RHF/UHF references and SCF/MP2 methods. Some supplemental methods are also implemented, including `einsum` and `diis`. The integrals are evaluated using `libint2`, and the linear algebra library used is `Eigen`.
+An electronic structure engine built using C++ that is optimized over time. The current repository supports RHF/UHF references and SCF/MP2 methods. Some supplemental methods are also implemented, including `einsum` and `diis`. The integrals are evaluated using `libint2`, and the linear algebra library used is `Eigen`. The newest versions are also focusing on writing a General Matrix Multiplication (GEMM) manually to use as the backend of `einsum`, along aside other established libraries like `Eigen` and `OpenBLAS`.
 
 The test used to evaluate the performance of the engine is formaldehyde at the def2-tzvp basis set. The accuracy and performance is benchmarked against Psi4. 
 
@@ -8,10 +8,15 @@ The test used to evaluate the performance of the engine is formaldehyde at the d
 
 This repository is inspired by the following projects, which are also the references for the equations and programming materials:
 
+**Electronic Structure Theory**
 - Psi4Numpy: https://github.com/psi4/psi4numpy/
 - CCQC's summer program: https://github.com/CCQC/summer-program
 - Dr. Crawford's C++ Programming Projects: https://github.com/CrawfordGroup/ProgrammingProjects/
 - Dr. Crawford's PyCC: https://github.com/CrawfordGroup/pycc/
+
+**General Matrix Multiplication**
+- https://github.com/flame/how-to-optimize-gemm
+- https://github.com/flame/blislab
 
 ## Benchmarking
 
@@ -39,18 +44,25 @@ freeze_core false
 
 ## 1. GEMM Microbenchmark
 
-Starting from version 3.0.0, the focus shifted to optimizing the backend of the manually implemented `einsum`, which is the backbone of the post-HF methods implemented here. This update wired Eigen to call GEMM instead of the previous odometer scheme for `einsum` contractions. Version 3.1.0 introduced a specialized microbenchmark for GEMM, with the intention to walk up the optimization ladder starting from the naive baseline GEMM. See `bench/gemm` for full results.
+Starting from version 3.0.0, the focus shifted to optimizing the backend of the manually implemented `einsum`, which is the backbone of the post-HF methods implemented here. This update wired Eigen to call GEMM instead of the previous odometer scheme for `einsum` contractions. Version 3.1.0 introduced a specialized microbenchmark for GEMM, with the intention to walk up the optimization ladder starting from the naive baseline GEMM. Version 3.1.1 reorganized the route naming into three families: `naive_*` (unoptimized references), `mkn_RxR` (loop order `mnk`, blocks rows of A reused against B), `mnk_RxR` (tiles a block of C held as accumulators that live in registers across the k reduction, or "register blocking").
 
 The results reported here are timings for a matrix multiplcation task: C = alpha\*\(A\*\B) + beta\*\C. Single-core peak GFLOPs on this machine (AMD Ryzen 9 7950X) = ~4.5 clock(GHz) * 8 doubles/zmm * 2 FMA units * 2 flops/FMA = 144 GFLOPs. GFLOPs of each run is calculated as (2.0 * M * N * K) / (avg_ms * 1e6).
 
-Shape: 1024x1024x1024
+Shape: 1022x1022x1022
 | Route | Avg(ms) | %OpenBLAS | GFLOP/s | %Peak | Note |
 | --- | --- | --- | --- | --- | --- |
-| Eigen | 26.0580 | 100.7 | 82.41 | 57.2 | - |
-| OpenBLAS | 26.2530 | 100.0 | 81.80 | 56.8 | - |
-| gemm_reorder | 98.7280 | 26.6 | 21.75 | 15.1 | loops through `m-k-n`, striding along a single row for B and C in the innermost loop |
-| gemm_naive2 | 4323.7940 | 0.6| 0.50 | 0.3 | accumulates into a temporary sum first inside `k` loop then accumulates to C outside the loop |
-| gemm_naive1 | 4679.6640 | 0.6 | 0.46 | 0.3 | loops in `m-n-k` and has a single accumulate operation directly to C inside the inner most loop |
+| OpenBLAS | 25.896 | 100.0 | 82.44 | 57.3 | - |
+| Eigen | 27.133 | 95.4 | 78.68 | 54.6 | - |
+| naive_mkn | 86.808 | 29.8 | 24.59 | 17.1 | unblocked, but correct innermost loop variable. Naive but efficient |
+| mkn_8x1 | 93.485 | 27.7 | 22.84 | 15.9 | fastest blocked route on this hardware, still loses to `naive_mkn` |
+| mkn_4x1 | 95.522 | 27.1 | 22.35 | 15.5 | same as above, smaller row-block |
+| mnk_1x8 | 115.430 | 22.4 | 18.50 | 12.8 | best of the register blocking family, with 8 contiguous accumulator columns |
+| mnk_4x4 | 139.849 | 18.5 | 15.27 | 10.6 | 16 named accumulators, fit in register but non-contiguous A fetches |
+| mnk_8x8 | 159.395 | 16.2 | 13.39 | 9.3 | 64 named accumulators, spills out of register |
+| mnk_8x1 | 178.955 | 14.5 | 11.93 | 8.3 | 8 strided accumulator rows from A |
+| mnk_1x4 | 193.116 | 13.4 | 11.06 | 7.7 | half a zmm register, half the vectorization as `mkn_8x1` |
+| mnk_4x1 | 194.875 | 13.3 | 10.96 | 7.6 | same as above, but non-contiguous A fetches |
+| naive_mnk | 580.608 | 4.5 | 3.68 | 2.6 | unblocked, wrong innermost loop variable k. (baseline naive) |
 
 ## 2. EST Performance log
 

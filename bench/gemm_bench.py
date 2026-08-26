@@ -1,7 +1,3 @@
-"""Launch the gemm_bench executable, parse its timing table + correctness lines,
-and rank each GEMM route by GFLOP/s against OpenBLAS. Mirrors benchmark.py's
-conventions (subprocess launch, JSON into bench/outputs/)."""
-
 import argparse
 import json
 import re

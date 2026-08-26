@@ -80,8 +80,6 @@ int main(int argc, char** argv) {
     std::vector<int> sizes = {256, 511, 1022, /*2045*/};
     int repeats = 3;
     bool enable_naive = false;
-    std::string only;  // if set, run just this one route -- needed so `perf stat` can attribute
-                        // counters to a single kernel instead of the whole route loop.
 
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--sizes") == 0 && i + 1 < argc) {
@@ -89,22 +87,11 @@ int main(int argc, char** argv) {
         } else if (std::strcmp(argv[i], "--repeats") == 0 && i + 1 < argc) {
             repeats = std::stoi(argv[++i]);
         } else if (std::strcmp(argv[i], "--enable_naive") == 0) {
-            enable_naive = true;
-        } else if (std::strcmp(argv[i], "--only") == 0 && i + 1 < argc) {
-            only = argv[++i];
-        }
+            enable_naive = true; }
     }
-
     openblas_set_num_threads(1);
 
-    auto routes = make_routes(enable_naive || !only.empty());
-    if (!only.empty()) {
-        std::erase_if(routes, [&](const Route& r) { return r.name != only; });
-        if (routes.empty()) {
-            std::println("no route named '{}'", only);
-            return 1;
-        }
-    }
+    auto routes = make_routes(enable_naive);
 
     // Fixed seed
     std::mt19937 rng(12345);

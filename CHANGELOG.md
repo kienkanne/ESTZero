@@ -2,6 +2,14 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.1.1] Reorganized GEMM ladder into naive/mkn_RxR/mnk_RxR; register-file investigation
+
+- Renamed different gemm versions from v3.1.0 (and newer ones) into three families, moved from `estzero/linalg/` into their own `estzero/gemm/` directory: `naive_mnk`/`naive_mkn` (unoptimized references: wrong vs. right innermost index), `mkn_RxR` (`mkn` loop, MR blocks rows of A reused against B), `mnk_RxR` (`mnk` tiles an MRxNR block of C held as NAMED local scalar accumulators across the full k reduction, written once).
+- `mnk_RxR` uses named scalar accumulators (`c00, c01, ...`), as named locals give the compiler the a clear signal to keep them in the register (reference: https://github.com/flame/how-to-optimize-gemm). This alone doesn't save `mnk_8x8` from spilling (64 named accumulators is still far past what fits): confirmed via `perf stat` + `objdump` that `mnk_8x8` has the *lowest* L1-dcache-load-miss rate of the whole family (10.5%) while also having the *most* total instructions — consistent with spill-then-immediate-reload traffic (an L1 hit, not a miss, but a real extra load/store pair each time) rather than genuine memory pressure.
+- `mnk_1x8` (~115ms at 1022x1022x1022) beats `mnk_8x1` (~179ms) despite both fill 8 doubles. `1x8`'s 8 values are one contiguous 64-byte fetch from B, while `8x1`'s are 8 separate strided fetches from A (row-major; if it's column major the problem just reverses)
+- `naive_mkn` (~87ms) is actually the best custom GEMM scheme here even with the new blocking schemes, which all have their own tradeoffs.
+- `mkn_8x1` (~93ms, 21.7 GFLOP/s) beats every `mnk_RxR` combo including `mnk_1x8` (~120ms). The `mnk_Rxr` tradeoffs register blocking for the non-contiguous k stride in the innermost loop in B, and without packing it turned out worse than `mkn_`. However, the register blocking scheme here has more optimization potential.
+
 ## [v3.1.0] Added Microbenchmark for GEMM (manual GEMM optimization prep)
 
 - This update added a manually written GEMM with the intention of gradually walking up the optimization ladder. To measure the performance independently from the main EST pipeline (the naive baseline GEMM version would also be too slow to wire in the main runs), a microbenchmark is added: `gemm_bench` executable that runs the different size matrix multiplications on all routes, and `gemm_bench.py` to parse and format the data.
