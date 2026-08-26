@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT    = Path(__file__).resolve().parents[1]
 BINARY  = ROOT / "build" / "gemm_bench"
-OUT_DIR = ROOT / "bench" / "gemm"
+OUT_DIR = ROOT / "bench" / "outputs_gemm"
 OUT_DIR.mkdir(exist_ok=True)
 
 # [check] <route> <MxNxK> <PASS|FAIL> max_diff=<x>
@@ -75,6 +75,7 @@ def main():
     ap.add_argument("--name", default=datetime.now().strftime("gemm_%Y-%m-%d_%H-%M-%S"))
     ap.add_argument("--sizes", help="comma-separated square dims, e.g. 256,512,1024")
     ap.add_argument("--repeats", type=int)
+    ap.add_argument("--enable_naive", action="store_true")
     args = ap.parse_args()
 
     if not BINARY.exists():
@@ -91,6 +92,8 @@ def main():
         cmd += ["--sizes", args.sizes]
     if args.repeats:
         cmd += ["--repeats", str(args.repeats)]
+    if args.enable_naive:
+        cmd += ["--enable_naive"]
 
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:

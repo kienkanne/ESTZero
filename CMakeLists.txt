@@ -37,7 +37,10 @@ add_library(est_core STATIC
     estzero/est/cc_iter.cc
     estzero/est/cc_triples.cc
     estzero/linalg/einsum.cc
-    estzero/linalg/gemm.cc
+
+    estzero/gemm/mkn_RxR.cc
+    estzero/gemm/mnk_RxR.cc
+    estzero/gemm/naive.cc
 )
 
 target_include_directories(est_core PUBLIC
@@ -63,7 +66,7 @@ target_link_libraries(ESTZero PRIVATE est_core)
 add_executable(verify_ccsd estzero/est/verify_ccsd.cc)
 target_link_libraries(verify_ccsd PRIVATE est_core)
 
-add_executable(gemm_bench estzero/linalg/gemm_bench.cc)
+add_executable(gemm_bench estzero/gemm/gemm_bench.cc)
 target_link_libraries(gemm_bench PRIVATE est_core)
 
 if(EST_BUILD_TESTS)

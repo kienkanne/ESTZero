@@ -1,0 +1,41 @@
+#ifndef GEMM_H
+#define GEMM_H
+
+// Manually written GEMM optimization ladder. A(M x K) x B(K x N) = C(M x N), all row-major.
+// Convention: C = alpha*(A*B) + beta*C.
+//
+// Three families:
+// - naive_* : unoptimized reference loops, neither blocked nor register-accumulating.
+//
+// - mkn_RxR : loop order fixed at m-outer/k-middle/n-inner, keeping inner contiguous for B and C.
+// MR blocks rows of A/C, reused against B. NR (=1 always) because it's meaningless to block along
+// an already contiguous dimension for B and C. This is blocking for input data.
+//
+// - mnk_RxR : tiles an MR x NR block of C, held as named local accumulators across the entire k 
+// reduction, written to C once, MR x NR is the tile size. This is the "canonical" loop that major
+// libraries uses.
+
+void naive_mnk(int M, int N, int K, double alpha, double beta,
+               const double* A, const double* B, double* C);
+void naive_mkn(int M, int N, int K, double alpha, double beta,
+               const double* A, const double* B, double* C);
+
+void mkn_4x1(int M, int N, int K, double alpha, double beta,
+             const double* A, const double* B, double* C);
+void mkn_8x1(int M, int N, int K, double alpha, double beta,
+             const double* A, const double* B, double* C);
+
+void mnk_4x1(int M, int N, int K, double alpha, double beta,
+             const double* A, const double* B, double* C);
+void mnk_1x4(int M, int N, int K, double alpha, double beta,
+             const double* A, const double* B, double* C);
+void mnk_8x1(int M, int N, int K, double alpha, double beta,
+             const double* A, const double* B, double* C);
+void mnk_1x8(int M, int N, int K, double alpha, double beta,
+             const double* A, const double* B, double* C);
+void mnk_4x4(int M, int N, int K, double alpha, double beta,
+             const double* A, const double* B, double* C);
+void mnk_8x8(int M, int N, int K, double alpha, double beta,
+             const double* A, const double* B, double* C);
+
+#endif
