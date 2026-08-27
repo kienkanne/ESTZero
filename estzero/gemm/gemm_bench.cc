@@ -21,7 +21,8 @@ struct Route {
 };
 
 
-static std::vector<Route> make_routes(bool enable_naive) {
+// `enable_legacy` gates every pre-AVX hand-rolled route (naive_*/mkn_RxR/mnk_RxR)
+static std::vector<Route> make_routes(bool enable_legacy) {
 
     std::vector<Route> routes = {
         {"openblas", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
@@ -32,36 +33,52 @@ static std::vector<Route> make_routes(bool enable_naive) {
                   C_map = alpha * (Eigen::Map<const Matrix>(A, M, K) *
                           Eigen::Map<const Matrix>(B, K, N)) +
                       beta * C_map; }},
-        {"mkn_4x1", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
-                  mkn_4x1(M, N, K, alpha, beta, A, B, C); }},
-        {"mkn_8x1", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
-                  mkn_8x1(M, N, K, alpha, beta, A, B, C); }},
-        {"mnk_4x1", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
-                  mnk_4x1(M, N, K, alpha, beta, A, B, C); }},
-        {"mnk_1x4", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
-                  mnk_1x4(M, N, K, alpha, beta, A, B, C); }},
-        {"mnk_8x1", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
-                  mnk_8x1(M, N, K, alpha, beta, A, B, C); }},
-        {"mnk_1x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
-                  mnk_1x8(M, N, K, alpha, beta, A, B, C); }},
-        {"mnk_4x4", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
-                  mnk_4x4(M, N, K, alpha, beta, A, B, C); }},
-        {"mnk_8x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
-                  mnk_8x8(M, N, K, alpha, beta, A, B, C); }},
+
         {"avx_1x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
                   avx_1x8(M, N, K, alpha, beta, A, B, C); }},
         {"avx_8x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
                   avx_8x8(M, N, K, alpha, beta, A, B, C); }},
+        {"avx_12x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  avx_12x8(M, N, K, alpha, beta, A, B, C); }},
+        {"avx_16x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  avx_16x8(M, N, K, alpha, beta, A, B, C); }},
+        {"avx_20x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  avx_20x8(M, N, K, alpha, beta, A, B, C); }},
+        {"avx_24x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  avx_24x8(M, N, K, alpha, beta, A, B, C); }},
                 };
 
-    if (enable_naive) {
+    if (enable_legacy) {
         routes.push_back(
          {"naive_mnk", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
                       naive_mnk(M, N, K, alpha, beta, A, B, C); }});
-
         routes.push_back(
          {"naive_mkn", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
                       naive_mkn(M, N, K, alpha, beta, A, B, C); }});
+        routes.push_back(
+         {"mkn_4x1", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  mkn_4x1(M, N, K, alpha, beta, A, B, C); }});
+        routes.push_back(
+         {"mkn_8x1", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  mkn_8x1(M, N, K, alpha, beta, A, B, C); }});
+        routes.push_back(
+         {"mnk_4x1", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  mnk_4x1(M, N, K, alpha, beta, A, B, C); }});
+        routes.push_back(
+         {"mnk_1x4", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  mnk_1x4(M, N, K, alpha, beta, A, B, C); }});
+        routes.push_back(
+         {"mnk_8x1", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  mnk_8x1(M, N, K, alpha, beta, A, B, C); }});
+        routes.push_back(
+         {"mnk_1x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  mnk_1x8(M, N, K, alpha, beta, A, B, C); }});
+        routes.push_back(
+         {"mnk_4x4", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  mnk_4x4(M, N, K, alpha, beta, A, B, C); }});
+        routes.push_back(
+         {"mnk_8x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  mnk_8x8(M, N, K, alpha, beta, A, B, C); }});
     }
 
     return routes;
@@ -81,11 +98,10 @@ static std::vector<int> parse_sizes(const char* arg) {
 }
 
 int main(int argc, char** argv) {
-    std::vector<int> sizes = {256, 511, 1022, /*2045*/};
+    std::vector<int> sizes = {510, 1022, 1024, 2045};
     int repeats = 3;
-    bool enable_naive = false;
-    std::string only;  // if set, run just this one route -- needed so `perf stat` can attribute
-                        // counters to a single kernel instead of the whole route loop.
+    bool enable_legacy = false;
+    std::string only;
     bool list_routes = false;
 
     for (int i = 1; i < argc; ++i) {
@@ -93,8 +109,8 @@ int main(int argc, char** argv) {
             sizes = parse_sizes(argv[++i]);
         } else if (std::strcmp(argv[i], "--repeats") == 0 && i + 1 < argc) {
             repeats = std::stoi(argv[++i]);
-        } else if (std::strcmp(argv[i], "--enable_naive") == 0) {
-            enable_naive = true;
+        } else if (std::strcmp(argv[i], "--legacy") == 0) {
+            enable_legacy = true;
         } else if (std::strcmp(argv[i], "--only") == 0 && i + 1 < argc) {
             only = argv[++i];
         } else if (std::strcmp(argv[i], "--list-routes") == 0) {
@@ -102,12 +118,10 @@ int main(int argc, char** argv) {
         }
     }
 
-    // Checked before any benchmark setup: lets callers (bench/gemm_bench.py) discover the
-    // current route set at runtime instead of hardcoding a list that can drift out of sync
-    // with make_routes() below. Always includes naive routes, since they're always reachable
-    // via --only regardless of --enable_naive.
+    // Lets callers (bench/gemm_bench.py) discover the current route set at runtime instead 
+    // of hardcoding a list
     if (list_routes) {
-        for (const auto& r : make_routes(/*enable_naive=*/true)) {
+        for (const auto& r : make_routes(/*enable_legacy=*/true)) {
             std::println("{}", r.name);
         }
         return 0;
@@ -115,7 +129,7 @@ int main(int argc, char** argv) {
 
     openblas_set_num_threads(1);
 
-    auto routes = make_routes(enable_naive || !only.empty());
+    auto routes = make_routes(enable_legacy || !only.empty());
     if (!only.empty()) {
         std::erase_if(routes, [&](const Route& r) { return r.name != only; });
         if (routes.empty()) {

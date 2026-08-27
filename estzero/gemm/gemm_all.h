@@ -44,6 +44,16 @@ void mnk_8x8(int M, int N, int K, double alpha, double beta,
 
 void avx_1x8(int M, int N, int K, double alpha, double beta,
              const double* A, const double* B, double* C);
+
 void avx_8x8(int M, int N, int K, double alpha, double beta,
              const double* A, const double* B, double* C);
+void avx_12x8(int M, int N, int K, double alpha, double beta,
+              const double* A, const double* B, double* C);
+void avx_16x8(int M, int N, int K, double alpha, double beta,
+              const double* A, const double* B, double* C);
+void avx_20x8(int M, int N, int K, double alpha, double beta,
+              const double* A, const double* B, double* C);
+void avx_24x8(int M, int N, int K, double alpha, double beta,
+              const double* A, const double* B, double* C);
+
 #endif
