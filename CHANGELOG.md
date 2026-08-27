@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.1.2] Added `perf stat` to microbenchmark to monitor IPC and L1 cache load misses
+
+- `gemm_bench.py` now additionally reports IPC and L1-dcache-load-miss% per route (it runs one process per route under `perf stat`, so hardware counters attribute to a single kernel)
+- `gemm_bench.py` and `benchmark.py` (EST) now prints out markdown formatted tables/rows to fill in directly into `README.md`
+
 ## [v3.1.1] Reorganized GEMM ladder into naive/mkn_RxR/mnk_RxR; register-file investigation
 
 - Renamed different gemm versions from v3.1.0 (and newer ones) into three families, moved from `estzero/linalg/` into their own `estzero/gemm/` directory: `naive_mnk`/`naive_mkn` (unoptimized references: wrong vs. right innermost index), `mkn_RxR` (`mkn` loop, MR blocks rows of A reused against B), `mnk_RxR` (`mnk` tiles an MRxNR block of C held as NAMED local scalar accumulators across the full k reduction, written once).

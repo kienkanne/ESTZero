@@ -1,0 +1,332 @@
+{
+  "256x256x256": {
+    "openblas": {
+      "avg_ms": 0.472,
+      "gflops": 71.08989830508474,
+      "ok": true,
+      "max_diff": 0.0,
+      "ipc": 0.4382554366594296,
+      "l1_miss_pct": 2.98,
+      "llc_miss_pct": 1.56
+    },
+    "eigen": {
+      "avg_ms": 1.004,
+      "gflops": 33.420749003984064,
+      "ok": true,
+      "max_diff": 1.776e-15,
+      "ipc": 0.4373110376554915,
+      "l1_miss_pct": 3.89,
+      "llc_miss_pct": 2.19
+    },
+    "mkn_4x1": {
+      "avg_ms": 4.14,
+      "gflops": 8.104935265700483,
+      "ok": true,
+      "max_diff": 6.395e-14,
+      "ipc": 0.43082216176175975,
+      "l1_miss_pct": 1.62,
+      "llc_miss_pct": 1.36
+    },
+    "mkn_8x1": {
+      "avg_ms": 4.23,
+      "gflops": 7.9324898345153665,
+      "ok": true,
+      "max_diff": 6.395e-14,
+      "ipc": 0.428324242223088,
+      "l1_miss_pct": 1.65,
+      "llc_miss_pct": 1.0
+    },
+    "mnk_4x1": {
+      "avg_ms": 4.703,
+      "gflops": 7.134686795662343,
+      "ok": true,
+      "max_diff": 1.776e-14,
+      "ipc": 0.46144954869345484,
+      "l1_miss_pct": 9.58,
+      "llc_miss_pct": 0.08
+    },
+    "mnk_1x4": {
+      "avg_ms": 5.785,
+      "gflops": 5.80024753673293,
+      "ok": true,
+      "max_diff": 1.776e-15,
+      "ipc": 0.4380174787951292,
+      "l1_miss_pct": 10.23,
+      "llc_miss_pct": 0.1
+    },
+    "mnk_8x1": {
+      "avg_ms": 6.647,
+      "gflops": 5.048056566872273,
+      "ok": true,
+      "max_diff": 1.776e-14,
+      "ipc": 0.4475948450969186,
+      "l1_miss_pct": 2.3,
+      "llc_miss_pct": 0.27
+    },
+    "mnk_1x8": {
+      "avg_ms": 6.396,
+      "gflops": 5.246158849280801,
+      "ok": true,
+      "max_diff": 1.776e-15,
+      "ipc": 0.4311664336070409,
+      "l1_miss_pct": 6.11,
+      "llc_miss_pct": 0.29
+    },
+    "mnk_4x4": {
+      "avg_ms": 6.608,
+      "gflops": 5.077849878934625,
+      "ok": true,
+      "max_diff": 1.776e-14,
+      "ipc": 0.4438284081051807,
+      "l1_miss_pct": 2.8,
+      "llc_miss_pct": 0.33
+    },
+    "mnk_8x8": {
+      "avg_ms": 3.397,
+      "gflops": 9.87766617603768,
+      "ok": true,
+      "max_diff": 1.776e-14,
+      "ipc": 0.47490059486847014,
+      "l1_miss_pct": 1.85,
+      "llc_miss_pct": 0.87
+    },
+    "naive_mnk": {
+      "avg_ms": 23.954,
+      "gflops": 1.4007861734992069,
+      "ok": true,
+      "max_diff": 1.776e-14,
+      "ipc": 0.45534495388675633,
+      "l1_miss_pct": 13.07,
+      "llc_miss_pct": 0.03
+    },
+    "naive_mkn": {
+      "avg_ms": 2.195,
+      "gflops": 15.286757175398634,
+      "ok": true,
+      "max_diff": 6.395e-14,
+      "ipc": 0.4425409743118619,
+      "l1_miss_pct": 6.07,
+      "llc_miss_pct": 0.42
+    }
+  },
+  "511x511x511": {
+    "openblas": {
+      "avg_ms": 3.585,
+      "gflops": 74.43951520223152,
+      "ok": true,
+      "max_diff": 0.0,
+      "ipc": 0.45540566683845496,
+      "l1_miss_pct": 5.71,
+      "llc_miss_pct": 0.64
+    },
+    "eigen": {
+      "avg_ms": 4.698,
+      "gflops": 56.80410004257131,
+      "ok": true,
+      "max_diff": 9.948e-14,
+      "ipc": 0.43793390003947236,
+      "l1_miss_pct": 3.23,
+      "llc_miss_pct": 1.98
+    },
+    "mkn_4x1": {
+      "avg_ms": 13.396,
+      "gflops": 19.921294565541952,
+      "ok": true,
+      "max_diff": 1.563e-13,
+      "ipc": 0.46471456444660436,
+      "l1_miss_pct": 2.95,
+      "llc_miss_pct": 3.75
+    },
+    "mkn_8x1": {
+      "avg_ms": 14.186,
+      "gflops": 18.81190342591287,
+      "ok": true,
+      "max_diff": 1.563e-13,
+      "ipc": 0.4640422398382559,
+      "l1_miss_pct": 7.66,
+      "llc_miss_pct": 1.35
+    },
+    "mnk_4x1": {
+      "avg_ms": 30.175,
+      "gflops": 8.843932460646231,
+      "ok": true,
+      "max_diff": 8.171e-14,
+      "ipc": 0.5536107963788356,
+      "l1_miss_pct": 20.81,
+      "llc_miss_pct": 0.09
+    },
+    "mnk_1x4": {
+      "avg_ms": 27.012,
+      "gflops": 9.879522508514734,
+      "ok": true,
+      "max_diff": 8.171e-14,
+      "ipc": 0.50909968188465,
+      "l1_miss_pct": 17.08,
+      "llc_miss_pct": 1.62
+    },
+    "mnk_8x1": {
+      "avg_ms": 24.684,
+      "gflops": 10.811281072759682,
+      "ok": true,
+      "max_diff": 8.171e-14,
+      "ipc": 0.5487679698278103,
+      "l1_miss_pct": 20.13,
+      "llc_miss_pct": 0.05
+    },
+    "mnk_1x8": {
+      "avg_ms": 25.959,
+      "gflops": 10.280275126160484,
+      "ok": true,
+      "max_diff": 8.171e-14,
+      "ipc": 0.4711459337468414,
+      "l1_miss_pct": 14.08,
+      "llc_miss_pct": 3.56
+    },
+    "mnk_4x4": {
+      "avg_ms": 19.139,
+      "gflops": 13.943553059198495,
+      "ok": true,
+      "max_diff": 8.171e-14,
+      "ipc": 0.5509315224411369,
+      "l1_miss_pct": 11.67,
+      "llc_miss_pct": 0.3
+    },
+    "mnk_8x8": {
+      "avg_ms": 21.96,
+      "gflops": 12.152352550091075,
+      "ok": true,
+      "max_diff": 8.171e-14,
+      "ipc": 0.5625027811740319,
+      "l1_miss_pct": 6.51,
+      "llc_miss_pct": 0.65
+    },
+    "naive_mnk": {
+      "avg_ms": 72.506,
+      "gflops": 3.6806010812898244,
+      "ok": true,
+      "max_diff": 8.171e-14,
+      "ipc": 0.7549986239331808,
+      "l1_miss_pct": 13.09,
+      "llc_miss_pct": 0.18
+    },
+    "naive_mkn": {
+      "avg_ms": 13.891,
+      "gflops": 19.211407530055432,
+      "ok": true,
+      "max_diff": 1.563e-13,
+      "ipc": 0.4626232503587173,
+      "l1_miss_pct": 7.87,
+      "llc_miss_pct": 5.41
+    }
+  },
+  "1022x1022x1022": {
+    "openblas": {
+      "avg_ms": 25.992,
+      "gflops": 82.13778454909203,
+      "ok": true,
+      "max_diff": 0.0,
+      "ipc": 0.5324470417544835,
+      "l1_miss_pct": 12.35,
+      "llc_miss_pct": 0.5
+    },
+    "eigen": {
+      "avg_ms": 27.598,
+      "gflops": 77.35797144720632,
+      "ok": true,
+      "max_diff": 1.279e-13,
+      "ipc": 0.5267244382140728,
+      "l1_miss_pct": 14.54,
+      "llc_miss_pct": 1.49
+    },
+    "mkn_4x1": {
+      "avg_ms": 96.441,
+      "gflops": 22.137112804719983,
+      "ok": true,
+      "max_diff": 2.132e-13,
+      "ipc": 0.7069649788180736,
+      "l1_miss_pct": 16.75,
+      "llc_miss_pct": 0.51
+    },
+    "mkn_8x1": {
+      "avg_ms": 93.805,
+      "gflops": 22.759184435797664,
+      "ok": true,
+      "max_diff": 2.132e-13,
+      "ipc": 0.7042779260324755,
+      "l1_miss_pct": 15.84,
+      "llc_miss_pct": 0.38
+    },
+    "mnk_4x1": {
+      "avg_ms": 195.423,
+      "gflops": 10.924636793007988,
+      "ok": true,
+      "max_diff": 2.7e-13,
+      "ipc": 1.1950277997829426,
+      "l1_miss_pct": 55.18,
+      "llc_miss_pct": 0.06
+    },
+    "mnk_1x4": {
+      "avg_ms": 194.318,
+      "gflops": 10.986760341296225,
+      "ok": true,
+      "max_diff": 2.416e-13,
+      "ipc": 0.913098883432827,
+      "l1_miss_pct": 40.2,
+      "llc_miss_pct": 0.81
+    },
+    "mnk_8x1": {
+      "avg_ms": 180.519,
+      "gflops": 11.826596070219756,
+      "ok": true,
+      "max_diff": 2.7e-13,
+      "ipc": 1.1454697109295255,
+      "l1_miss_pct": 51.17,
+      "llc_miss_pct": 0.03
+    },
+    "mnk_1x8": {
+      "avg_ms": 115.427,
+      "gflops": 18.495891741100436,
+      "ok": true,
+      "max_diff": 2.416e-13,
+      "ipc": 0.8244190199734676,
+      "l1_miss_pct": 32.55,
+      "llc_miss_pct": 8.25
+    },
+    "mnk_4x4": {
+      "avg_ms": 139.95,
+      "gflops": 15.254914583779922,
+      "ok": true,
+      "max_diff": 2.7e-13,
+      "ipc": 1.2228544767011027,
+      "l1_miss_pct": 27.37,
+      "llc_miss_pct": 0.24
+    },
+    "mnk_8x8": {
+      "avg_ms": 159.61,
+      "gflops": 13.375886824133826,
+      "ok": true,
+      "max_diff": 2.7e-13,
+      "ipc": 1.2456095629230324,
+      "l1_miss_pct": 10.95,
+      "llc_miss_pct": 0.24
+    },
+    "naive_mnk": {
+      "avg_ms": 585.272,
+      "gflops": 3.647748903074126,
+      "ok": true,
+      "max_diff": 2.7e-13,
+      "ipc": 1.6258187551805279,
+      "l1_miss_pct": 53.56,
+      "llc_miss_pct": 0.03
+    },
+    "naive_mkn": {
+      "avg_ms": 87.873,
+      "gflops": 24.29557766321851,
+      "ok": true,
+      "max_diff": 2.132e-13,
+      "ipc": 0.7099566396328103,
+      "l1_miss_pct": 13.99,
+      "llc_miss_pct": 1.61
+    }
+  }
+}

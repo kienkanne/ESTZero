@@ -234,6 +234,71 @@ METHOD_SPECS = {
 }
 
 
+# Each README.md table tracks ONE fixed system per (method, reference) across versions --
+# these are those systems, matched to the labels in bench/systems.json. New versions append a
+# row to the existing table rather than replacing it (unlike the GEMM microbenchmark table),
+# so the markdown output below prints one row per canonical pair actually present in this run,
+# not a full table.
+README_CANONICAL = {
+    ("scf",    "rhf"): "benzene/def2-svp",
+    ("scf",    "uhf"): "ch3/aug-cc-pvtz",
+    ("mp2",    "rhf"): "benzene/def2-svp",
+    ("mp2",    "uhf"): "ch3/aug-cc-pvtz",
+    ("mp3",    "rhf"): "pyrimidine/6-31g",
+    ("mp3",    "uhf"): "propargyl/6-31g",
+    ("ccsd_t", "rhf"): "pyrimidine/sto-3g",
+    ("ccsd_t", "uhf"): "propargyl/sto-3g",
+}
+
+
+def _md_row_scf(d, version):
+    return (f"| {version} | {d['wall']:.3f} | {fmt(d['eri_s'],'.3f')} | {fmt(d['jk_ms'],'.1f')} "
+            f"| {d['n_iter']} | {fmt(d['peak_rss'],'.1f')} | - |")
+
+def _md_row_mp2(d, version):
+    return (f"| {version} | {d['wall']:.3f} | {fmt(d['eri_s'],'.3f')} | {fmt(d['jk_ms'],'.1f')} "
+            f"| {d['n_iter']} | {fmt(d['mo_s'],'.3f')} | {fmt(d['mp2_ms'],'.1f')} "
+            f"| {fmt(d['peak_rss'],'.1f')} | - |")
+
+def _md_row_mp3(d, version):
+    return (f"| {version} | {d['wall']:.3f} | {fmt(d['eri_s'],'.3f')} | {fmt(d['jk_ms'],'.1f')} "
+            f"| {d['n_iter']} | {fmt(d['mo_cc_s'],'.3f')} | {fmt(d['mp3_s'],'.3f')} "
+            f"| {fmt(d['peak_rss'],'.1f')} | - |")
+
+def _md_row_ccsd_t(d, version):
+    return (f"| {version} | {fmt(d['ccsd_only_s'],'.3f')} | {fmt(d['eri_s'],'.3f')} "
+            f"| {fmt(d['jk_ms'],'.1f')} | {d['n_iter']} | {fmt(d['mo_cc_s'],'.3f')} "
+            f"| {fmt(d['cc_ms'],'.1f')} | {fmt(d['cc_iters'],'.0f')} | {fmt(d['ptriples_s'],'.3f')} "
+            f"| {fmt(d['peak_rss'],'.1f')} | - |")
+
+MD_HEADERS = {
+    "scf":    ("| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | Peak RSS (MB) | Note |",
+               "|---|---|---|---|---|---|---|"),
+    "mp2":    ("| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform(s) | MP2 energy (ms) | Peak RSS (MB) | Note |",
+               "|---|---|---|---|---|---|---|---|---|"),
+    "mp3":    ("| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform(s) | MP3 energy (s) | Peak RSS (MB) | Note |",
+               "|---|---|---|---|---|---|---|---|---|"),
+    "ccsd_t": ("| version | Total CCSD wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | PertT(s) | Peak RSS (MB) | Note |",
+               "|---|---|---|---|---|---|---|---|---|---|---|"),
+}
+MD_ROW_FN = {"scf": _md_row_scf, "mp2": _md_row_mp2, "mp3": _md_row_mp3, "ccsd_t": _md_row_ccsd_t}
+
+
+def report_markdown(collected, version, logger):
+    """One row per (method, reference) canonical system actually present in this run, in README.md's column order.
+    Created to easily append under the existing table for that section. Notes are empty"""
+    logger.info("\n--- README.md rows (append) ---")
+    for (method, reference), label in README_CANONICAL.items():
+        d = collected.get(label, {}).get(method)
+        if d is None:
+            continue
+        header, sep = MD_HEADERS[method]
+        logger.info(f"\n{label} ({method}/{reference}):")
+        logger.info(header)
+        logger.info(sep)
+        logger.info(MD_ROW_FN[method](d, version))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--name", default=datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
@@ -251,6 +316,8 @@ def main():
                     help="ERI storage scheme (default: tensor)")
     ap.add_argument("--gemmscheme", choices=["eigen", "blas"], default="blas",
                     help="GEMM scheme for einsum (default: blas)")
+    ap.add_argument("--version", default="vX.X.X",
+                    help="version string stamped into the README.md row output (e.g. v3.1.2)")
     args = ap.parse_args()
 
     with open(ROOT / "bench" / "systems.json") as fh:
@@ -394,6 +461,8 @@ def main():
 
     run_params = " ".join(f"{k}={v}" for k, v in vars(args).items() if k != "name")
     logger.info(f"params: {run_params}")
+
+    report_markdown(collected, args.version, logger)
 
     (OUT_DIR / f"{args.name}.json").write_text(json.dumps(nan_to_null(outputs), indent=2))
 
