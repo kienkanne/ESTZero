@@ -44,32 +44,39 @@ freeze_core false
 
 ## 1. GEMM Microbenchmark
 
-Starting from version 3.0.0, the focus shifted to optimizing the backend of the manually implemented `einsum`, which is the backbone of the post-HF methods implemented here. This update wired Eigen to call GEMM instead of the previous odometer scheme for `einsum` contractions. Version 3.1.0 introduced a specialized microbenchmark for GEMM, with the intention to walk up the optimization ladder starting from the naive baseline GEMM. Version 3.1.1 reorganized the route naming into three families: `naive_*` (unoptimized references), `mkn_RxR` (loop order `mnk`, blocks rows of A reused against B), `mnk_RxR` (tiles a block of C held as accumulators that live in registers across the k reduction, or "register blocking").
+Starting from version 3.0.0, the focus shifted to optimizing the backend of the manually implemented `einsum`, which is the backbone of the post-HF methods implemented here. This update wired Eigen to call GEMM instead of the previous odometer scheme for `einsum` contractions. Version 3.1.0 introduced a specialized microbenchmark for GEMM, with the intention to walk up the optimization ladder starting from the naive baseline GEMM. Version 3.1.1 reorganized the route naming into three families: `naive_*` (unoptimized references), `mkn_RxR` (loop order `mnk`, blocks rows of A reused against B), `mnk_RxR` (tiles a block of C held as accumulators that live in registers across the k reduction, or "register blocking"). Version 3.1.3/3.1.4 added a fourth family, `avx_RxNR`, using `<immintrin.h>` AVX-512 intrinsics directly instead of hoping the auto-vectorizer packs named scalar accumulators (`avx_12x8`/`avx_16x8`/`avx_20x8`/`avx_24x8` are generated using macros from the same logic as `avx_8x8`).
 
 The results reported here are timings for a matrix multiplcation task: C = alpha\*\(A\*\B) + beta\*\C. Single-core peak GFLOPs on this machine (AMD Ryzen 9 7950X) = ~4.5 clock(GHz) * 8 doubles/zmm * 2 FMA units * 2 flops/FMA = 144 GFLOPs. GFLOPs of each run is calculated as (2.0 * M * N * K) / (avg_ms * 1e6).
 
 ```bash
-python3 bench/gemm_bench.py --sizes 1022                                     # every route
+python3 bench/gemm_bench.py                                                  # default: avx_*/openblas/eigen at size 510,1022,2045
+python3 bench/gemm_bench.py --legacy --sizes 1022                            # include the frozen naive/mkn/mnk routes
 python3 bench/gemm_bench.py --routes openblas,avx_8x8,mkn_8x1 --sizes 1022   # just these
 ```
 
-Shape: 1022x1022x1022
+### Full ladder snapshot (frozen as of v3.1.4; `avx_*` rows added in v3.1.4)
+
+Shape: 2045x2045x2045
 | Route | Avg(ms) | %OpenBLAS | GFLOP/s | %Peak | IPC | L1miss% | LLCmiss% | Note |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| OpenBLAS | 25.923 | 100.0 | 82.36 | 57.2 | - |
-| Eigen | 27.800 | 93.2 | 76.80 | 53.3 | - |
-| avx_8x8 | 33.220 | 78.0 | 64.27 | 44.6 | correctly vectorized accumulators sitting in registers using AVX-512 intrinsics |
-| naive_mkn | 88.158 | 29.4 | 24.22 | 16.8 | unblocked, but correct innermost loop variable. Naive but efficient |
-| mkn_8x1 | 94.210 | 27.5 | 22.66 | 15.7 | fastest blocked route on this hardware, still loses to `naive_mkn` |
-| mkn_4x1 | 96.273 | 26.9 | 22.18 | 15.4 | same as above, smaller row-block |
-| avx_1x8 | 107.621 | 24.1 | 19.84 | 13.8 | only having one vectorized accumulator in register, it could not utilize the loaded B row fully  |
-| mnk_1x8 | 115.026 | 22.5 | 18.56 | 12.9 | best of the register blocking family, with 8 contiguous accumulator columns |
-| mnk_4x4 | 139.681 | 18.6 | 15.28 | 10.6 | 16 named accumulators, fit in register but non-contiguous A fetches |
-| mnk_8x8 | 159.769 | 16.2 | 13.36 | 9.3 | 64 named accumulators, spills out of register |
-| mnk_8x1 | 179.264 | 14.5 | 11.91 | 8.3 | 8 strided accumulator rows from A |
-| mnk_1x4 | 194.671 | 13.3 | 10.97 | 7.6 | half a zmm register, half the vectorization as `mkn_8x1` |
-| mnk_4x1 | 195.359 | 13.3 | 10.93 | 7.6 | same as above, but non-contiguous A fetches |
-| naive_mnk | 583.910 | 4.4 | 3.66 | 2.5 | unblocked, wrong innermost loop variable k. (baseline naive) |
+| OpenBLAS | 206.905 | 100.0 | 82.67 | 57.4 | 0.97 | 22.32 | 0.29 | - |
+| Eigen | 213.556 | 96.9 | 80.09 | 55.6 | 0.92 | 25.21 | 1.46 | - |
+| avx_12x8 | 379.929 | 54.5 | 45.02 | 31.3 | 0.72 | 31.45 | 3.47 | closest to OpenBLAS, every row's address offset fits directly in a GPR |
+| avx_24x8 | 396.620 | 52.2 | 43.13 | 29.9 | 0.80 | 22.96 | 2.94 | MR=24>GPR=16, so the compiler reloads from outside, but the tradeoff is less k loops |
+| avx_20x8 | 405.196 | 51.1 | 42.21 | 29.3 | 0.76 | 27.80 | 2.75 | similar to `avx_20x8` |
+| avx_8x8 | 446.237 | 46.4 | 38.33 | 26.6 | 0.72 | 31.82 | 5.41 | correctly vectorized accumulators sitting in registers |
+| avx_16x8 | 561.847 | 36.8 | 30.44 | 21.1 | 0.68 | 34.28 | 3.28 | worst of the `avx_Rx8`, *not fully explained* |
+| mkn_8x1 | 942.814 | 21.9 | 18.14 | 12.6 | 1.09 | 19.42 | 0.15 | best of pre-avx family, reusing B 8 times |
+| mkn_4x1 | 1026.760 | 20.2 | 16.66 | 11.6 | 1.03 | 20.85 | 0.19 | similar to above |
+| mnk_4x4 | 1293.532 | 16.0 | 13.22 | 9.2 | 2.26 | 33.79 | 0.31 | 16 named accumulators, fit in register but non-contiguous A fetches |
+| mnk_8x8 | 1329.830 | 15.6 | 12.86 | 8.9 | 2.36 | 11.77 | 0.67 | 64 named accumulators, spills out of register |
+| naive_mkn | 1358.154 | 15.2 | 12.59 | 8.7 | 0.81 | 17.53 | 1.23 | previously beat all of the pre-avx versions in 1022, but in the larger size 2045 the blocking scheme showed work |
+| avx_1x8 | 1622.559 | 12.8 | 10.54 | 7.3 | 0.69 | 64.86 | 14.80 | only having one vectorized accumulator in register, it could not utilize the loaded B row fully  |
+| mnk_8x1 | 1636.388 | 12.6 | 10.45 | 7.3 | 1.91 | 59.81 | 0.07 | better than `mnk_8x1` despite non-contiguous A fetches |
+| mnk_1x4 | 1884.383 | 11.0 | 9.08 | 6.3 | 1.31 | 45.30 | 1.26 | compared to `mnk_1x4`, the situation is flipped here vs the x8 variant |
+| mnk_1x8 | 2247.778 | 9.2 | 7.61 | 5.3 | 0.74 | 36.03 | 9.88 | worse than `mnk_1x8` despite contiguous B fetches |
+| mnk_4x1 | 2941.667 | 7.0 | 5.81 | 4.0 | 1.25 | 60.72 | 1.22 | compared to `mnk_4x1`, the situation is flipped here vs the x8 variant |
+| naive_mnk | 7640.584 | 2.7 | 2.24 | 1.6 | 1.30 | 55.82 | 3.18 | unblocked, wrong innermost loop variable k. (baseline naive) |
 
 ## 2. EST Performance log
 

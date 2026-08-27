@@ -26,6 +26,13 @@ PEAK_GFLOPS = 4.5 * 8 * 2 * 2
 # `perf stat` trackings
 PERF_EVENTS = "cycles,instructions,L1-dcache-loads,L1-dcache-load-misses,cache-references,cache-misses"
 
+# Pre-AVX hand-rolled routes, frozen as of v3.1.3 (see CHANGELOG) -- excluded from the default
+# route set so routine runs stay avx-focused; still reachable via --legacy or --routes.
+LEGACY_ROUTES = {
+    "naive_mnk", "naive_mkn", "mkn_4x1", "mkn_8x1",
+    "mnk_4x1", "mnk_1x4", "mnk_8x1", "mnk_1x8", "mnk_4x4", "mnk_8x8",
+}
+
 
 def parse(text):
     """Returns {shape: {route: {avg_ms, gflops, ok, max_diff}}}."""
@@ -105,15 +112,15 @@ def discover_routes(only=None):
     return only
 
 
-def run_plain(sizes, repeats, enable_naive):
+def run_plain(sizes, repeats, enable_legacy):
     """Existing single-invocation path: binary loops every route internally. Returns stdout."""
     cmd = [str(BINARY)]
     if sizes:
         cmd += ["--sizes", sizes]
     if repeats:
         cmd += ["--repeats", str(repeats)]
-    if enable_naive:
-        cmd += ["--enable_naive"]
+    if enable_legacy:
+        cmd += ["--legacy"]
 
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
@@ -191,21 +198,24 @@ def report_markdown(results, logger, noperf=False):
             pct_pk = f"{100 * d['gflops'] / PEAK_GFLOPS:.1f}"
             name = DISPLAY_NAME.get(route, route)
             if noperf:
-                logger.info(f"| {name} | {d['avg_ms']:.3f} | {pct_ob} | {d['gflops']:.2f} | {pct_pk} | {d['ipc']:.2f} | {d['l1_miss_pct']:.2f} | {d['llc_miss_pct']:.2f} | - |")
-            else:
                 logger.info(f"| {name} | {d['avg_ms']:.3f} | {pct_ob} | {d['gflops']:.2f} | {pct_pk} | - |")
-
+            else:
+                logger.info(f"| {name} | {d['avg_ms']:.3f} | {pct_ob} | {d['gflops']:.2f} | {pct_pk} | {d['ipc']:.2f} | {d['l1_miss_pct']:.2f} | {d['llc_miss_pct']:.2f} | - |")
+                
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--name", default=datetime.now().strftime("gemm_%Y-%m-%d_%H-%M-%S"))
     ap.add_argument("--sizes", help="comma-separated square dims, e.g. 256,512,1024")
     ap.add_argument("--repeats", type=int)
-    ap.add_argument("--enable_naive", action="store_true")
+    ap.add_argument("--legacy", action="store_true",
+                     help="include the pre-AVX routes (naive_*/mkn_RxR/mnk_RxR), frozen as of "
+                          "v3.1.3 and excluded from the default route set")
     ap.add_argument("--noperf", action="store_true",
                      help="run the binary directly for all paths without perf for separate routes")
     ap.add_argument("--routes", help="comma-separated route names (only valid without --noperf); "
-                                      "default: every route gemm_bench --list-routes reports")
+                                      "default: every non-legacy route gemm_bench --list-routes "
+                                      "reports (add --legacy to include the frozen pre-AVX ones)")
     args = ap.parse_args()
 
     if args.routes and args.noperf:
@@ -221,15 +231,20 @@ def main():
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
     if not args.noperf:
-        routes = discover_routes(args.routes.split(",") if args.routes else None)
-        sizes = [int(s) for s in args.sizes.split(",")] if args.sizes else [256, 511, 1022]
+        if args.routes:
+            routes = discover_routes(args.routes.split(","))
+        else:
+            routes = discover_routes(None)
+            if not args.legacy:
+                routes = [r for r in routes if r not in LEGACY_ROUTES]
+        sizes = [int(s) for s in args.sizes.split(",")] if args.sizes else [510, 1022, 2045]
         results = run_all_perf(routes, sizes, args.repeats or 3, logger)
     else:
-        stdout = run_plain(args.sizes, args.repeats, args.enable_naive)
+        stdout = run_plain(args.sizes, args.repeats, args.legacy)
         results = parse(stdout)
 
     report(results, logger, noperf=args.noperf)
-    report_markdown(results, logger)
+    report_markdown(results, logger, noperf=args.noperf)
 
     (OUT_DIR / f"{args.name}.json").write_text(json.dumps(results, indent=2))
 

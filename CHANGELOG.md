@@ -2,6 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.1.4] Generalized `avx_Rx8` via nested macros, updated benchmark matrix size.
+
+- Added `avx_12x8`/`avx_16x8`/`avx_20x8`/`avx_24x8` (`estzero/gemm/avx512.cc`) by generalizing `avx_8x8` into a macro-generated family instead of hand writing the function for each size. `REPEATn(X)` is built by chaining onto the previous `REPEATn` (`REPEAT12` = `REPEAT8` + 4 more literal index calls). `DEFINE_AVX_RX8(MR)` then write out one whole function per size.
+- `avx_12x8` reaches 85.0% of OpenBLAS at 1022x1022x1022 (69.72 GFLOP/s) (see [v3.1.4.log](bench/outputs_gemm/v3.1.4.log)). However, `avx_16x8` (44.49 GFLOP/s) is worse than both its neighbors `avx_12x8` and `avx_20x8` (see `README.md`). A possibility is that in larger `MR` schemes they run out of general purpose registers (there is only 16 of them) to store the memory address for FMA instructions, so beyond MR=12 it starts to become a tradeoff.
+- **Benchmark defaults reorganized.** The `naive_*`/`mkn_RxR`/`mnk_RxR` ladder is now frozen at 3.14. and will not be run in the future by default. The new `avx_Rx8` family became the active work, requiring benchmark at bigger sizes: 510, 1022, 2045. The standard size for comparison in `README.md` is now 2045.
+- At 2045x2045x2045 (three ~33MB matrices, past L3), the `avx_Rx8` family couldn't keep up with BLAS anymore: `avx_12x8` drops from 83.5% of OpenBLAS to 53.5%, while OpenBLAS/Eigen barely move (OpenBLAS 82.39 -> 82.79 GFLOP/s, Eigen 78.81 -> 80.12 GFLOP/s). The smaller matrices likely fit entirely in cache, so smaller matrices hid their the limitation of the `avx_Rx8` family. The size of matrices used to benchmark will be investigated more next patch.
+
 ## [v3.1.3] Added in AVX-512 intrinsics for GEMM (`avx_8x8`) to vectorize filling in the registers
 
 - Added `avx_1x8`/`avx_8x8` (`estzero/gemm/avx512.cc`), using `<immintrin.h>` `__m512d` intrinsics directly instead of "praying" the auto-vectorizer packs named scalar accumulators into a register, which it probably didn't past `mnk_4x4` (v3.1.1). `avx_8x8` tiles the same 8x8 block of C as `mnk_8x8`, but as 8 named `__m512d` accumulators (one zmm register per row of 8 doubles) instead of 64 scalar doubles.
