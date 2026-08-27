@@ -38,6 +38,7 @@ add_library(est_core STATIC
     estzero/est/cc_triples.cc
     estzero/linalg/einsum.cc
 
+    estzero/gemm/avx512.cc
     estzero/gemm/mkn_RxR.cc
     estzero/gemm/mnk_RxR.cc
     estzero/gemm/naive.cc

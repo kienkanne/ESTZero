@@ -14,6 +14,10 @@
 // - mnk_RxR : tiles an MR x NR block of C, held as named local accumulators across the entire k 
 // reduction, written to C once, MR x NR is the tile size. This is the "canonical" loop that major
 // libraries uses.
+//
+// - avx_RxR : utilizes <immintrin.h> AVX-512 intrinsics to vectorize the accumulators fill a zmm
+// register completely with 8 entries on a C row, providing actual vectorization instead of manually
+// declaring all named local variables in `mnk_RxR` and hoping the compiler does so.
 
 void naive_mnk(int M, int N, int K, double alpha, double beta,
                const double* A, const double* B, double* C);
@@ -38,4 +42,8 @@ void mnk_4x4(int M, int N, int K, double alpha, double beta,
 void mnk_8x8(int M, int N, int K, double alpha, double beta,
              const double* A, const double* B, double* C);
 
+void avx_1x8(int M, int N, int K, double alpha, double beta,
+             const double* A, const double* B, double* C);
+void avx_8x8(int M, int N, int K, double alpha, double beta,
+             const double* A, const double* B, double* C);
 #endif

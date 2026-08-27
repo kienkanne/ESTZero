@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.1.3] Added in AVX-512 intrinsics for GEMM (`avx_8x8`) to vectorize filling in the registers
+
+- Added `avx_1x8`/`avx_8x8` (`estzero/gemm/avx512.cc`), using `<immintrin.h>` `__m512d` intrinsics directly instead of "praying" the auto-vectorizer packs named scalar accumulators into a register, which it probably didn't past `mnk_4x4` (v3.1.1). `avx_8x8` tiles the same 8x8 block of C as `mnk_8x8`, but as 8 named `__m512d` accumulators (one zmm register per row of 8 doubles) instead of 64 scalar doubles.
+- `avx_8x8` hits 64.27 GFLOP/s at 1022x1022x1022 (~33ms, 78.0% of OpenBLAS, 44.6% of peak) vs. `mnk_8x8`'s 13.36 GFLOP/s (~160ms, 16.2%). The vectorization scheme completely beats the manually blocking ones, including the `mkn` family. It is also relatively close to OpenBLAS and Eigen already with zero packing.
+- `avx_1x8`, despite also filling a full zmm register per k-step, performed far worse (19.84 GFLOP/s, 24.1% of OpenBLAS at 1022x1022x1022). `perf stat` showsed 48.83% L1-dcache-load-miss and 14.29% LLC-miss, vs. `avx_8x8`'s 21.73%/3.80%. It cannot fully utilized the loaded B block with only using one register of vectorized C accumulators.
+
 ## [v3.1.2] Added `perf stat` to microbenchmark to monitor IPC and L1 cache load misses
 
 - `gemm_bench.py` now additionally reports IPC and L1-dcache-load-miss% per route (it runs one process per route under `perf stat`, so hardware counters attribute to a single kernel)

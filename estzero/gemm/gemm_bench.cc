@@ -48,6 +48,10 @@ static std::vector<Route> make_routes(bool enable_naive) {
                   mnk_4x4(M, N, K, alpha, beta, A, B, C); }},
         {"mnk_8x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
                   mnk_8x8(M, N, K, alpha, beta, A, B, C); }},
+        {"avx_1x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  avx_1x8(M, N, K, alpha, beta, A, B, C); }},
+        {"avx_8x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  avx_8x8(M, N, K, alpha, beta, A, B, C); }},
                 };
 
     if (enable_naive) {
@@ -80,6 +84,9 @@ int main(int argc, char** argv) {
     std::vector<int> sizes = {256, 511, 1022, /*2045*/};
     int repeats = 3;
     bool enable_naive = false;
+    std::string only;  // if set, run just this one route -- needed so `perf stat` can attribute
+                        // counters to a single kernel instead of the whole route loop.
+    bool list_routes = false;
 
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--sizes") == 0 && i + 1 < argc) {
@@ -87,11 +94,35 @@ int main(int argc, char** argv) {
         } else if (std::strcmp(argv[i], "--repeats") == 0 && i + 1 < argc) {
             repeats = std::stoi(argv[++i]);
         } else if (std::strcmp(argv[i], "--enable_naive") == 0) {
-            enable_naive = true; }
+            enable_naive = true;
+        } else if (std::strcmp(argv[i], "--only") == 0 && i + 1 < argc) {
+            only = argv[++i];
+        } else if (std::strcmp(argv[i], "--list-routes") == 0) {
+            list_routes = true;
+        }
     }
+
+    // Checked before any benchmark setup: lets callers (bench/gemm_bench.py) discover the
+    // current route set at runtime instead of hardcoding a list that can drift out of sync
+    // with make_routes() below. Always includes naive routes, since they're always reachable
+    // via --only regardless of --enable_naive.
+    if (list_routes) {
+        for (const auto& r : make_routes(/*enable_naive=*/true)) {
+            std::println("{}", r.name);
+        }
+        return 0;
+    }
+
     openblas_set_num_threads(1);
 
-    auto routes = make_routes(enable_naive);
+    auto routes = make_routes(enable_naive || !only.empty());
+    if (!only.empty()) {
+        std::erase_if(routes, [&](const Route& r) { return r.name != only; });
+        if (routes.empty()) {
+            std::println("no route named '{}'", only);
+            return 1;
+        }
+    }
 
     // Fixed seed
     std::mt19937 rng(12345);

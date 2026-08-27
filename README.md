@@ -56,18 +56,20 @@ python3 bench/gemm_bench.py --routes openblas,avx_8x8,mkn_8x1 --sizes 1022   # j
 Shape: 1022x1022x1022
 | Route | Avg(ms) | %OpenBLAS | GFLOP/s | %Peak | IPC | L1miss% | LLCmiss% | Note |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| OpenBLAS | 25.992 | 100.0 | 82.14 | 57.0 | 0.53 | 12.35 | 0.50 | - |
-| Eigen | 27.598 | 94.2 | 77.36 | 53.7 | 0.53 | 14.54 | 1.49 | - |
-| naive_mkn | 87.873 | 29.6 | 24.30 | 16.9 | 0.71 | 13.99 | 1.61 | unblocked, but correct innermost loop variable. Naive but efficient |
-| mkn_8x1 | 93.805 | 27.7 | 22.76 | 15.8 | 0.70 | 15.84 | 0.38 | fastest blocked route on this hardware, still loses to `naive_mkn` |
-| mkn_4x1 | 96.441 | 27.0 | 22.14 | 15.4 | 0.71 | 16.75 | 0.51 | same as above, smaller row-block |
-| mnk_1x8 | 115.427 | 22.5 | 18.50 | 12.8 | 0.82 | 32.55 | 8.25 | best of the register blocking family, with 8 contiguous accumulator columns |
-| mnk_4x4 | 139.950 | 18.6 | 15.25 | 10.6 | 1.22 | 27.37 | 0.24 | 16 named accumulators, fit in register but non-contiguous A fetches |
-| mnk_8x8 | 159.610 | 16.3 | 13.38 | 9.3 | 1.25 | 10.95 | 0.24 | 64 named accumulators, spills out of register |
-| mnk_8x1 | 180.519 | 14.4 | 11.83 | 8.2 | 1.15 | 51.17 | 0.03 | 8 strided accumulator rows from A |
-| mnk_1x4 | 194.318 | 13.4 | 10.99 | 7.6 | 0.91 | 40.20 | 0.81 | half a zmm register, half the vectorization as `mkn_8x1` |
-| mnk_4x1 | 195.423 | 13.3 | 10.92 | 7.6 | 1.20 | 55.18 | 0.06 | same as above, but non-contiguous A fetches |
-| naive_mnk | 585.272 | 4.4 | 3.65 | 2.5 | 1.63 | 53.56 | 0.03 | unblocked, wrong innermost loop variable k. (baseline naive) |
+| OpenBLAS | 25.923 | 100.0 | 82.36 | 57.2 | - |
+| Eigen | 27.800 | 93.2 | 76.80 | 53.3 | - |
+| avx_8x8 | 33.220 | 78.0 | 64.27 | 44.6 | correctly vectorized accumulators sitting in registers using AVX-512 intrinsics |
+| naive_mkn | 88.158 | 29.4 | 24.22 | 16.8 | unblocked, but correct innermost loop variable. Naive but efficient |
+| mkn_8x1 | 94.210 | 27.5 | 22.66 | 15.7 | fastest blocked route on this hardware, still loses to `naive_mkn` |
+| mkn_4x1 | 96.273 | 26.9 | 22.18 | 15.4 | same as above, smaller row-block |
+| avx_1x8 | 107.621 | 24.1 | 19.84 | 13.8 | only having one vectorized accumulator in register, it could not utilize the loaded B row fully  |
+| mnk_1x8 | 115.026 | 22.5 | 18.56 | 12.9 | best of the register blocking family, with 8 contiguous accumulator columns |
+| mnk_4x4 | 139.681 | 18.6 | 15.28 | 10.6 | 16 named accumulators, fit in register but non-contiguous A fetches |
+| mnk_8x8 | 159.769 | 16.2 | 13.36 | 9.3 | 64 named accumulators, spills out of register |
+| mnk_8x1 | 179.264 | 14.5 | 11.91 | 8.3 | 8 strided accumulator rows from A |
+| mnk_1x4 | 194.671 | 13.3 | 10.97 | 7.6 | half a zmm register, half the vectorization as `mkn_8x1` |
+| mnk_4x1 | 195.359 | 13.3 | 10.93 | 7.6 | same as above, but non-contiguous A fetches |
+| naive_mnk | 583.910 | 4.4 | 3.66 | 2.5 | unblocked, wrong innermost loop variable k. (baseline naive) |
 
 ## 2. EST Performance log
 
