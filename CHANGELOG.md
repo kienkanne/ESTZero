@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.1.5] Added `gemm_sweep.py`, sweeping around 1024 and 2048 with SVG chart
+
+- v3.1.4 found the `avx` family performed much worse than OpenBLAS at large matrix sizes, and also a sharp drop at the power of twos (1024, 2048). This update sweeps around that range to investigate what's happening with `bench/gemm_sweep.py` that uses `gemm_bench.py` helpers to run different matrix sizes around these numbers (`avx_1x8` excluded).
+- A sharp, narrow spike exactly at the power of 2** (1024 and 2048) showed `avx_12x8` (the fastest hand written route) is at 71.3%/**43.5%**/75.8% of OpenBLAS for N=1023/1024/1025, and 50.4%/**29.6%**/52.2% for N=2047/2048/2049. See `README.md`
+
 ## [v3.1.4] Generalized `avx_Rx8` via nested macros, updated benchmark matrix size.
 
 - Added `avx_12x8`/`avx_16x8`/`avx_20x8`/`avx_24x8` (`estzero/gemm/avx512.cc`) by generalizing `avx_8x8` into a macro-generated family instead of hand writing the function for each size. `REPEATn(X)` is built by chaining onto the previous `REPEATn` (`REPEAT12` = `REPEAT8` + 4 more literal index calls). `DEFINE_AVX_RX8(MR)` then write out one whole function per size.

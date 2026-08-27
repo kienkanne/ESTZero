@@ -78,6 +78,27 @@ Shape: 2045x2045x2045
 | mnk_4x1 | 2941.667 | 7.0 | 5.81 | 4.0 | 1.25 | 60.72 | 1.22 | compared to `mnk_4x1`, the situation is flipped here vs the x8 variant |
 | naive_mnk | 7640.584 | 2.7 | 2.24 | 1.6 | 1.30 | 55.82 | 3.18 | unblocked, wrong innermost loop variable k. (baseline naive) |
 
+### Dense sweep around powers of 2
+
+N=1024 makes every `avx_Rx8` route noticeably worse than its neighbor, i.e. N=1022. Sweeping densely around N=1024 and N=2048 (`bench/gemm_sweep.py`, avx-focused, one run per size) shows this spike only happens exactly at the power of two:
+
+![GEMM throughput near N=1024](bench/outputs_gemm/sweep_1024.svg)
+![GEMM throughput near N=2048](bench/outputs_gemm/sweep_2048.svg)
+
+`avx_12x8` (the fastest hand written route):
+
+| Center | N-1 | **N (exact power of 2)** | N+1 |
+| --- | --- | --- | --- |
+| 1024 | 71.3% of OpenBLAS | **43.5%** | 75.8% |
+| 2048 | 50.4% of OpenBLAS | **29.6%** | 52.2% |
+
+See `bench/outputs_gemm/sweep_1024.log` / `sweep_2048.log` for full details.
+
+```bash
+python3 bench/gemm_sweep.py                                       # sweep around 1024 and 2048 (avx_* + openblas/eigen only)
+python3 bench/gemm_sweep.py --centers 3072 --offsets=-4,-2,0,2,4  # sweep around any other center
+```
+
 ## 2. EST Performance log
 
 This log tracks the update in features and their performance in the most computationally costly steps of different electronic structure theory methods. Versions without algorithm update for each section is not documented. See `bench/outputs` for full version peformance logs.
