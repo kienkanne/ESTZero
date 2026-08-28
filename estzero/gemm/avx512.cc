@@ -1,5 +1,6 @@
 #include <immintrin.h>
 #include "gemm_all.h"
+#include "vector"
 
 static inline double mnk_dot_1x1(int K, const double* A_row, const double* B, int ldb, int n) {
     double c = 0.0;
@@ -10,10 +11,10 @@ static inline double mnk_dot_1x1(int K, const double* A_row, const double* B, in
 void avx_1x8(int M, int N, int K, double alpha, double beta,
              const double* A, const double* B, double* C) {
     const int lda = K, ldb = N, ldc = N;
-    const int N8 = (N / 8) * 8;
+    const int Nblk = (N / 8) * 8;
 
     for (int m = 0; m < M; ++m) {
-    for (int n = 0; n < N8; n += 8) {
+    for (int n = 0; n < Nblk; n += 8) {
 
         // Initialize the C accumulator vector to zero
         // i.e. C(0,0) -> C(0,7)
@@ -48,7 +49,7 @@ void avx_1x8(int M, int N, int K, double alpha, double beta,
     }}
 
     for (int m = 0; m < M; ++m) {
-    for (int n = N8; n < N; ++n) {
+    for (int n = Nblk; n < N; ++n) {
         const double c = mnk_dot_1x1(K, A + m * lda, B, ldb, n);
         const int idx = m * ldc + n;
         C[idx] = (beta == 0.0) ? alpha * c : C[idx] * beta + alpha * c;
@@ -72,16 +73,6 @@ void avx_1x8(int M, int N, int K, double alpha, double beta,
 // One __m512d accumulator per C row (8 entries)
 #define INIT_C(i) __m512d c##i##_vec = _mm512_setzero_pd();
 
-// Packs MR rows of A (row-major, starting at row m0) in full k length, into a scratch
-// buffer laid out contiguously in MR (~column major), so that the innermost loop advancing in
-// MR is contiguous
-#define PACK_A(MR, K) \
-    double A_packed[MR * K]; \
-    for (int k = 0; k < K; ++k) { \
-    for (int i = 0; i < MR; ++i) { \
-        A_packed[k * MR + i] = A[(m + i) * lda + k]; \
-    }} \
-
 // Within the innermost loop k, each row's FMA against the shared b_vec loaded once. This loops
 // MR times for MR registers.
 #define COMPUTE_ROW(i) { \
@@ -103,20 +94,44 @@ void avx_##MR##x8(int M, int N, int K, double alpha, double beta, \
                    const double* A, const double* B, double* C) { \
     const int lda = K, ldb = N, ldc = N; \
     const int Mblk = (M / MR) * MR; \
-    const int N8 = (N / 8) * 8; \
+    const int Nblk = (N / 8) * 8; \
 \
+    /* Packs K rows (row with length NR) of B (row-major, starting at n0) in full k length, into a scratch
+    buffer laid out contiguously STILL in NR (~row major). AND THEN, in the next n, do the same. This basically
+    means that, for example, position (k_last, 8) is connected to (0, 9) when NR=8. Goes zigzag (left, down right)
+    with the width being NR, then finally jumps up and do it again, across Nblk. B_packed is more PACKED (big) than
+    A_packed, the size being N_blk x 8 x K */ \
+    std::vector<double> B_packed(static_cast<size_t>(Nblk / 8) * K * 8); /* integer division */ \
+    for (int n = 0; n < Nblk; n += 8) { \
+        double* dst = B_packed.data() + (n / 8) * K * 8; \
+        for (int k = 0; k < K; ++k) { \
+        for (int j = 0; j < 8; ++j) { \
+            dst[k * 8 + j] = B[k * ldb + j + n]; \
+        } \
+    }} \
+\
+    /* MAIN LOOP */ \
     for (int m = 0; m < Mblk; m += MR) { \
     const double* A_ptr = A + m * lda; \
-    PACK_A(MR, K) \
 \
-        for (int n = 0; n < N8; n += 8) { \
-    \
+    /* Packs MR rows of A (row-major, starting at row m0) in full k length, into a scratch
+    buffer laid out contiguously in MR (~column major), so that the innermost loop advancing in
+    MR is contiguous. Done inside the m loop, needs the current m. */ \
+    std::vector<double> A_packed(MR * K);\
+    for (int k = 0; k < K; ++k) { \
+    for (int i = 0; i < MR; ++i) { \
+        A_packed[k * MR + i] = A[(m + i) * lda + k]; \
+    }} \
+\
+        for (int n = 0; n < Nblk; n += 8) { \
             REPEAT##MR(INIT_C) \
-    \
+\
+            /* Get the correct B block based on current n */ \
+            const double* B_ptr = B_packed.data() + (n / 8) * K * 8; \
             for (int k = 0; k < K; ++k) { \
     \
                 int a_flat = k * MR; \
-                __m512d b_vec = _mm512_loadu_pd(&B[k * ldb + n]); \
+                __m512d b_vec = _mm512_loadu_pd(&B_ptr[k * 8]); \
                 REPEAT##MR(COMPUTE_ROW) \
             } \
     \
@@ -133,7 +148,7 @@ void avx_##MR##x8(int M, int N, int K, double alpha, double beta, \
 \
     for (int m = 0; m < M; ++m) { \
     for (int n = 0; n < N; ++n) { \
-        if (m < Mblk && n < N8) continue; \
+        if (m < Mblk && n < Nblk) continue; \
         const double c = mnk_dot_1x1(K, A + m * lda, B, ldb, n); \
         const int idx = m * ldc + n; \
         C[idx] = (beta == 0.0) ? alpha * c : C[idx] * beta + alpha * c; \
@@ -146,7 +161,6 @@ DEFINE_AVX_RX8(16)
 DEFINE_AVX_RX8(20)
 DEFINE_AVX_RX8(24)
 
-#undef PACK_A
 #undef DEFINE_AVX_RX8
 #undef STORE_WITH_BETA
 #undef STORE_ZERO_BETA

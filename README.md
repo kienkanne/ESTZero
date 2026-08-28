@@ -82,15 +82,15 @@ Shape: 2045x2045x2045
 
 N=1024 makes every `avx_Rx8` route noticeably worse than its neighbor, i.e. N=1022. Sweeping densely around N=1024 and N=2048 (`bench/gemm_sweep.py`, avx-focused, one run per size) shows this spike only happens exactly at the power of two:
 
-![GEMM throughput near N=1024](bench/outputs_gemm/v3.1.6_sweep_1024.svg)
-![GEMM throughput near N=2048](bench/outputs_gemm/v3.1.6_sweep_2048.svg)
+![GEMM throughput near N=1024](bench/outputs_gemm/v3.1.7_sweep_1024.svg)
+![GEMM throughput near N=2048](bench/outputs_gemm/v3.1.7_sweep_2048.svg)
 
 `avx_16x8` (the fastest hand written route):
 
 | Center | N-1 | **N (exact power of 2)** | N+1 |
 | --- | --- | --- | --- |
-| 1024 | 69.4% of OpenBLAS | **95.2%** | 96.5% |
-| 2048 | 50.0% of OpenBLAS | **54.1%** | 62.1% |
+| 1024 | 67.7% of OpenBLAS | **97.5%** | 98.1% |
+| 2048 | 65.1% of OpenBLAS | **74.7%** | 75.1% |
 
 See `bench/outputs_gemm/sweep_1024.log` / `sweep_2048.log` for full details.
 

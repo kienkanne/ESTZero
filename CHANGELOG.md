@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.1.7] Added `B` packing over the `N_blk x 8 x K` block for `avx` family
+
+- This is a similar idea to A packing, but different from A packing, when reading at a fixed ROW `k` it's already contiguous. The problem is that when `k` changes, it jumps down a row, moving by `k * ldb`. Moving to the next NR block (n+1 along N_blk) jumps all the way from k=K to k=0. This pattern is predictable, so the strategy is basically reshaping B in this special layout so that throughout the entire main loop reading from B is always contiguous.
+- Performance across all `avx` schemes improved significantly at 2048x2048x2048, with `avx_16x8` reaching 74.7% OpenBLAS, compared to 54.1% last patch with only A packing. At the smaller size matrix 1024x1024x1024, performance is essentially equivalent to OpenBLAS, with `avx_8x8` and `avx_16x8` being at 97.8% and 97.5% with B_packed sitting entirely in L2 cache, not needing L3 like in size 2048.
+
 ## [v3.1.6] Added `A` packing over the `MR x K` block for `avx` family
 
 - The innermost loop requires continuous reads from a fixed column `k` in A, so the idea here is to pack this scratch buffer that will be read inside this loop into a contiguous block in `MR`, basically converting into a column major block.
