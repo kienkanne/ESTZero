@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.1.6] Added `A` packing over the `MR x K` block for `avx` family
+
+- The innermost loop requires continuous reads from a fixed column `k` in A, so the idea here is to pack this scratch buffer that will be read inside this loop into a contiguous block in `MR`, basically converting into a column major block.
+- This blocking scheme significantly improved the performance of the `avx` family as a whole. Performance varies, however, for example at 1024x1024x1024 `avx_20x8` went from 30.2% to 58.0% of OpenBLAS at 1024, and `avx_16x8` went from 47.2 to 95.2%, beating Eigen! At 2048x2048x2048, the family still loses to OpenBLAS by a decent amount, but has improved since last patch, with the best being `avx_16x8` reaching 54.1% OpenBLAS performance.
+
 ## [v3.1.5] Added `gemm_sweep.py`, sweeping around 1024 and 2048 with SVG chart
 
 - v3.1.4 found the `avx` family performed much worse than OpenBLAS at large matrix sizes, and also a sharp drop at the power of twos (1024, 2048). This update sweeps around that range to investigate what's happening with `bench/gemm_sweep.py` that uses `gemm_bench.py` helpers to run different matrix sizes around these numbers (`avx_1x8` excluded).

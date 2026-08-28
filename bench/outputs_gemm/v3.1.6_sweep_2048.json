@@ -1,0 +1,587 @@
+{
+  "2040x2040x2040": {
+    "openblas": {
+      "avg_ms": 205.361,
+      "gflops": 82.68039209002683,
+      "ok": true,
+      "max_diff": 0.0,
+      "ipc": 0.8524971988430122,
+      "l1_miss_pct": 20.66,
+      "llc_miss_pct": 0.32
+    },
+    "eigen": {
+      "avg_ms": 209.144,
+      "gflops": 81.18486784225223,
+      "ok": true,
+      "max_diff": 1.528e-13,
+      "ipc": 0.8212053660601372,
+      "l1_miss_pct": 23.22,
+      "llc_miss_pct": 1.14
+    },
+    "avx_8x8": {
+      "avg_ms": 289.846,
+      "gflops": 58.580515170124826,
+      "ok": true,
+      "max_diff": 4.192e-13,
+      "ipc": 0.752383481631336,
+      "l1_miss_pct": 25.94,
+      "llc_miss_pct": 3.02
+    },
+    "avx_12x8": {
+      "avg_ms": 232.909,
+      "gflops": 72.90112447350683,
+      "ok": true,
+      "max_diff": 4.192e-13,
+      "ipc": 0.7534154417406858,
+      "l1_miss_pct": 21.95,
+      "llc_miss_pct": 2.22
+    },
+    "avx_16x8": {
+      "avg_ms": 256.677,
+      "gflops": 66.15056276955083,
+      "ok": true,
+      "max_diff": 4.192e-13,
+      "ipc": 0.7561484535509679,
+      "l1_miss_pct": 21.32,
+      "llc_miss_pct": 2.91
+    },
+    "avx_20x8": {
+      "avg_ms": 243.53,
+      "gflops": 69.72170985094239,
+      "ok": true,
+      "max_diff": 4.192e-13,
+      "ipc": 0.7278910969614688,
+      "l1_miss_pct": 17.36,
+      "llc_miss_pct": 3.41
+    },
+    "avx_24x8": {
+      "avg_ms": 265.682,
+      "gflops": 63.90846199591993,
+      "ok": true,
+      "max_diff": 4.192e-13,
+      "ipc": 0.6834690322926348,
+      "l1_miss_pct": 17.59,
+      "llc_miss_pct": 5.14
+    }
+  },
+  "2044x2044x2044": {
+    "openblas": {
+      "avg_ms": 207.291,
+      "gflops": 82.39336183432951,
+      "ok": true,
+      "max_diff": 0.0,
+      "ipc": 0.8519066625209095,
+      "l1_miss_pct": 20.72,
+      "llc_miss_pct": 0.31
+    },
+    "eigen": {
+      "avg_ms": 209.932,
+      "gflops": 81.35683158356039,
+      "ok": true,
+      "max_diff": 1.705e-13,
+      "ipc": 0.8228176713904285,
+      "l1_miss_pct": 23.39,
+      "llc_miss_pct": 1.13
+    },
+    "avx_8x8": {
+      "avg_ms": 371.59,
+      "gflops": 45.96303013536424,
+      "ok": true,
+      "max_diff": 4.69e-13,
+      "ipc": 0.7226589325506546,
+      "l1_miss_pct": 27.1,
+      "llc_miss_pct": 4.64
+    },
+    "avx_12x8": {
+      "avg_ms": 332.481,
+      "gflops": 51.36955906653313,
+      "ok": true,
+      "max_diff": 4.69e-13,
+      "ipc": 0.7210302555626498,
+      "l1_miss_pct": 23.28,
+      "llc_miss_pct": 3.82
+    },
+    "avx_16x8": {
+      "avg_ms": 321.531,
+      "gflops": 53.118991226351426,
+      "ok": true,
+      "max_diff": 4.69e-13,
+      "ipc": 0.7446928326634843,
+      "l1_miss_pct": 22.64,
+      "llc_miss_pct": 2.89
+    },
+    "avx_20x8": {
+      "avg_ms": 359.866,
+      "gflops": 47.460450189792866,
+      "ok": true,
+      "max_diff": 4.69e-13,
+      "ipc": 0.6724398263690615,
+      "l1_miss_pct": 18.81,
+      "llc_miss_pct": 5.18
+    },
+    "avx_24x8": {
+      "avg_ms": 303.04,
+      "gflops": 56.360224287222806,
+      "ok": true,
+      "max_diff": 4.69e-13,
+      "ipc": 0.6853232315633508,
+      "l1_miss_pct": 19.17,
+      "llc_miss_pct": 4.47
+    }
+  },
+  "2046x2046x2046": {
+    "openblas": {
+      "avg_ms": 209.572,
+      "gflops": 81.73604618937644,
+      "ok": true,
+      "max_diff": 0.0,
+      "ipc": 0.8490421128107614,
+      "l1_miss_pct": 20.95,
+      "llc_miss_pct": 0.34
+    },
+    "eigen": {
+      "avg_ms": 214.405,
+      "gflops": 79.89359703365126,
+      "ok": true,
+      "max_diff": 1.448e-13,
+      "ipc": 0.8216804268038376,
+      "l1_miss_pct": 23.45,
+      "llc_miss_pct": 1.31
+    },
+    "avx_8x8": {
+      "avg_ms": 409.97,
+      "gflops": 41.78253694660585,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.720892219111339,
+      "l1_miss_pct": 25.88,
+      "llc_miss_pct": 5.42
+    },
+    "avx_12x8": {
+      "avg_ms": 394.844,
+      "gflops": 43.383175816271745,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.6887550239950327,
+      "l1_miss_pct": 22.75,
+      "llc_miss_pct": 5.29
+    },
+    "avx_16x8": {
+      "avg_ms": 422.08,
+      "gflops": 40.583744010614105,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.7060347402820456,
+      "l1_miss_pct": 22.45,
+      "llc_miss_pct": 4.43
+    },
+    "avx_20x8": {
+      "avg_ms": 332.985,
+      "gflops": 51.442517446731834,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.7141729789383678,
+      "l1_miss_pct": 18.95,
+      "llc_miss_pct": 4.3
+    },
+    "avx_24x8": {
+      "avg_ms": 311.906,
+      "gflops": 54.91906751393048,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.7106008871274607,
+      "l1_miss_pct": 19.3,
+      "llc_miss_pct": 4.46
+    }
+  },
+  "2047x2047x2047": {
+    "openblas": {
+      "avg_ms": 208.765,
+      "gflops": 82.17237394199219,
+      "ok": true,
+      "max_diff": 0.0,
+      "ipc": 0.8510366175469901,
+      "l1_miss_pct": 21.49,
+      "llc_miss_pct": 0.32
+    },
+    "eigen": {
+      "avg_ms": 216.543,
+      "gflops": 79.22082748461045,
+      "ok": true,
+      "max_diff": 1.705e-13,
+      "ipc": 0.8209407232277275,
+      "l1_miss_pct": 23.56,
+      "llc_miss_pct": 1.36
+    },
+    "avx_8x8": {
+      "avg_ms": 591.738,
+      "gflops": 28.99039041940859,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.6433200973660903,
+      "l1_miss_pct": 28.98,
+      "llc_miss_pct": 6.6
+    },
+    "avx_12x8": {
+      "avg_ms": 402.541,
+      "gflops": 42.616070526977374,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.7053337217802301,
+      "l1_miss_pct": 24.56,
+      "llc_miss_pct": 6.58
+    },
+    "avx_16x8": {
+      "avg_ms": 417.634,
+      "gflops": 41.075955611851526,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.6895862471445412,
+      "l1_miss_pct": 23.78,
+      "llc_miss_pct": 6.16
+    },
+    "avx_20x8": {
+      "avg_ms": 367.285,
+      "gflops": 46.7068234368406,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.6971626638484916,
+      "l1_miss_pct": 20.03,
+      "llc_miss_pct": 5.66
+    },
+    "avx_24x8": {
+      "avg_ms": 370.47,
+      "gflops": 46.30527612492239,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.689937281443192,
+      "l1_miss_pct": 20.39,
+      "llc_miss_pct": 5.08
+    }
+  },
+  "2048x2048x2048": {
+    "openblas": {
+      "avg_ms": 209.718,
+      "gflops": 81.91890626460294,
+      "ok": true,
+      "max_diff": 0.0,
+      "ipc": 0.851034266123902,
+      "l1_miss_pct": 21.39,
+      "llc_miss_pct": 0.33
+    },
+    "eigen": {
+      "avg_ms": 232.198,
+      "gflops": 73.98801533174273,
+      "ok": true,
+      "max_diff": 1.421e-13,
+      "ipc": 0.7992534342728359,
+      "l1_miss_pct": 23.71,
+      "llc_miss_pct": 2.27
+    },
+    "avx_8x8": {
+      "avg_ms": 735.589,
+      "gflops": 23.355255698494677,
+      "ok": true,
+      "max_diff": 3.979e-13,
+      "ipc": 0.5059802644920104,
+      "l1_miss_pct": 32.76,
+      "llc_miss_pct": 19.88
+    },
+    "avx_12x8": {
+      "avg_ms": 698.599,
+      "gflops": 24.591889172472335,
+      "ok": true,
+      "max_diff": 3.979e-13,
+      "ipc": 0.5298635379895911,
+      "l1_miss_pct": 25.18,
+      "llc_miss_pct": 20.21
+    },
+    "avx_16x8": {
+      "avg_ms": 387.827,
+      "gflops": 44.29776468373785,
+      "ok": true,
+      "max_diff": 3.979e-13,
+      "ipc": 0.6171451055015184,
+      "l1_miss_pct": 20.56,
+      "llc_miss_pct": 18.37
+    },
+    "avx_20x8": {
+      "avg_ms": 525.584,
+      "gflops": 32.68719973210752,
+      "ok": true,
+      "max_diff": 3.979e-13,
+      "ipc": 0.593527132538013,
+      "l1_miss_pct": 19.12,
+      "llc_miss_pct": 17.57
+    },
+    "avx_24x8": {
+      "avg_ms": 512.645,
+      "gflops": 33.512214464200376,
+      "ok": true,
+      "max_diff": 3.979e-13,
+      "ipc": 0.5758246567168368,
+      "l1_miss_pct": 19.47,
+      "llc_miss_pct": 16.0
+    }
+  },
+  "2049x2049x2049": {
+    "openblas": {
+      "avg_ms": 210.293,
+      "gflops": 81.81464574664872,
+      "ok": true,
+      "max_diff": 0.0,
+      "ipc": 0.8495343535014334,
+      "l1_miss_pct": 21.56,
+      "llc_miss_pct": 0.34
+    },
+    "eigen": {
+      "avg_ms": 217.656,
+      "gflops": 79.04696998015217,
+      "ok": true,
+      "max_diff": 1.705e-13,
+      "ipc": 0.8203131338610611,
+      "l1_miss_pct": 23.65,
+      "llc_miss_pct": 1.41
+    },
+    "avx_8x8": {
+      "avg_ms": 408.304,
+      "gflops": 42.13783675398722,
+      "ok": true,
+      "max_diff": 4.334e-13,
+      "ipc": 0.6717792360756708,
+      "l1_miss_pct": 27.42,
+      "llc_miss_pct": 8.85
+    },
+    "avx_12x8": {
+      "avg_ms": 394.256,
+      "gflops": 43.63927828111684,
+      "ok": true,
+      "max_diff": 4.334e-13,
+      "ipc": 0.6936593970273804,
+      "l1_miss_pct": 23.96,
+      "llc_miss_pct": 8.68
+    },
+    "avx_16x8": {
+      "avg_ms": 338.652,
+      "gflops": 50.804505208887,
+      "ok": true,
+      "max_diff": 4.334e-13,
+      "ipc": 0.6636992891641887,
+      "l1_miss_pct": 20.43,
+      "llc_miss_pct": 8.7
+    },
+    "avx_20x8": {
+      "avg_ms": 361.465,
+      "gflops": 47.59810022547135,
+      "ok": true,
+      "max_diff": 4.334e-13,
+      "ipc": 0.6916507381408222,
+      "l1_miss_pct": 19.36,
+      "llc_miss_pct": 7.59
+    },
+    "avx_24x8": {
+      "avg_ms": 329.477,
+      "gflops": 52.21926658917011,
+      "ok": true,
+      "max_diff": 4.334e-13,
+      "ipc": 0.6855518465073648,
+      "l1_miss_pct": 19.73,
+      "llc_miss_pct": 7.26
+    }
+  },
+  "2050x2050x2050": {
+    "openblas": {
+      "avg_ms": 209.66,
+      "gflops": 82.18186587808833,
+      "ok": true,
+      "max_diff": 0.0,
+      "ipc": 0.8509282350623928,
+      "l1_miss_pct": 21.25,
+      "llc_miss_pct": 0.3
+    },
+    "eigen": {
+      "avg_ms": 215.735,
+      "gflops": 79.86766171460357,
+      "ok": true,
+      "max_diff": 1.492e-13,
+      "ipc": 0.8212850133549836,
+      "l1_miss_pct": 23.52,
+      "llc_miss_pct": 1.34
+    },
+    "avx_8x8": {
+      "avg_ms": 361.752,
+      "gflops": 47.6300061920874,
+      "ok": true,
+      "max_diff": 4.121e-13,
+      "ipc": 0.7168393859750695,
+      "l1_miss_pct": 24.81,
+      "llc_miss_pct": 6.33
+    },
+    "avx_12x8": {
+      "avg_ms": 358.249,
+      "gflops": 48.095737880636094,
+      "ok": true,
+      "max_diff": 4.121e-13,
+      "ipc": 0.7149599532706067,
+      "l1_miss_pct": 22.84,
+      "llc_miss_pct": 6.95
+    },
+    "avx_16x8": {
+      "avg_ms": 337.515,
+      "gflops": 51.05032368931751,
+      "ok": true,
+      "max_diff": 4.121e-13,
+      "ipc": 0.6741269850085079,
+      "l1_miss_pct": 19.73,
+      "llc_miss_pct": 7.05
+    },
+    "avx_20x8": {
+      "avg_ms": 350.815,
+      "gflops": 49.114918119236634,
+      "ok": true,
+      "max_diff": 4.121e-13,
+      "ipc": 0.7084667768254926,
+      "l1_miss_pct": 18.91,
+      "llc_miss_pct": 5.56
+    },
+    "avx_24x8": {
+      "avg_ms": 358.861,
+      "gflops": 48.01371561691017,
+      "ok": true,
+      "max_diff": 4.121e-13,
+      "ipc": 0.6839616573744763,
+      "l1_miss_pct": 19.36,
+      "llc_miss_pct": 5.03
+    }
+  },
+  "2052x2052x2052": {
+    "openblas": {
+      "avg_ms": 210.209,
+      "gflops": 82.2073708356921,
+      "ok": true,
+      "max_diff": 0.0,
+      "ipc": 0.8521854412807074,
+      "l1_miss_pct": 20.81,
+      "llc_miss_pct": 0.35
+    },
+    "eigen": {
+      "avg_ms": 217.782,
+      "gflops": 79.3487488222167,
+      "ok": true,
+      "max_diff": 1.492e-13,
+      "ipc": 0.8331585919347283,
+      "l1_miss_pct": 23.24,
+      "llc_miss_pct": 1.26
+    },
+    "avx_8x8": {
+      "avg_ms": 478.771,
+      "gflops": 36.09393471200219,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.6867772588453178,
+      "l1_miss_pct": 27.17,
+      "llc_miss_pct": 5.96
+    },
+    "avx_12x8": {
+      "avg_ms": 382.295,
+      "gflops": 45.202603267110476,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.6490674841833561,
+      "l1_miss_pct": 22.6,
+      "llc_miss_pct": 6.33
+    },
+    "avx_16x8": {
+      "avg_ms": 408.986,
+      "gflops": 42.25261797714347,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.6592729976282782,
+      "l1_miss_pct": 21.38,
+      "llc_miss_pct": 6.22
+    },
+    "avx_20x8": {
+      "avg_ms": 384.357,
+      "gflops": 44.960100156885396,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.7133196739850403,
+      "l1_miss_pct": 20.22,
+      "llc_miss_pct": 5.08
+    },
+    "avx_24x8": {
+      "avg_ms": 341.015,
+      "gflops": 50.674396187850974,
+      "ok": true,
+      "max_diff": 4.263e-13,
+      "ipc": 0.7174084803748937,
+      "l1_miss_pct": 20.65,
+      "llc_miss_pct": 4.83
+    }
+  },
+  "2056x2056x2056": {
+    "openblas": {
+      "avg_ms": 210.902,
+      "gflops": 82.41734659699766,
+      "ok": true,
+      "max_diff": 0.0,
+      "ipc": 0.8563252276473174,
+      "l1_miss_pct": 20.83,
+      "llc_miss_pct": 0.27
+    },
+    "eigen": {
+      "avg_ms": 216.757,
+      "gflops": 80.1911044718279,
+      "ok": true,
+      "max_diff": 1.563e-13,
+      "ipc": 0.8226107821813158,
+      "l1_miss_pct": 23.31,
+      "llc_miss_pct": 1.25
+    },
+    "avx_8x8": {
+      "avg_ms": 290.598,
+      "gflops": 59.81453152464917,
+      "ok": true,
+      "max_diff": 4.192e-13,
+      "ipc": 0.7556720493015957,
+      "l1_miss_pct": 25.96,
+      "llc_miss_pct": 3.83
+    },
+    "avx_12x8": {
+      "avg_ms": 262.294,
+      "gflops": 66.26908443197328,
+      "ok": true,
+      "max_diff": 4.192e-13,
+      "ipc": 0.7566842961823943,
+      "l1_miss_pct": 22.74,
+      "llc_miss_pct": 2.85
+    },
+    "avx_16x8": {
+      "avg_ms": 249.926,
+      "gflops": 69.54851928970976,
+      "ok": true,
+      "max_diff": 4.192e-13,
+      "ipc": 0.7672483579028674,
+      "l1_miss_pct": 21.44,
+      "llc_miss_pct": 3.23
+    },
+    "avx_20x8": {
+      "avg_ms": 298.305,
+      "gflops": 58.26916488828548,
+      "ok": true,
+      "max_diff": 4.192e-13,
+      "ipc": 0.7804017737370247,
+      "l1_miss_pct": 20.19,
+      "llc_miss_pct": 4.23
+    },
+    "avx_24x8": {
+      "avg_ms": 316.411,
+      "gflops": 54.93482600794536,
+      "ok": true,
+      "max_diff": 4.192e-13,
+      "ipc": 0.7346606870576596,
+      "l1_miss_pct": 20.54,
+      "llc_miss_pct": 4.95
+    }
+  }
+}

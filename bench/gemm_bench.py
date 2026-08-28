@@ -237,7 +237,7 @@ def main():
             routes = discover_routes(None)
             if not args.legacy:
                 routes = [r for r in routes if r not in LEGACY_ROUTES]
-        sizes = [int(s) for s in args.sizes.split(",")] if args.sizes else [510, 1022, 2045]
+        sizes = [int(s) for s in args.sizes.split(",")] if args.sizes else [1022, 1024, 2045, 2048]
         results = run_all_perf(routes, sizes, args.repeats or 3, logger)
     else:
         stdout = run_plain(args.sizes, args.repeats, args.legacy)

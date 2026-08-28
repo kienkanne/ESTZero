@@ -54,7 +54,7 @@ python3 bench/gemm_bench.py --legacy --sizes 1022                            # i
 python3 bench/gemm_bench.py --routes openblas,avx_8x8,mkn_8x1 --sizes 1022   # just these
 ```
 
-### Full ladder snapshot (frozen as of v3.1.4; `avx_*` rows added in v3.1.4)
+### Full ladder snapshot (frozen as of v3.1.4, before packing)
 
 Shape: 2045x2045x2045
 | Route | Avg(ms) | %OpenBLAS | GFLOP/s | %Peak | IPC | L1miss% | LLCmiss% | Note |
@@ -82,15 +82,15 @@ Shape: 2045x2045x2045
 
 N=1024 makes every `avx_Rx8` route noticeably worse than its neighbor, i.e. N=1022. Sweeping densely around N=1024 and N=2048 (`bench/gemm_sweep.py`, avx-focused, one run per size) shows this spike only happens exactly at the power of two:
 
-![GEMM throughput near N=1024](bench/outputs_gemm/sweep_1024.svg)
-![GEMM throughput near N=2048](bench/outputs_gemm/sweep_2048.svg)
+![GEMM throughput near N=1024](bench/outputs_gemm/v3.1.6_sweep_1024.svg)
+![GEMM throughput near N=2048](bench/outputs_gemm/v3.1.6_sweep_2048.svg)
 
-`avx_12x8` (the fastest hand written route):
+`avx_16x8` (the fastest hand written route):
 
 | Center | N-1 | **N (exact power of 2)** | N+1 |
 | --- | --- | --- | --- |
-| 1024 | 71.3% of OpenBLAS | **43.5%** | 75.8% |
-| 2048 | 50.4% of OpenBLAS | **29.6%** | 52.2% |
+| 1024 | 69.4% of OpenBLAS | **95.2%** | 96.5% |
+| 2048 | 50.0% of OpenBLAS | **54.1%** | 62.1% |
 
 See `bench/outputs_gemm/sweep_1024.log` / `sweep_2048.log` for full details.
 

@@ -72,10 +72,20 @@ void avx_1x8(int M, int N, int K, double alpha, double beta,
 // One __m512d accumulator per C row (8 entries)
 #define INIT_C(i) __m512d c##i##_vec = _mm512_setzero_pd();
 
+// Packs MR rows of A (row-major, starting at row m0) in full k length, into a scratch
+// buffer laid out contiguously in MR (~column major), so that the innermost loop advancing in
+// MR is contiguous
+#define PACK_A(MR, K) \
+    double A_packed[MR * K]; \
+    for (int k = 0; k < K; ++k) { \
+    for (int i = 0; i < MR; ++i) { \
+        A_packed[k * MR + i] = A[(m + i) * lda + k]; \
+    }} \
+
 // Within the innermost loop k, each row's FMA against the shared b_vec loaded once. This loops
 // MR times for MR registers.
 #define COMPUTE_ROW(i) { \
-    __m512d a_vec = _mm512_set1_pd(A_ptr[(i) * lda + k]); \
+    __m512d a_vec = _mm512_set1_pd(A_packed[a_flat++]); /* A_packed is contiguous in MR, so ++ */ \
     c##i##_vec = _mm512_fmadd_pd(a_vec, b_vec, c##i##_vec); \
 }
 
@@ -96,25 +106,30 @@ void avx_##MR##x8(int M, int N, int K, double alpha, double beta, \
     const int N8 = (N / 8) * 8; \
 \
     for (int m = 0; m < Mblk; m += MR) { \
-    for (int n = 0; n < N8; n += 8) { \
+    const double* A_ptr = A + m * lda; \
+    PACK_A(MR, K) \
 \
-        REPEAT##MR(INIT_C) \
-\
-        const double* A_ptr = A + m * lda; \
-        for (int k = 0; k < K; ++k) { \
-            __m512d b_vec = _mm512_loadu_pd(&B[k * ldb + n]); \
-            REPEAT##MR(COMPUTE_ROW) \
+        for (int n = 0; n < N8; n += 8) { \
+    \
+            REPEAT##MR(INIT_C) \
+    \
+            for (int k = 0; k < K; ++k) { \
+    \
+                int a_flat = k * MR; \
+                __m512d b_vec = _mm512_loadu_pd(&B[k * ldb + n]); \
+                REPEAT##MR(COMPUTE_ROW) \
+            } \
+    \
+            double* C_ptr = C + m * ldc + n; \
+            __m512d alpha_vec = _mm512_set1_pd(alpha); \
+            if (beta == 0.0) { \
+                REPEAT##MR(STORE_ZERO_BETA) \
+            } else { \
+                __m512d beta_vec = _mm512_set1_pd(beta); \
+                REPEAT##MR(STORE_WITH_BETA) \
+            } \
         } \
-\
-        double* C_ptr = C + m * ldc + n; \
-        __m512d alpha_vec = _mm512_set1_pd(alpha); \
-        if (beta == 0.0) { \
-            REPEAT##MR(STORE_ZERO_BETA) \
-        } else { \
-            __m512d beta_vec = _mm512_set1_pd(beta); \
-            REPEAT##MR(STORE_WITH_BETA) \
-        } \
-    }} \
+    } \
 \
     for (int m = 0; m < M; ++m) { \
     for (int n = 0; n < N; ++n) { \
@@ -131,6 +146,7 @@ DEFINE_AVX_RX8(16)
 DEFINE_AVX_RX8(20)
 DEFINE_AVX_RX8(24)
 
+#undef PACK_A
 #undef DEFINE_AVX_RX8
 #undef STORE_WITH_BETA
 #undef STORE_ZERO_BETA
