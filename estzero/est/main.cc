@@ -25,6 +25,7 @@ int main(int argc, char* argv[]) {
         else if ((arg == "--method") && i + 1 < argc) { method = argv[++i]; }
         else if ((arg == "--eri-scheme") && i + 1 < argc) { eri_scheme_str = argv[++i]; }
         else if ((arg == "--gemm-scheme") && i + 1 < argc) { gemm_scheme_str = argv[++i]; }
+        else if ((arg == "--gemm-min") && i + 1 < argc) { gemm_threshold = std::stoul(argv[++i]); }
         else if ((arg == "--mult") && i + 1 < argc) { mult = std::stoi(argv[++i]); }
         else if ((arg == "--charge") && i + 1 < argc) { charge = std::stoi(argv[++i]); }
         else if ((arg == "--econv") && i + 1 < argc) { econv = std::stod(argv[++i]); }
@@ -40,9 +41,10 @@ int main(int argc, char* argv[]) {
 
     // Validate required arguments
     if (xyz_file.empty() || basis.empty()) {
-        std::println(R"(Usage: {} <xyz-file> <basis> [--reference <val>] [--method <val>] 
-            [--mult <val>] [--charge <val>] 
-            [--eri-scheme <vector|tensor>] [--gemm-scheme <eigen|blas>] 
+        std::println(R"(Usage: {} <xyz-file> <basis> [--reference <val>] [--method <val>]
+            [--mult <val>] [--charge <val>]
+            [--eri-scheme <vector|tensor>]
+            [--gemm-scheme <odometer|eigen|blas|avx_8x8|avx_16x8|avx_24x8>] [--gemm-min <val>]
             [--econv <val>] [--max-iter <val>] [--verbose <val>])", argv[0]);
         return EXIT_FAILURE;
     }

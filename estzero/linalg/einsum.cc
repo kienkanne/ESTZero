@@ -125,6 +125,7 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
 
 
 bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands, Tensor& result) {
+    if (gs == GEMMScheme::ODO) return false;
     if (operands.size() != 2) return false;
 
     const std::string& A = terms_strings[0];
@@ -185,7 +186,7 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
     // MP2, where the full AO ERI tensor is contracted with a small matrix (C_occ), so the contraction work
     // is still large, and should be routed through GEMM. Its performance dropped substantially. See CHANGELOG v3.0.3.
     size_t total_work = static_cast<size_t>(left_size) * static_cast<size_t>(summed_size) * static_cast<size_t>(right_size);
-    if (total_work < 1024) { return false; }
+    if (total_work < gemm_threshold) { return false; }
 
     // Freshly built Tensor, guaranteed to be contiguous
     Tensor M = operands[0].permute(permA).reshape(left_size, summed_size);
@@ -200,24 +201,16 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
     Tensor combined;
     
     if (gs == GEMMScheme::EIGEN) {
-        // Eigen route
         Matrix result_mat = M.as_matrix(left_size, summed_size) * N.as_matrix(summed_size, right_size);
         combined = mat_to_tensor(result_mat).reshape(combined_shape);
-    } else if (gs == GEMMScheme::BLAS) {
-        // OpenBLAS route
+    } else {
+        // Non-Eigen route: works directly on a vector
         std::vector<double> result_data(left_size * right_size);
+        raw_gemm(gs, left_size, right_size, summed_size, M.data_ptr(), N.data_ptr(), result_data.data());
 
-        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-            left_size, right_size, summed_size, // M, N, K
-            1.0, // alpha
-            M.data_ptr(), summed_size, // lda = K
-            N.data_ptr(), right_size, // ldb = N
-            0.0, //beta
-            result_data.data(), right_size); // ldc = N
-        
         combined = Tensor(combined_shape, result_data);
     }
-
+    
     // Reorder combined's axes into the caller's actual requested order
     std::vector<int> perm_out(C.size());
     for (size_t i = 0; i < C.size(); ++i) {
