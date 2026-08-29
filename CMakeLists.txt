@@ -39,6 +39,7 @@ add_library(est_core STATIC
     estzero/linalg/einsum.cc
 
     estzero/gemm/avx512.cc
+    estzero/gemm/avx_blis.cc
     estzero/gemm/mkn_RxR.cc
     estzero/gemm/mnk_RxR.cc
     estzero/gemm/naive.cc
@@ -50,6 +51,7 @@ target_include_directories(est_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/est
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/linalg
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/estzero/gemm
 )
 target_link_directories(est_core PUBLIC ${LIBINT_ROOT}/lib)
 target_link_libraries(est_core PUBLIC Eigen3::Eigen int2 ${OPENBLAS_LIBRARY})

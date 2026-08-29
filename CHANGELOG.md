@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.1.8] Added `avx_blis_Rx8`, a full NC/KC/MC blocked + packed GEMM following BLIS framework. Closing GEMM CPU phase
+
+- Implemented the full BLIS 5-loop scheme (`estzero/gemm/avx_blis.cc`): NC/KC/MC blocking on top of packing, targeting L3/L1/L2 respectively, same `MRx8` micro-kernel as `avx_Rx8`. Follows exactly the [BLIS framework](https://github.com/flame/blislab/blob/master/tutorial.pdf). No `gemm_sweep.py` support added since this purely exploratory.
+- The full blocking scheme did not pay off compared to the best of the `avx_Rx8` family (v3.1.7a), even at large matrices: `avx_Rx8` beats `avx_blis_Rx8` at every tested size (2048/4096/5000) (see `v3.1.8.log`). The reuse theory isn't wrong, but this implementation doesn't have enough of an edge over an optimized flat kernel to justify its extra complexity. The cache level tunning was not fully optimized as that would required more complex schemes to fit per matrix shape.
+- This closes the hand-written GEMM CPU ladder. `avx_Rx8` is the final, best-performing route, and will be added as a backend for `einsum`.
+
 ## [v3.1.7a] Fix: allocate buffer for `A` packing once outside the main loop
 
 - A packing does need to be done inside every `m` loop, but the buffer vector can be allocated outside of this to be reused. This mini patch just moves it outside the loop.

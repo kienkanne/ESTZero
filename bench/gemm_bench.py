@@ -29,6 +29,7 @@ PERF_EVENTS = "cycles,instructions,L1-dcache-loads,L1-dcache-load-misses,cache-r
 # Pre-AVX hand-rolled routes, frozen as of v3.1.3 (see CHANGELOG) -- excluded from the default
 # route set so routine runs stay avx-focused; still reachable via --legacy or --routes.
 LEGACY_ROUTES = {
+    "avx_1x8",
     "naive_mnk", "naive_mkn", "mkn_4x1", "mkn_8x1",
     "mnk_4x1", "mnk_1x4", "mnk_8x1", "mnk_1x8", "mnk_4x4", "mnk_8x8",
 }
