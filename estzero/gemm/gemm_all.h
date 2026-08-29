@@ -56,4 +56,15 @@ void avx_20x8(int M, int N, int K, double alpha, double beta,
 void avx_24x8(int M, int N, int K, double alpha, double beta,
               const double* A, const double* B, double* C);
 
+void avx_blis_8x8(int M, int N, int K, double alpha, double beta,
+                      const double* A, const double* B, double* C);
+void avx_blis_12x8(int M, int N, int K, double alpha, double beta,
+                       const double* A, const double* B, double* C);
+void avx_blis_16x8(int M, int N, int K, double alpha, double beta,
+                       const double* A, const double* B, double* C);
+void avx_blis_20x8(int M, int N, int K, double alpha, double beta,
+                       const double* A, const double* B, double* C);
+void avx_blis_24x8(int M, int N, int K, double alpha, double beta,
+                       const double* A, const double* B, double* C);
+
 #endif

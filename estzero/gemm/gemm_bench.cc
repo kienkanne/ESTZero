@@ -34,8 +34,6 @@ static std::vector<Route> make_routes(bool enable_legacy) {
                           Eigen::Map<const Matrix>(B, K, N)) +
                       beta * C_map; }},
 
-        {"avx_1x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
-                  avx_1x8(M, N, K, alpha, beta, A, B, C); }},
         {"avx_8x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
                   avx_8x8(M, N, K, alpha, beta, A, B, C); }},
         {"avx_12x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
@@ -46,9 +44,23 @@ static std::vector<Route> make_routes(bool enable_legacy) {
                   avx_20x8(M, N, K, alpha, beta, A, B, C); }},
         {"avx_24x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
                   avx_24x8(M, N, K, alpha, beta, A, B, C); }},
+
+        {"avx_blis_8x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  avx_blis_8x8(M, N, K, alpha, beta, A, B, C); }},
+        {"avx_blis_12x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  avx_blis_12x8(M, N, K, alpha, beta, A, B, C); }},
+        {"avx_blis_16x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  avx_blis_16x8(M, N, K, alpha, beta, A, B, C); }},
+        {"avx_blis_20x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  avx_blis_20x8(M, N, K, alpha, beta, A, B, C); }},
+        {"avx_blis_24x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  avx_blis_24x8(M, N, K, alpha, beta, A, B, C); }},
                 };
 
     if (enable_legacy) {
+        routes.push_back(
+         {"avx_1x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                      avx_1x8(M, N, K, alpha, beta, A, B, C); }}),
         routes.push_back(
          {"naive_mnk", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
                       naive_mnk(M, N, K, alpha, beta, A, B, C); }});
