@@ -95,13 +95,16 @@ void avx_##MR##x8(int M, int N, int K, double alpha, double beta, \
     const int lda = K, ldb = N, ldc = N; \
     const int Mblk = (M / MR) * MR; \
     const int Nblk = (N / 8) * 8; \
+    /* Initialize the vector buffers for packed A, B once to be reused */ \
+    std::vector<double> A_packed(MR * K);\
+    std::vector<double> B_packed(static_cast<size_t>(Nblk / 8) * K * 8); /* integer division */ \
 \
     /* Packs K rows (row with length NR) of B (row-major, starting at n0) in full k length, into a scratch
     buffer laid out contiguously STILL in NR (~row major). AND THEN, in the next n, do the same. This basically
     means that, for example, position (k_last, 8) is connected to (0, 9) when NR=8. Goes zigzag (left, down right)
     with the width being NR, then finally jumps up and do it again, across Nblk. B_packed is more PACKED (big) than
     A_packed, the size being N_blk x 8 x K */ \
-    std::vector<double> B_packed(static_cast<size_t>(Nblk / 8) * K * 8); /* integer division */ \
+\
     for (int n = 0; n < Nblk; n += 8) { \
         double* dst = B_packed.data() + (n / 8) * K * 8; \
         for (int k = 0; k < K; ++k) { \
@@ -117,7 +120,6 @@ void avx_##MR##x8(int M, int N, int K, double alpha, double beta, \
     /* Packs MR rows of A (row-major, starting at row m0) in full k length, into a scratch
     buffer laid out contiguously in MR (~column major), so that the innermost loop advancing in
     MR is contiguous. Done inside the m loop, needs the current m. */ \
-    std::vector<double> A_packed(MR * K);\
     for (int k = 0; k < K; ++k) { \
     for (int i = 0; i < MR; ++i) { \
         A_packed[k * MR + i] = A[(m + i) * lda + k]; \
@@ -132,7 +134,7 @@ void avx_##MR##x8(int M, int N, int K, double alpha, double beta, \
     \
                 int a_flat = k * MR; \
                 __m512d b_vec = _mm512_loadu_pd(&B_ptr[k * 8]); \
-                REPEAT##MR(COMPUTE_ROW) \
+                REPEAT##MR(COMPUTE_ROW) /* A_packed is used here */ \
             } \
     \
             double* C_ptr = C + m * ldc + n; \

@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.1.7a] Fix: allocate buffer for `A` packing once outside the main loop
+
+- A packing does need to be done inside every `m` loop, but the buffer vector can be allocated outside of this to be reused. This mini patch just moves it outside the loop.
+- Avoiding repeated heap allocations actually substantially improved performance in all `avx` schemes. At 2048x2048x2048, `avx_16x8` reached 89.5% OpenBLAS, essentially equal to Eigen (89.8%). For the sizes that are not power of 2, the best `avx` varies around 70-90%, and `avx_16x8` performed generally better for >2048 than <2048, meaning the cleaning up sweep can be improved.
+
 ## [v3.1.7] Added `B` packing over the `N_blk x 8 x K` block for `avx` family
 
 - This is a similar idea to A packing, but different from A packing, when reading at a fixed ROW `k` it's already contiguous. The problem is that when `k` changes, it jumps down a row, moving by `k * ldb`. Moving to the next NR block (n+1 along N_blk) jumps all the way from k=K to k=0. This pattern is predictable, so the strategy is basically reshaping B in this special layout so that throughout the entire main loop reading from B is always contiguous.
