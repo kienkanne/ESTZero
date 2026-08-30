@@ -30,8 +30,8 @@ static inline void mkn_row_1x1(int N, int K, double alpha, const double* A_row, 
     }
 }
 
-void mkn_4x1(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C) {
+void mkn_4x1(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C) {
     const int lda = K, ldb = N, ldc = N;
     beta_init(M, N, beta, C);
 
@@ -56,8 +56,8 @@ void mkn_4x1(int M, int N, int K, double alpha, double beta,
     }
 }
 
-void mkn_8x1(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C) {
+void mkn_8x1(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C) {
     const int lda = K, ldb = N, ldc = N;
     beta_init(M, N, beta, C);
 

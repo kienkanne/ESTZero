@@ -8,8 +8,8 @@ static inline double mnk_dot_1x1(int K, const double* A_row, const double* B, in
     return c;
 }
 
-void avx_1x8(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C) {
+void avx_1x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C) {
     const int lda = K, ldb = N, ldc = N;
     const int Nblk = (N / 8) * 8;
 
@@ -90,8 +90,8 @@ void avx_1x8(int M, int N, int K, double alpha, double beta,
 }
 
 #define DEFINE_AVX_RX8(MR) \
-void avx_##MR##x8(int M, int N, int K, double alpha, double beta, \
-                   const double* A, const double* B, double* C) { \
+void avx_##MR##x8(const int M, const int N, const int K, const double alpha, const double beta, \
+                const double* A, const double* B, double* C) { \
     const int lda = K, ldb = N, ldc = N; \
     const int Mblk = (M / MR) * MR; \
     const int Nblk = (N / 8) * 8; \

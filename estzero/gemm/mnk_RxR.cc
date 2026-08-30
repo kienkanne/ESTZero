@@ -11,8 +11,8 @@ static inline double mnk_dot_1x1(int K, const double* A_row, const double* B, in
     return c;
 }
 
-void mnk_4x1(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C) {
+void mnk_4x1(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C) {
     const int lda = K, ldb = N, ldc = N;
     const int M4 = (M / 4) * 4;
 
@@ -41,8 +41,8 @@ void mnk_4x1(int M, int N, int K, double alpha, double beta,
     }}
 }
 
-void mnk_1x4(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C) {
+void mnk_1x4(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C) {
     const int lda = K, ldb = N, ldc = N;
     const int N4 = (N / 4) * 4;
 
@@ -73,8 +73,8 @@ void mnk_1x4(int M, int N, int K, double alpha, double beta,
     }}
 }
 
-void mnk_8x1(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C) {
+void mnk_8x1(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C) {
     const int lda = K, ldb = N, ldc = N;
     const int M8 = (M / 8) * 8;
 
@@ -111,8 +111,8 @@ void mnk_8x1(int M, int N, int K, double alpha, double beta,
     }}
 }
 
-void mnk_1x8(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C) {
+void mnk_1x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C) {
     const int lda = K, ldb = N, ldc = N;
     const int N8 = (N / 8) * 8;
 
@@ -151,8 +151,8 @@ void mnk_1x8(int M, int N, int K, double alpha, double beta,
     }}
 }
 
-void mnk_4x4(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C) {
+void mnk_4x4(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C) {
     const int lda = K, ldb = N, ldc = N;
     const int M4 = (M / 4) * 4;
     const int N4 = (N / 4) * 4;
@@ -215,8 +215,8 @@ void mnk_4x4(int M, int N, int K, double alpha, double beta,
     }}
 }
 
-void mnk_8x8(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C) {
+void mnk_8x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C) {
     const int lda = K, ldb = N, ldc = N;
     const int M8 = (M / 8) * 8;
     const int N8 = (N / 8) * 8;

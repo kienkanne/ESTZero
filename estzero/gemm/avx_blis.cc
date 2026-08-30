@@ -89,8 +89,8 @@ void pack_B_block(int nc_len, int kc_len, const double* B, int ldb,
 }
 
 #define DEFINE_AVX_BLOCKED(MR) \
-void avx_blis_##MR##x8(int M, int N, int K, double alpha, double beta, \
-                           const double* A, const double* B, double* C) { \
+void avx_blis_##MR##x8(const int M, const int N, const int K, const double alpha, const double beta, \
+                const double* A, const double* B, double* C) { \
     const int lda = K, ldb = N, ldc = N; \
     const int Mblk = (M / MR) * MR; \
     const int Nblk = (N / NR) * NR; \

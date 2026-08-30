@@ -19,52 +19,52 @@
 // register completely with 8 entries on a C row, providing actual vectorization instead of manually
 // declaring all named local variables in `mnk_RxR` and hoping the compiler does so.
 
-void naive_mnk(int M, int N, int K, double alpha, double beta,
-               const double* A, const double* B, double* C);
-void naive_mkn(int M, int N, int K, double alpha, double beta,
-               const double* A, const double* B, double* C);
+void naive_mnk(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void naive_mkn(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
 
-void mkn_4x1(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C);
-void mkn_8x1(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C);
+void mkn_4x1(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void mkn_8x1(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
 
-void mnk_4x1(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C);
-void mnk_1x4(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C);
-void mnk_8x1(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C);
-void mnk_1x8(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C);
-void mnk_4x4(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C);
-void mnk_8x8(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C);
+void mnk_4x1(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void mnk_1x4(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void mnk_8x1(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void mnk_1x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void mnk_4x4(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void mnk_8x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
 
-void avx_1x8(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C);
+void avx_1x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
 
-void avx_8x8(int M, int N, int K, double alpha, double beta,
-             const double* A, const double* B, double* C);
-void avx_12x8(int M, int N, int K, double alpha, double beta,
-              const double* A, const double* B, double* C);
-void avx_16x8(int M, int N, int K, double alpha, double beta,
-              const double* A, const double* B, double* C);
-void avx_20x8(int M, int N, int K, double alpha, double beta,
-              const double* A, const double* B, double* C);
-void avx_24x8(int M, int N, int K, double alpha, double beta,
-              const double* A, const double* B, double* C);
+void avx_8x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void avx_12x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void avx_16x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void avx_20x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void avx_24x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
 
-void avx_blis_8x8(int M, int N, int K, double alpha, double beta,
-                      const double* A, const double* B, double* C);
-void avx_blis_12x8(int M, int N, int K, double alpha, double beta,
-                       const double* A, const double* B, double* C);
-void avx_blis_16x8(int M, int N, int K, double alpha, double beta,
-                       const double* A, const double* B, double* C);
-void avx_blis_20x8(int M, int N, int K, double alpha, double beta,
-                       const double* A, const double* B, double* C);
-void avx_blis_24x8(int M, int N, int K, double alpha, double beta,
-                       const double* A, const double* B, double* C);
+void avx_blis_8x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void avx_blis_12x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void avx_blis_16x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void avx_blis_20x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
+void avx_blis_24x8(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
 
 #endif
