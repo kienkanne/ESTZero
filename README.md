@@ -108,11 +108,12 @@ This log tracks the update in features and their performance in the most computa
 > v1.5.2 switched `Tensor`'s element access (`operator()`/`flat_index`) to bounds-checked `std::vector::at()` as part of the shared_ptr-backed zero-copy view rewrite (`swapaxes`/`slice`). Since `Tensor` is the storage type behind the ERI tensor scheme, `build_JK`, and the `einsum`-driven MO transform, this regressed every section below that touches it — most visibly UHF MP2's MO transform, which lost the v1.5.1 fix's gains. v1.5.3 replaces `.at()` with unchecked indexing (safe here, since every call site already guarantees in-bounds access), restoring MP2 to v1.5.1 levels and improving ERI/JK further; the remaining ERI gap vs. the v1.5.0 vector scheme is now fully explained by the tensor scheme's inherent 8-fold permutation writes per integral, not indexing overhead.
 
 > Starting from version v3.0.0, the optimization are focused on the backend of `einsum`, so it will impact post-HF algorithms about equally, depending on the intensity of the number of `einsum` calls. This is a major speed up for methos like MP2, MP3 and CCSD/CCSD(T). These changes are summarized here in short instead of given in the notes below. To see the full changes, see `CHANGELOG.md`
-> - v3.0.0 added **Eigen GEMM for `einsum`**. The GEMM setup, however, require the contiguous buffer from Tensor, and in some cases it creates copies, so the memory footprint is higher. 
-> - v3.0.1 added a minimum-size guard before calling GEMM (decline to the odometer scheme if an operand was too small), to avoid GEMM setup overhead on the many small contractions in the CCSD(T) "vikings" perturbative-triples loop. The guard checked **every** operand independently, which turned out to be the wrong criterion — see v3.0.3 below.
-> - v3.0.2 added **OpenBLAS GEMM for `einsum`**. The performance is still superior to pre v3.0.0, compared to Eigen it's generally worse, especially for CCSD(T) with high intensity of `einsum` calls.
-> - v3.0.2a fixed **threading=1 for OpenBLAS GEMM**. The allowed threading by default for OpenBLAS in the previous version created significant overhead, relative to the small system size used here.
-> - v3.0.3 fixed the v3.0.1 guard, now gating on the contraction's total work (`left_size * summed_size * right_size`) rather any operand's raw element count. **v3.0.1 through v3.0.2a all ran with this bug, so the Eigen vs OpenBLAS comparison in those versions is unreliable. v3.0.3 (eigen) vs. v3.0.3 (blas) is the first fair comparison between the two backends.**
+> - **v3.0.0** added **Eigen GEMM for `einsum`**. The GEMM setup, however, require the contiguous buffer from Tensor, and in some cases it creates copies, so the memory footprint is higher. 
+> - **v3.0.1** added a minimum-size guard before calling GEMM (decline to the odometer scheme if an operand was too small), to avoid GEMM setup overhead on the many small contractions in the CCSD(T) "vikings" perturbative-triples loop. The guard checked **every** operand independently, which turned out to be the wrong criterion — see v3.0.3 below.
+> - **v3.0.2** added **OpenBLAS GEMM for `einsum`**. The performance is still superior to pre v3.0.0, compared to Eigen it's generally worse, especially for CCSD(T) with high intensity of `einsum` calls.
+> - **v3.0.2a** fixed **threading=1 for OpenBLAS GEMM**. The allowed threading by default for OpenBLAS in the previous version created significant overhead, relative to the small system size used here.
+> - **v3.0.3** fixed the v3.0.1 guard, now gating on the contraction's total work (`left_size * summed_size * right_size`) rather any operand's raw element count. **v3.0.1 through v3.0.2a all ran with this bug, so the Eigen vs OpenBLAS comparison in those versions is unreliable. v3.0.3 (eigen) vs. v3.0.3 (blas) is the first fair comparison between the two backends.**
+> **v3.2.0** wires the hand-written `estzero/gemm/` ladder (v3.1.0-v3.1.8, see `README.md`'s GEMM Microbenchmark section above) into `einsum` as three more selectable `--gemm-scheme` backends (`avx_8x8`/`avx_16x8`/`avx_24x8`), alongside the existing `odometer`/`eigen`/`blas`. The tables below add one row per scheme for this version, and this is the first version where all six can be compared fairly, side by side, on the same real post-HF methods.
 
 ### SCF
 
@@ -166,6 +167,12 @@ Version v1.0.0 included MP2 for RHF. The baseline is the 4 step MO transformatio
 | *v3.0.2a* | 6.144 | 1.724 | 137.3 | 13 | 2.127 | 481.2 | 2363.6 | **Fix threading=1 for OpenBLAS GEMM** |
 | v3.0.3 (eigen) | 6.388 | 1.740 | 136.4 | 13 | 2.343 | 498.5 | 2557.3 | **Fixed v3.0.1 GEMM-size guard** |
 | v3.0.3 (blas) | 6.224 | 1.740 | 137.1 | 13 | 2.171 | 498.2 | 2368.1 | **Fixed v3.0.1 GEMM-size guard** |
+| v3.2.0 | 30.016 | 2.160 | 150.0 | 13 | 25.528 | 279.9 | 1738.6 | odometer |
+| v3.2.0 | 6.360 | 1.740 | 137.3 | 13 | 2.308 | 493.3 | 2557.7 | eigen |
+| v3.2.0 | 7.495 | 2.082 | 149.8 | 13 | 2.828 | 539.1 | 2364.1 | blas |
+| v3.2.0 | 9.089 | 2.076 | 147.8 | 13 | 4.445 | 544.9 | 3070.7 | avx_8x8 |
+| v3.2.0 | 9.208 | 2.086 | 146.1 | 13 | 4.595 | 531.0 | 3071.0 | avx_16x8 |
+| v3.2.0 | 11.549 | 2.063 | 145.4 | 13 | 6.945 | 556.0 | 3071.2 | avx_24x8 |
 
 > (2) Version v1.5.5c tried replacing all `einsum` with `Tensor` arithemic operators, but performance is identical, showing the fixed cost lie in `Tensor` setups.
 
@@ -190,6 +197,12 @@ UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alp
 | *v3.0.2a* | 10.926 | 1.431 | 140.6 | 14 | 5.478<sup>(4)</sup> | 34.7 | 1644.4 | **Fix threading=1 for OpenBLAS GEMM** |
 | v3.0.3 (eigen) | 6.897 | 1.439 | 140.9 | 14 | 1.429 | 34.0 | 1701.6 | **Fixed v3.0.1 GEMM-size guard** |
 | v3.0.3 (blas) | 6.727 | 1.438 | 140.5 | 14 | 1.271 | 34.7 | 1648.9 | **Fixed v3.0.1 GEMM-size guard** |
+| v3.2.0 | 16.205 | 1.798 | 154.2 | 14 | 9.944 | 31.6 | 1473.5 | odometer |
+| v3.2.0 | 6.880 | 1.441 | 141.0 | 14 | 1.409 | 33.9 | 1702.3 | eigen |
+| v3.2.0 | 7.861 | 1.819 | 152.5 | 14 | 1.614 | 35.1 | 1645.3 | blas |
+| v3.2.0 | 10.111 | 1.796 | 151.5 | 14 | 3.921 | 35.1 | 2812.4 | avx_8x8 |
+| v3.2.0 | 9.969 | 1.760 | 147.8 | 14 | 3.923 | 34.8 | 2812.6 | avx_16x8 |
+| v3.2.0 | 10.076 | 1.778 | 150.6 | 14 | 3.935 | 34.7 | 2812.5 | avx_24x8 |
 
 > (3) v1.3.0-v1.5.0 didn't use intermediate 2 of Iaa to build Iab when using the new `einsum`, so performance was heavily impacted. This is fixed in v1.5.1
 >
@@ -210,6 +223,12 @@ Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports t
 | *v3.0.2a* | 4.042 | 0.427 | 10.1 | 21 | 1.473 | 0.818 | 691.2 | **Fix threading=1 for OpenBLAS GEMM** |
 | v3.0.3 (eigen) | 4.398 | 0.437 | 10.1 | 21 | 1.684 | 0.871 | 803.7 | **Fixed v3.0.1 GEMM-size guard** |
 | v3.0.3 (blas) | 4.182 | 0.436 | 10.2 | 21 | 1.543 | 0.839 | 695.5 | **Fixed v3.0.1 GEMM-size guard** |
+| v3.2.0 | 37.729 | 0.472 | 11.1 | 21 | 19.181 | 16.574 | 577.6 | odometer |
+| v3.2.0 | 4.292 | 0.434 | 10.2 | 21 | 1.641 | 0.835 | 804.6 | eigen |
+| v3.2.0 | 5.042 | 0.464 | 11.0 | 21 | 2.154 | 0.875 | 691.3 | blas |
+| v3.2.0 | 5.553 | 0.462 | 10.9 | 21 | 2.615 | 0.941 | 690.9 | avx_8x8 |
+| v3.2.0 | 6.005 | 0.438 | 10.2 | 21 | 3.055 | 1.004 | 691.0 | avx_16x8 |
+| v3.2.0 | 6.150 | 0.473 | 10.5 | 21 | 3.089 | 1.055 | 691.0 | avx_24x8 |
 
 #### UHF
 
@@ -222,6 +241,12 @@ Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports t
 | *v3.0.2a* | 2.220 | 0.041 | 0.9 | 24 | 0.304 | 0.612 | 529.7 | **Fix threading=1 for OpenBLAS GEMM** |
 | v3.0.3 (eigen) | 2.248 | 0.054 | 0.9 | 24 | 0.319 | 0.633 | 539.0 | **Fixed v3.0.1 GEMM-size guard** |
 | v3.0.3 (blas) | 2.177 | 0.055 | 0.9 | 24 | 0.299 | 0.605 | 534.2 | **Fixed v3.0.1 GEMM-size guard** |
+| v3.2.0 | 16.787 | 0.056 | 0.9 | 24 | 1.381 | 13.977 | 502.8 | odometer |
+| v3.2.0 | 2.177 | 0.078 | 0.9 | 24 | 0.311 | 0.599 | 539.6 | eigen |
+| v3.2.0 | 2.429 | 0.057 | 0.9 | 24 | 0.329 | 0.648 | 530.3 | blas |
+| v3.2.0 | 2.445 | 0.055 | 0.9 | 24 | 0.340 | 0.701 | 529.8 | avx_8x8 |
+| v3.2.0 | 2.528 | 0.055 | 0.9 | 24 | 0.316 | 0.773 | 529.9 | avx_16x8 |
+| v3.2.0 | 2.600 | 0.054 | 0.9 | 24 | 0.362 | 0.797 | 559.8 | avx_24x8 |
 
 ### CCSD(T)
 
@@ -240,6 +265,12 @@ Version 2.1.0 introduced CCSD for RHF. The baseline use equations adopted from [
 | *v3.0.2a* | 4.587 | 0.114 | 1.0 | 20 | 0.127 | 263.4 | 16 | 18.318 | 75.1 | **Fix threading=1 for OpenBLAS GEMM** |
 | v3.0.3 (eigen) | 5.092 | 0.128 | 1.0 | 21 | 0.141 | 292.9 | 16 | 22.750 | 85.6 | **Fixed v3.0.1 GEMM-size guard (Eigen)**. PertT is ~20% slower than v3.0.2a because vikings' small `einsum` now clears the threshold. |
 | v3.0.3 (blas) | 5.096 | 0.127 | 1.0 | 21 | 0.131 | 293.9 | 16 | 22.176 | 79.4 | **Fixed v3.0.1 GEMM-size guard (OpenBLAS)**. Same as above |
+| v3.2.0 | 18.087 | 0.132 | 1.0 | 21 | 0.635 | 1073.6 | 16 | 19.168 | 67.9 | odometer |
+| v3.2.0 | 5.051 | 0.129 | 1.0 | 21 | 0.135 | 290.6 | 16 | 22.262 | 86.0 | eigen |
+| v3.2.0 | 5.152 | 0.132 | 1.0 | 21 | 0.149 | 295.8 | 16 | 22.155 | 76.9 | blas |
+| v3.2.0 | 5.201 | 0.128 | 1.0 | 21 | 0.144 | 299.4 | 16 | 22.858 | 75.1 | avx_8x8 |
+| v3.2.0 | 5.333 | 0.128 | 1.0 | 21 | 0.141 | 308.1 | 16 | 23.421 | 75.3 | avx_16x8 |
+| v3.2.0 | 5.362 | 0.130 | 1.0 | 21 | 0.154 | 308.9 | 16 | 23.654 | 88.7 | avx_24x8 |
 
 #### UHF
 
@@ -259,6 +290,12 @@ Version 2.0.0 introduced CCSD for UHF. The baseline use the formulated equations
 | *v3.0.2a* | 4.398 | 0.012 | 0.1 | 22 | 0.062 | 210.0 | 20 | 21.134 | 65.4 | **Fix threading=1 for OpenBLAS GEMM** |
 | v3.0.3 (eigen) | 4.676 | 0.015 | 0.1 | 22 | 0.036 | 224.7 | 20 | 19.018 | 68.2 | **Fixed v3.0.1 GEMM-size guard (Eigen)**. PertT is actually faster here, so it's very system-dependent |
 | v3.0.3 (blas) | 4.557 | 0.015 | 0.1 | 22 | 0.035 | 219.1 | 20 | 18.724 | 70.6 | **Fixed v3.0.1 GEMM-size guard (OpenBLAS)** |
+| v3.2.0 | 15.925 | 0.015 | 0.1 | 22 | 0.077 | 785.0 | 20 | 21.052 | 66.6 | odometer |
+| v3.2.0 | 4.581 | 0.015 | 0.1 | 22 | 0.036 | 220.3 | 20 | 18.605 | 68.9 | eigen |
+| v3.2.0 | 4.698 | 0.015 | 0.1 | 22 | 0.035 | 225.9 | 20 | 19.214 | 68.1 | blas |
+| v3.2.0 | 4.727 | 0.015 | 0.1 | 22 | 0.036 | 227.5 | 20 | 19.155 | 66.3 | avx_8x8 |
+| v3.2.0 | 4.818 | 0.015 | 0.1 | 22 | 0.036 | 232.1 | 20 | 19.669 | 71.5 | avx_16x8 |
+| v3.2.0 | 5.110 | 0.015 | 0.1 | 22 | 0.041 | 246.6 | 20 | 19.463 | 77.5 | avx_24x8 |
 
 > (5) From version v2.3.0: In the benchmark runs that produced these numbers, only CCSD(T) was requested as it prints both the CCSD energy baseline as well as the corrected energy CCSD(T). The timings of all steps are printed, and the total CCSD wall time reported here is the actual total wall time subtracted by the run time of the perbutative triples calculation. This is done to save benchmarking run time.
 >

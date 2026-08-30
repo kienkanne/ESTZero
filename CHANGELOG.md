@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.2.0] Wired `avx_8x8`/`avx_16x8`/`avx_24x8` into `einsum` backends
+
+- `einsum`'s `GEMMScheme` now covers 6 backends: `odometer`, `eigen`, `blas`, `avx_8x8`, `avx_16x8`, `avx_24x8`.
+- Added `--gemm-min` (`estzero/est/main.cc`) to override `try_gemm`'s FLOP-size guard (default 1024, unchanged).
+- This is the first version where all 6 schemes are correct and compared fairly, side by side, on the same systems. 6 new rows were added to each of the MP2/MP3/CCSD(T) tables in `README.md`.
+
 ## [v3.1.8] Added `avx_blis_Rx8`, a full NC/KC/MC blocked + packed GEMM following BLIS framework. Closing GEMM CPU phase
 
 - Implemented the full BLIS 5-loop scheme (`estzero/gemm/avx_blis.cc`): NC/KC/MC blocking on top of packing, targeting L3/L1/L2 respectively, same `MRx8` micro-kernel as `avx_Rx8`. Follows exactly the [BLIS framework](https://github.com/flame/blislab/blob/master/tutorial.pdf). No `gemm_sweep.py` support added since this purely exploratory.
