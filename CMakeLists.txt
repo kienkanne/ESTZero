@@ -43,7 +43,7 @@ add_library(est_core STATIC
     estzero/est/cc_triples.cc
     estzero/linalg/einsum.cc
 
-    estzero/gemm/cublas_gemm.cc
+    estzero/gemm/cuda_ladder.cc
     estzero/gemm/avx512.cc
     estzero/gemm/avx_blis.cc
     estzero/gemm/mkn_RxR.cc
@@ -72,8 +72,19 @@ target_compile_options(est_core PUBLIC
 
 set_source_files_properties(estzero/gemm/cublas_gemm.cc PROPERTIES LANGUAGE CUDA)
 
-target_compile_definitions(est_core PUBLIC EST_HAVE_CUBLAS)
-target_link_libraries(est_core PRIVATE CUDA::cublas)
+# ================================================
+# cuBLAS backend for einsum's --gemm-scheme cublas (estzero/gemm/cublas_gemm.cc).
+#
+# cublas gets linked into EVERY est_core-linked executable by this unconditionally, and just having it 
+# loaded without any calls inflates process RSS by ~180MB on every single run, regardless of which
+# --gemm-scheme is actually selected (see CHANGELOG). That's a tradeoff for having --gemm-scheme cublas 
+# available at runtime in the same binary as the CPU schemes.
+#
+# For a clean CPU-only baseline run, just these two lines have to be commented out. Nothing else needs to 
+# change, as cublas_gemm.cc's EST_HAVE_CUBLAS guard makes --gemm-scheme cublas throw a clear runtime error
+#target_compile_definitions(est_core PUBLIC EST_HAVE_CUBLAS)
+#target_link_libraries(est_core PRIVATE CUDA::cublas)
+# ================================================
 
 add_executable(ESTZero estzero/est/main.cc)
 target_link_libraries(ESTZero PRIVATE est_core)

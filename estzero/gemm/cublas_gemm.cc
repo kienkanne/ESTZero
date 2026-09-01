@@ -1,5 +1,10 @@
 #include "gemm_all.h"
 
+// Guarded by EST_HAVE_CUBLAS (set in CMakeLists.txt, alongside the CUDA::cublas link) so a clean
+// CPU-only build doesn't have to load this in.
+#ifdef EST_HAVE_CUBLAS
+
+#include <stdlib.h>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 
@@ -42,3 +47,17 @@ void cublas_dgemm(const int M, const int N, const int K, const double alpha, con
     cudaFree(d_C);
     cublasDestroy(handle);
 }
+
+#else
+
+#include <stdexcept>
+
+void cublas_dgemm(const int, const int, const int, const double, const double,
+                  const double*, const double*, double*) {
+    throw std::runtime_error(
+        "gemm_cublas: this build was compiled without EST_HAVE_CUBLAS -- the cuBLAS block in "
+        "CMakeLists.txt is commented out (clean CPU-only build). Un-comment it to use "
+        "--gemm-scheme cublas.");
+}
+
+#endif
