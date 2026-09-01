@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(ESTZero LANGUAGES CXX)
+# RTX 4090 = compute capability 8.9
+set(CMAKE_CUDA_ARCHITECTURES 89)
+
+project(ESTZero LANGUAGES CXX CUDA)
+
+find_package(CUDAToolkit REQUIRED)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -38,6 +43,7 @@ add_library(est_core STATIC
     estzero/est/cc_triples.cc
     estzero/linalg/einsum.cc
 
+    estzero/gemm/cublas_gemm.cc
     estzero/gemm/avx512.cc
     estzero/gemm/avx_blis.cc
     estzero/gemm/mkn_RxR.cc
@@ -53,6 +59,7 @@ target_include_directories(est_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/gemm
 )
+
 target_link_directories(est_core PUBLIC ${LIBINT_ROOT}/lib)
 target_link_libraries(est_core PUBLIC Eigen3::Eigen int2 ${OPENBLAS_LIBRARY})
 
@@ -62,6 +69,11 @@ target_compile_options(est_core PUBLIC
     -fno-omit-frame-pointer
     -march=native
 )
+
+set_source_files_properties(estzero/gemm/cublas_gemm.cc PROPERTIES LANGUAGE CUDA)
+
+target_compile_definitions(est_core PUBLIC EST_HAVE_CUBLAS)
+target_link_libraries(est_core PRIVATE CUDA::cublas)
 
 add_executable(ESTZero estzero/est/main.cc)
 target_link_libraries(ESTZero PRIVATE est_core)

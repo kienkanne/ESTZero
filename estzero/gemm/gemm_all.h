@@ -67,4 +67,6 @@ void avx_blis_20x8(const int M, const int N, const int K, const double alpha, co
 void avx_blis_24x8(const int M, const int N, const int K, const double alpha, const double beta,
                 const double* A, const double* B, double* C);
 
+void cublas_dgemm(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* A, const double* B, double* C);
 #endif

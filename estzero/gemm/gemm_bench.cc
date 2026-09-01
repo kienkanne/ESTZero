@@ -55,6 +55,8 @@ static std::vector<Route> make_routes(bool enable_legacy) {
                   avx_blis_20x8(M, N, K, alpha, beta, A, B, C); }},
         {"avx_blis_24x8", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
                   avx_blis_24x8(M, N, K, alpha, beta, A, B, C); }},
+        {"cublas_dgemm", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  cublas_dgemm(M, N, K, alpha, beta, A, B, C); }},
                 };
 
     if (enable_legacy) {
