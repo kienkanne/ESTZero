@@ -113,7 +113,7 @@ This log tracks the update in features and their performance in the most computa
 > - **v3.0.2** added **OpenBLAS GEMM for `einsum`**. The performance is still superior to pre v3.0.0, compared to Eigen it's generally worse, especially for CCSD(T) with high intensity of `einsum` calls.
 > - **v3.0.2a** fixed **threading=1 for OpenBLAS GEMM**. The allowed threading by default for OpenBLAS in the previous version created significant overhead, relative to the small system size used here.
 > - **v3.0.3** fixed the v3.0.1 guard, now gating on the contraction's total work (`left_size * summed_size * right_size`) rather any operand's raw element count. **v3.0.1 through v3.0.2a all ran with this bug, so the Eigen vs OpenBLAS comparison in those versions is unreliable. v3.0.3 (eigen) vs. v3.0.3 (blas) is the first fair comparison between the two backends.**
-> **v3.2.0** wires the hand-written `estzero/gemm/` ladder (v3.1.0-v3.1.8, see `README.md`'s GEMM Microbenchmark section above) into `einsum` as three more selectable `--gemm-scheme` backends (`avx_8x8`/`avx_16x8`/`avx_24x8`), alongside the existing `odometer`/`eigen`/`blas`. The tables below add one row per scheme for this version, and this is the first version where all six can be compared fairly, side by side, on the same real post-HF methods. **v3.2.1** introduced another backend, `cublas`, but since other are kept the same, it's also directly comparable.
+> **v3.2.0** wires the hand-written `estzero/gemm/` ladder (v3.1.0-v3.1.8, see `README.md`'s GEMM Microbenchmark section above) into `einsum` as three more selectable `--gemm-scheme` backends (`avx_8x8`/`avx_16x8`/`avx_24x8`), alongside the existing `odometer`/`eigen`/`blas`. The tables below add one row per scheme for this version, and this is the first version where all six can be compared fairly, side by side, on the same real post-HF methods. **v3.2.1** introduced another backend, `cublas_dgemm`, but since other are kept the same, it's also directly comparable. **v3.2.2** adds `cublas_sgemm` (single-precision cuBLAS) alongside it, to explore the performance/accuracy tradeoff.
 
 ### SCF
 
@@ -173,7 +173,8 @@ Version v1.0.0 included MP2 for RHF. The baseline is the 4 step MO transformatio
 | v3.2.0 | 9.089 | 2.076 | 147.8 | 13 | 4.445 | 544.9 | 3070.7 | avx_8x8 |
 | v3.2.0 | 9.208 | 2.086 | 146.1 | 13 | 4.595 | 531.0 | 3071.0 | avx_16x8 |
 | v3.2.0 | 11.549 | 2.063 | 145.4 | 13 | 6.945 | 556.0 | 3071.2 | avx_24x8 |
-| v3.2.1 | 6.294 | 1.730 | 137.3 | 13 | 2.153 | 487.0 | 2680.9 | cublas |
+| v3.2.1 | 6.294 | 1.730 | 137.3 | 13 | 2.153 | 487.0 | 2680.9 | cublas_dgemm |
+| v3.2.2 | 6.731 | 1.732 | 136.6 | 13 | 2.599 | 487.0 | 2915.4 | cublas_sgemm |
 
 > (2) Version v1.5.5c tried replacing all `einsum` with `Tensor` arithemic operators, but performance is identical, showing the fixed cost lie in `Tensor` setups.
 
@@ -204,7 +205,8 @@ UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alp
 | v3.2.0 | 10.111 | 1.796 | 151.5 | 14 | 3.921 | 35.1 | 2812.4 | avx_8x8 |
 | v3.2.0 | 9.969 | 1.760 | 147.8 | 14 | 3.923 | 34.8 | 2812.6 | avx_16x8 |
 | v3.2.0 | 10.076 | 1.778 | 150.6 | 14 | 3.935 | 34.7 | 2812.5 | avx_24x8 |
-| v3.2.1 | 7.020 | 1.444 | 140.8 | 14 | 1.452 | 34.0 | 1973.0 | cublas |
+| v3.2.1 | 7.020 | 1.444 | 140.8 | 14 | 1.452 | 34.0 | 1973.0 | cublas_dgemm |
+| v3.2.2 | 7.107 | 1.434 | 140.4 | 14 | 1.561 | 33.3 | 2585.3 | cublas_sgemm, **FAILS** 1e-6 Psi4 tol (|dE|=1.59e-6) |
 
 > (3) v1.3.0-v1.5.0 didn't use intermediate 2 of Iaa to build Iab when using the new `einsum`, so performance was heavily impacted. This is fixed in v1.5.1
 >
@@ -231,7 +233,8 @@ Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports t
 | v3.2.0 | 5.553 | 0.462 | 10.9 | 21 | 2.615 | 0.941 | 690.9 | avx_8x8 |
 | v3.2.0 | 6.005 | 0.438 | 10.2 | 21 | 3.055 | 1.004 | 691.0 | avx_16x8 |
 | v3.2.0 | 6.150 | 0.473 | 10.5 | 21 | 3.089 | 1.055 | 691.0 | avx_24x8 |
-| v3.2.1 | 4.291 | 0.436 | 10.1 | 21 | 1.616 | 0.741 | 1009.4 | cublas |
+| v3.2.1 | 4.291 | 0.436 | 10.1 | 21 | 1.616 | 0.741 | 1009.4 | cublas_dgemm |
+| v3.2.2 | 4.384 | 0.448 | 10.3 | 21 | 1.695 | 0.732 | 1061.5 | cublas_sgemm |
 
 #### UHF
 
@@ -250,7 +253,8 @@ Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports t
 | v3.2.0 | 2.445 | 0.055 | 0.9 | 24 | 0.340 | 0.701 | 529.8 | avx_8x8 |
 | v3.2.0 | 2.528 | 0.055 | 0.9 | 24 | 0.316 | 0.773 | 529.9 | avx_16x8 |
 | v3.2.0 | 2.600 | 0.054 | 0.9 | 24 | 0.362 | 0.797 | 559.8 | avx_24x8 |
-| v3.2.1 | 2.343 | 0.055 | 0.9 | 24 | 0.453 | 0.536 | 847.7 | cublas |
+| v3.2.1 | 2.343 | 0.055 | 0.9 | 24 | 0.453 | 0.536 | 847.7 | cublas_dgemm |
+| v3.2.2 | 2.371 | 0.055 | 0.9 | 24 | 0.465 | 0.537 | 900.6 | cublas_sgemm, **FAILS** 1e-6 Psi4 tol (|dE|=1.35e-6) |
 
 ### CCSD(T)
 
@@ -275,7 +279,8 @@ Version 2.1.0 introduced CCSD for RHF. The baseline use equations adopted from [
 | v3.2.0 | 5.201 | 0.128 | 1.0 | 21 | 0.144 | 299.4 | 16 | 22.858 | 75.1 | avx_8x8 |
 | v3.2.0 | 5.333 | 0.128 | 1.0 | 21 | 0.141 | 308.1 | 16 | 23.421 | 75.3 | avx_16x8 |
 | v3.2.0 | 5.362 | 0.130 | 1.0 | 21 | 0.154 | 308.9 | 16 | 23.654 | 88.7 | avx_24x8 |
-| v3.2.1 | 6.043 | 0.133 | 1.0 | 21 | 0.280 | 336.3 | 16 | 56.434 | 425.4 | cublas |
+| v3.2.1 | 6.043 | 0.133 | 1.0 | 21 | 0.280 | 336.3 | 16 | 56.434 | 425.4 | cublas_dgemm |
+| v3.2.2 | 5.091 | 0.127 | 1.0 | 21 | 0.299 | 295.1 | 15 | 55.192 | 485.7 | cublas_sgemm, PertT only ~2% faster than cublas_dgemm, so it's setup cost bottleneck |
 
 #### UHF
 
@@ -301,7 +306,8 @@ Version 2.0.0 introduced CCSD for UHF. The baseline use the formulated equations
 | v3.2.0 | 4.727 | 0.015 | 0.1 | 22 | 0.036 | 227.5 | 20 | 19.155 | 66.3 | avx_8x8 |
 | v3.2.0 | 4.818 | 0.015 | 0.1 | 22 | 0.036 | 232.1 | 20 | 19.669 | 71.5 | avx_16x8 |
 | v3.2.0 | 5.110 | 0.015 | 0.1 | 22 | 0.041 | 246.6 | 20 | 19.463 | 77.5 | avx_24x8 |
-| v3.2.1 | 4.859 | 0.015 | 0.1 | 22 | 0.179 | 222.1 | 20 | 39.457 | 421.7 | cublas |
+| v3.2.1 | 4.859 | 0.015 | 0.1 | 22 | 0.179 | 222.1 | 20 | 39.457 | 421.7 | cublas_dgemm |
+| v3.2.2 | 5.039 | 0.015 | 0.1 | 22 | 0.189 | 218.7 | 21 | 38.272 | 477.7 | cublas_sgemm |
 
 > (5) From version v2.3.0: In the benchmark runs that produced these numbers, only CCSD(T) was requested as it prints both the CCSD energy baseline as well as the corrected energy CCSD(T). The timings of all steps are printed, and the total CCSD wall time reported here is the actual total wall time subtracted by the run time of the perbutative triples calculation. This is done to save benchmarking run time.
 >

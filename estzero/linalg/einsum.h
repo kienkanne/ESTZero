@@ -8,7 +8,7 @@
 #include "gemm_all.h"
 
 enum class GEMMScheme {
-    ODO, EIGEN, BLAS, CUBLAS,
+    ODO, EIGEN, BLAS, CUBLAS_DGEMM, CUBLAS_SGEMM,
     AVX_8x8, AVX_16x8, AVX_24x8,
 };
 inline GEMMScheme gs;
@@ -21,7 +21,8 @@ inline void set_gemm_scheme(std::string g) {
     if      (g == "odometer")   gs = GEMMScheme::ODO;
     else if (g == "eigen")      gs = GEMMScheme::EIGEN;
     else if (g == "blas")       gs = GEMMScheme::BLAS;
-    else if (g == "cublas")     gs = GEMMScheme::CUBLAS;
+    else if (g == "cublas_dgemm")   gs = GEMMScheme::CUBLAS_DGEMM;
+    else if (g == "cublas_sgemm")   gs = GEMMScheme::CUBLAS_SGEMM;
     else if (g == "avx_8x8")    gs = GEMMScheme::AVX_8x8;
     else if (g == "avx_16x8")   gs = GEMMScheme::AVX_16x8;
     else if (g == "avx_24x8")   gs = GEMMScheme::AVX_24x8;
@@ -40,9 +41,19 @@ inline auto raw_gemm =
         else if (gs == GEMMScheme::AVX_8x8)      avx_8x8(M, N, K, alpha, beta, A, B, C);
         else if (gs == GEMMScheme::AVX_16x8)    avx_16x8(M, N, K, alpha, beta, A, B, C);
         else if (gs == GEMMScheme::AVX_24x8)    avx_24x8(M, N, K, alpha, beta, A, B, C);
-        else if (gs == GEMMScheme::CUBLAS)  cublas_dgemm(M, N, K, alpha, beta, A, B, C);
+        else if (gs == GEMMScheme::CUBLAS_DGEMM)  cublas_dgemm(M, N, K, alpha, beta, A, B, C);
+        else if (gs == GEMMScheme::CUBLAS_SGEMM)  cublas_sgemm(M, N, K, alpha, beta, A, B, C);
         else throw std::runtime_error("raw_gemm: unknown GEMMScheme");
     };
+
+// Move `parse_subscripts` here so `cutensor_einsum` can reuse
+struct ParsedSubscripts {
+    std::vector<std::string> terms_strings;
+    std::unordered_map<char, int> char_to_dim;
+    std::unordered_map<char, int> char_to_col;
+};
+
+ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::vector<Tensor>& operands);
 
 // General-purpose einsum, implemented from scratch (no Eigen math), operating
 // on the row-major Tensor container defined in tensor.h.

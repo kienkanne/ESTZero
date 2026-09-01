@@ -314,7 +314,7 @@ def main():
     ap.add_argument("--econv", type=float, default=1e-8)
     ap.add_argument("--erischeme", choices=["vector", "tensor"], default="tensor",
                     help="ERI storage scheme (default: tensor)")
-    ap.add_argument("--gemmscheme", choices=["odometer", "eigen", "blas", "cublas", 
+    ap.add_argument("--gemmscheme", choices=["odometer", "eigen", "blas", "cublas_dgemm", "cublas_sgemm",
                                             "avx_8x8", "avx_16x8", "avx_24x8"], default="blas",
                     help="GEMM scheme for einsum (default: blas)")
     ap.add_argument("--version", default="vX.X.X",

@@ -2,6 +2,14 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.2.2] Added `cublas_sgemm` as a backend for `einsum` and GEMM microbenchmark, explores the precision/perf tradeoff
+
+- Added a single-precision cuBLAS backend (`--gemm-scheme cublas_sgemm`) with casting from double to float happening inside the call.
+- Pure GEMM microbenchmark (`bench/outputs_gemm/v3.2.2.log`): `cublas_sgemm` roughly doubles `cublas_dgemm`'s throughput at every tested size (2045x2045x2045: 1305.98 vs 724.00 GFLOP/s, 906.9% vs 502.8% of OpenBLAS).
+- As an `einsum` backend, that gain doesn't shows up in the vikings PertT loop: 55.192s vs `cublas_dgemm`'s 56.397s at pyrimidine/sto-3g. PertT's bottleneck is fixed per-call cost from its many small contractions, and it this the same observation v3.2.1 for `cublas_dgemm`.
+- Two larger systems actually failed with the single precision: `ch3/aug-cc-pvtz` MP2/UHF (nbf=115, |dE|=1.59e-6) and `propargyl/6-31g` MP3/UHF (nbf=33, |dE|=1.35e-6).
+- Renamed the existing `cublas` scheme/rows to `cublas_dgemm` throughout for symmetry with the new `cublas_sgemm` 
+
 ## [v3.2.1] Added `cublas_dgemm` as a backend for `einsum` and GEMM microbenchmark
 
 - The `cuBLAS` library is the GPU version for GEMM, in this update it got introduced in both the microbenchmark and wired directly as a backend for `einsum`. The GPU on this machine is GeForce RTX 4090.

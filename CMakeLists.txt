@@ -90,8 +90,8 @@ set_source_files_properties(estzero/gemm/cuda_ladder.cc PROPERTIES LANGUAGE CUDA
 #
 # For a clean CPU-only baseline run, just these two lines have to be commented out. Nothing else needs to 
 # change, as cublas_gemm.cc's EST_HAVE_CUBLAS guard makes --gemm-scheme cublas throw a clear runtime error
-#target_compile_definitions(est_core PUBLIC EST_HAVE_CUBLAS)
-#target_link_libraries(est_core PRIVATE CUDA::cublas)
+target_compile_definitions(est_core PUBLIC EST_HAVE_CUBLAS)
+target_link_libraries(est_core PRIVATE CUDA::cublas)
 # ================================================
 
 add_executable(ESTZero estzero/est/main.cc)

@@ -57,6 +57,8 @@ static std::vector<Route> make_routes(bool enable_legacy) {
                   avx_blis_24x8(M, N, K, alpha, beta, A, B, C); }},
         {"cublas_dgemm", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
                   cublas_dgemm(M, N, K, alpha, beta, A, B, C); }},
+        {"cublas_sgemm", [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C) {
+                  cublas_sgemm(M, N, K, alpha, beta, A, B, C); }},
                 };
 
     if (enable_legacy) {
@@ -177,11 +179,13 @@ int main(int argc, char** argv) {
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
                     M, N, K, alpha, A.data(), K, B.data(), N, beta, C_ref.data(), N);
 
-        // Error scales with K
-        const double tol = 1e-9 * K;
-
-        // Correctness pass
+        // Correctness pass. cublas_sgemm accumulates in float (~1e-7 relative precision vs.
+        // double's ~1e-16), so it needs a much looser tolerance -- same "error scales with K"
+        // shape, just the coefficient bumped by float's ~1e6 worse precision. This is an
+        // EXPECTED, correct-behavior difference (the whole point of trying sgemm), not a bug --
+        // the raw max_diff is still printed either way so the actual accuracy tradeoff is visible.
         for (const auto& r : routes) {
+            const double tol = (r.name == "cublas_sgemm") ? 1e-3 * K : 1e-9 * K;
             std::fill(C.begin(), C.end(), 1.0);
             r.run(M, N, K, alpha, beta, A.data(), B.data(), C.data());
             double max_diff = 0.0;

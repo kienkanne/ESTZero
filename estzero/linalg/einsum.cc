@@ -10,12 +10,6 @@
 #include "einsum.h"
 #include "odometer.h"
 
-struct ParsedSubscripts {
-    std::vector<std::string> terms_strings;
-    std::unordered_map<char, int> char_to_dim;
-    std::unordered_map<char, int> char_to_col;
-};
-
 // Helper function to split a string by a delimiter
 std::vector<std::string> split(const std::string& str, char delimiter) {
     std::vector<std::string> tokens;
