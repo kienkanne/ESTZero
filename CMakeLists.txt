@@ -13,6 +13,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(Eigen3_DIR "/localscratch/kbui/CPP/eigen_install/share/eigen3/cmake")
 find_package(Eigen3 REQUIRED)
 
+set(CUTENSOR_ROOT "/localscratch/kbui/CPP/libcutensor")
+
 set(LIBINT_ROOT "/localscratch/kbui/CPP/libint_install")
 
 set(OPENBLAS_ROOT "/localscratch/kbui/CPP/OpenBLAS")
@@ -43,6 +45,8 @@ add_library(est_core STATIC
     estzero/est/cc_triples.cc
     estzero/linalg/einsum.cc
 
+    estzero/gemm/cutensor_einsum.cc
+    estzero/gemm/cublas_gemm.cc
     estzero/gemm/cuda_ladder.cc
     estzero/gemm/avx512.cc
     estzero/gemm/avx_blis.cc
@@ -53,6 +57,7 @@ add_library(est_core STATIC
 
 target_include_directories(est_core PUBLIC
     ${LIBINT_ROOT}/include
+    ${CUTENSOR_ROOT}/include
     ${OPENBLAS_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/est
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/linalg
@@ -61,6 +66,7 @@ target_include_directories(est_core PUBLIC
 )
 
 target_link_directories(est_core PUBLIC ${LIBINT_ROOT}/lib)
+target_link_directories(est_core PUBLIC ${CUTENSOR_ROOT}/lib)
 target_link_libraries(est_core PUBLIC Eigen3::Eigen int2 ${OPENBLAS_LIBRARY})
 
 target_compile_options(est_core PUBLIC
@@ -70,7 +76,9 @@ target_compile_options(est_core PUBLIC
     -march=native
 )
 
+set_source_files_properties(estzero/gemm/cutensor_einsum.cc PROPERTIES LANGUAGE CUDA)
 set_source_files_properties(estzero/gemm/cublas_gemm.cc PROPERTIES LANGUAGE CUDA)
+set_source_files_properties(estzero/gemm/cuda_ladder.cc PROPERTIES LANGUAGE CUDA)
 
 # ================================================
 # cuBLAS backend for einsum's --gemm-scheme cublas (estzero/gemm/cublas_gemm.cc).

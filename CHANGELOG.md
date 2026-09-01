@@ -2,6 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.2.1] Added `cublas_dgemm` as a backend for `einsum` and GEMM microbenchmark
+
+- The `cuBLAS` library is the GPU version for GEMM, in this update it got introduced in both the microbenchmark and wired directly as a backend for `einsum`. The GPU on this machine is GeForce RTX 4090.
+- Illustrated in the microbenchmark for pure GEMM task, it absolutely crushes the CPU GEMM implementations, reaching 726.18 GFLOP/s, which is 887.6% of OpenBLAS.
+- As an `einsum` backend, however, it doesn't perform as its setup cost is much more for than the CPU GEMM counterparts as it has to move memory from CPU. When the task is a few large contractions, for example MP2 benzene/def2-svp (nbf=114), cuBLAS (6.294s) matcheed Eigen (6.360s). However, for tasks with a large number of small contracions, such as the perbutative triples in the vikings algorithm, its performance tanked signficantly, taking 56.434s to finish this step, compared to 22.262s of Eigen.
+- Including cuBLAS made it so that the entire library got linked and always loaded unconditionally, even if `cublas_dgemm` is not called. This affect the pure-CPU workflows, increasing their peak RSS (see `bench/outputs/v3.2.1_eigen_cublas_build.log` and `bench/outputs/v3.2.1_eigen_nocublas_build.log`). To address this, an explicit note is added in `CMakeLists.txt` to comment out two lines when `cublas_dgemm` is not needed.
+
 ## [v3.2.0] Wired `avx_8x8`/`avx_16x8`/`avx_24x8` into `einsum` backends
 
 - `einsum`'s `GEMMScheme` now covers 6 backends: `odometer`, `eigen`, `blas`, `avx_8x8`, `avx_16x8`, `avx_24x8`.

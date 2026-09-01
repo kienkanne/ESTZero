@@ -1,0 +1,134 @@
+{
+  "h2_stretched/sto-3g": {
+    "nbf": 2,
+    "reference": "rhf",
+    "ccsd_t": {
+      "wall(s)": 0.012471308989915997,
+      "eri(s)": 0.0,
+      "jk(ms)": 0.0,
+      "mo(s)": 0.0,
+      "cc(ms)": 0.133,
+      "cc_iters": 14,
+      "ccsd(s)": 0.012471308989915997,
+      "ptriples(s)": 0.0,
+      "ptriples(E)": 0.0,
+      "dE_ccsd": 2.136496757287887e-09
+    }
+  },
+  "h2o/sto-3g": {
+    "nbf": 7,
+    "reference": "rhf",
+    "ccsd_t": {
+      "wall(s)": 0.016944088973104954,
+      "eri(s)": 0.0006,
+      "jk(ms)": 0.004,
+      "mo(s)": 0.0003,
+      "cc(ms)": 0.561,
+      "cc_iters": 9,
+      "ccsd(s)": 0.011744088973104954,
+      "ptriples(s)": 0.0052,
+      "ptriples(E)": -6.741e-05,
+      "dE_ccsd": 1.646171199354285e-09
+    }
+  },
+  "h2o/cc-pvdz": {
+    "nbf": 24,
+    "reference": "rhf"
+  },
+  "fm/def2-svp": {
+    "nbf": 38,
+    "reference": "rhf"
+  },
+  "fm/def2-tzvp": {
+    "nbf": 74,
+    "reference": "rhf"
+  },
+  "benzene/def2-svp": {
+    "nbf": 114,
+    "reference": "rhf"
+  },
+  "ch3/sto-3g": {
+    "nbf": 8,
+    "reference": "uhf",
+    "ccsd_t": {
+      "wall(s)": 0.2601664250250906,
+      "eri(s)": 0.001,
+      "jk(ms)": 0.006,
+      "mo(s)": 0.0013,
+      "cc(ms)": 9.587,
+      "cc_iters": 10,
+      "ccsd(s)": 0.11076642502509057,
+      "ptriples(s)": 0.1494,
+      "ptriples(E)": -0.00013593,
+      "dE_ccsd": 1.4807923776061216e-09
+    }
+  },
+  "o2/sto-3g": {
+    "nbf": 10,
+    "reference": "uhf",
+    "ccsd_t": {
+      "wall(s)": 0.5512580370414071,
+      "eri(s)": 0.0019,
+      "jk(ms)": 0.013,
+      "mo(s)": 0.0032,
+      "cc(ms)": 20.547,
+      "cc_iters": 12,
+      "ccsd(s)": 0.27215803704140706,
+      "ptriples(s)": 0.2791,
+      "ptriples(E)": -0.00079369,
+      "dE_ccsd": 1.1348532780175447e-08
+    }
+  },
+  "o2/6-31g": {
+    "nbf": 18,
+    "reference": "uhf"
+  },
+  "o2/def2-tzvppd": {
+    "nbf": 80,
+    "reference": "uhf"
+  },
+  "ch3/aug-cc-pvtz": {
+    "nbf": 115,
+    "reference": "uhf"
+  },
+  "pyrimidine/sto-3g": {
+    "nbf": 34,
+    "reference": "rhf",
+    "ccsd_t": {
+      "wall(s)": 27.406705697008874,
+      "eri(s)": 0.1284,
+      "jk(ms)": 0.97,
+      "mo(s)": 0.1371,
+      "cc(ms)": 292.037,
+      "cc_iters": 16,
+      "ccsd(s)": 5.076805697008876,
+      "ptriples(s)": 22.3299,
+      "ptriples(E)": -0.01008545,
+      "dE_ccsd": 3.228421974199591e-09
+    }
+  },
+  "propargyl/sto-3g": {
+    "nbf": 18,
+    "reference": "uhf",
+    "ccsd_t": {
+      "wall(s)": 23.23896155395778,
+      "eri(s)": 0.0151,
+      "jk(ms)": 0.106,
+      "mo(s)": 0.0373,
+      "cc(ms)": 217.408,
+      "cc_iters": 20,
+      "ccsd(s)": 4.52356155395778,
+      "ptriples(s)": 18.7154,
+      "ptriples(E)": -0.00168855,
+      "dE_ccsd": 4.2575720726745203e-10
+    }
+  },
+  "pyrimidine/6-31g": {
+    "nbf": 62,
+    "reference": "rhf"
+  },
+  "propargyl/6-31g": {
+    "nbf": 33,
+    "reference": "uhf"
+  }
+}

@@ -1,0 +1,26 @@
+
+── CCSD(T) ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+system               ref  nbf       |dE|    ok  psi4(s)  wall(s)  ERI(s)  JK/it(ms) scf_it   MO(s)  CCSD/it(ms)  cc_it  CCSD(s) PertT(s)  RSS(MB)
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+h2_stretched/sto-3g  rhf    2   2.14e-09  PASS    1.146    0.036   0.000        0.0      2   0.000          0.1     14    0.036    0.000    195.1
+h2o/sto-3g           rhf    7   1.33e-09  PASS    0.970    0.061   0.004        0.0      8   0.000          1.0      9    0.053    0.008    195.8
+ch3/sto-3g           uhf    8   5.81e-09  PASS    1.656    0.296   0.001        0.0     10   0.001          9.7     10    0.141    0.155    197.7
+o2/sto-3g            uhf   10   1.34e-08  PASS    2.153    0.579   0.002        0.0      8   0.003         20.4     12    0.304    0.276    201.9
+pyrimidine/sto-3g    rhf   34   2.97e-11  PASS    2.132   27.242   0.129        1.0     21   0.134        288.9     16    5.056   22.186    267.0
+propargyl/sto-3g     uhf   18   1.61e-09  PASS    2.052   23.258   0.015        0.1     22   0.036        217.3     20    4.546   18.712    250.0
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+tol = 1.0e-06 vs Psi4; wall = best of 3 runs
+params: repeats=3 tier=None method=['ccsd_t'] runall=False tol=1e-06 maxiter=200 econv=1e-08 erischeme=tensor gemmscheme=eigen version=vX.X.X
+
+--- README.md rows (append) ---
+
+pyrimidine/sto-3g (ccsd_t/rhf):
+| version | Total CCSD wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | PertT(s) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|---|---|
+| vX.X.X | 5.056 | 0.129 | 1.0 | 21 | 0.134 | 288.9 | 16 | 22.186 | 267.0 | - |
+
+propargyl/sto-3g (ccsd_t/uhf):
+| version | Total CCSD wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | PertT(s) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|---|---|
+| vX.X.X | 4.546 | 0.015 | 0.1 | 22 | 0.036 | 217.3 | 20 | 18.712 | 250.0 | - |
