@@ -2,6 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.2.3] Persistent `cublasHandle_t` + pinned staging for `cublas_sgemm`: why the cuBLAS routes were far from peak, and the fix
+
+- Both `cublas_dgemm` and `cublas_sgemm` called `cublasCreate`/`cublasDestroy` on every GEMM, and these are avoidable costs by reusing a similar idea in v3.1.7a by using a persistent global buffer. A single `cublasHandle_t` is created once via a local function static and reused for every call.
+- `cublas_sgemm` requires an additional `double->float` cast before going to device, so similar to the mentioned strategy, we can redirect the cast's output straight into pinned memory, no allocation cost.
+- The improvement is seen most in the vikings PertT loop. Pyrimidine/sto-3g 56.397s -> 27.067s (`cublas_dgemm`, ~2.1x), 55.192s -> 26.896s (`cublas_sgemm`, ~2.1x); propargyl/sto-3g 39.540s -> 22.125s / 38.272s -> 21.370s (~1.8x both).
+- For pure GEMM `cublas_dgemm` is ~537-780 GFLOP/s across 1022-2048 (unchanged from v3.2.2). `cublas_sgemm` climbs to ~1900-2300% of OpenBLAS at 2045/2048 (up from ~907-1062% pre-fix), so the pinned copying buffer helps with its dominant cost.
+
 ## [v3.2.2] Added `cublas_sgemm` as a backend for `einsum` and GEMM microbenchmark, explores the precision/perf tradeoff
 
 - Added a single-precision cuBLAS backend (`--gemm-scheme cublas_sgemm`) with casting from double to float happening inside the call.
