@@ -1,33 +1,49 @@
 #include "gemm_all.h"
-
+#include <vector>
 // Guarded by EST_HAVE_CUBLAS (set in CMakeLists.txt, alongside the CUDA::cublas link) so a clean
 // CPU-only build doesn't have to load this in.
 #ifdef EST_HAVE_CUBLAS
 
 #include <stdlib.h>
-#include <vector>
+#include <cstring>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 
+// The fixes down here are similar to the idea in v3.1.7a, where a persistent buffer is allocated once
+// at the beginning to reuse, not to be re-initiated every call.
+
+namespace {
+
+// Persistent global cuBLAS handle, created once and reused for every call instead of a fresh
+// cublasCreate/cublasDestroy per GEMM.
+cublasHandle_t get_handle() {
+    static cublasHandle_t handle = [] {
+        cublasHandle_t h;
+        cublasCreate(&h);
+        return h;
+    }();
+    return handle;
+}
+}
 void cublas_dgemm(const int M, const int N, const int K, const double alpha, const double beta,
                  const double* A, const double* B, double* C) {
 
+    const size_t sizeA = static_cast<size_t>(M) * K;
+    const size_t sizeB = static_cast<size_t>(K) * N;
+    const size_t sizeC = static_cast<size_t>(M) * N;
+
     double *d_A, *d_B, *d_C;
-    cudaMalloc((void**)&d_A, M * K * sizeof(double));
-    cudaMalloc((void**)&d_B, K * N * sizeof(double));
-    cudaMalloc((void**)&d_C, M * N * sizeof(double));
+    cudaMalloc((void**)&d_A, sizeA * sizeof(double));
+    cudaMalloc((void**)&d_B, sizeB * sizeof(double));
+    cudaMalloc((void**)&d_C, sizeC * sizeof(double));
 
-    // Contiguous linear copy from host to device
-    cudaMemcpy(d_A, A, M * K * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_B, B, K * N * sizeof(double), cudaMemcpyHostToDevice);
-
-    // Copy C to device also if beta != 0 to accumulate into it
+    cudaMemcpy(d_A, A, sizeA * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, B, sizeB * sizeof(double), cudaMemcpyHostToDevice);
     if (beta != 0.0) {
-        cudaMemcpy(d_C, C, M * N * sizeof(double), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_C, C, sizeC * sizeof(double), cudaMemcpyHostToDevice);
     }
 
-    cublasHandle_t handle;
-    cublasCreate(&handle);
+    cublasHandle_t handle = get_handle();
 
     // Pass in as (N, M, K, B, ldb=N, A, lda=K, C, ldc=N)
     // This means computing CT = BT * AT in column-major,
@@ -41,12 +57,11 @@ void cublas_dgemm(const int M, const int N, const int K, const double alpha, con
                 d_C, N); // CT
 
     // CT in column-major is C in row-major
-    cudaMemcpy(C, d_C, M * N * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(C, d_C, sizeC * sizeof(double), cudaMemcpyDeviceToHost);
 
     cudaFree(d_A);
     cudaFree(d_B);
     cudaFree(d_C);
-    cublasDestroy(handle);
 }
 
 // Single-precision path to explore the performance vs accuracy tradeoff. The double to float 
@@ -74,8 +89,7 @@ void cublas_sgemm(const int M, const int N, const int K, const double alpha, con
         cudaMemcpy(d_C, hC.data(), M * N * sizeof(float), cudaMemcpyHostToDevice);
     }
 
-    cublasHandle_t handle;
-    cublasCreate(&handle);
+    cublasHandle_t handle = get_handle();
 
     const float alpha_f = static_cast<float>(alpha);
     const float beta_f = static_cast<float>(beta);
@@ -96,7 +110,6 @@ void cublas_sgemm(const int M, const int N, const int K, const double alpha, con
     cudaFree(d_A);
     cudaFree(d_B);
     cudaFree(d_C);
-    cublasDestroy(handle);
 }
 
 #else
