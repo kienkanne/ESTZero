@@ -1,5 +1,5 @@
 #include "gemm_all.h"
-#include <vector>
+
 // Guarded by EST_HAVE_CUBLAS (set in CMakeLists.txt, alongside the CUDA::cublas link) so a clean
 // CPU-only build doesn't have to load this in.
 #ifdef EST_HAVE_CUBLAS
@@ -24,7 +24,26 @@ cublasHandle_t get_handle() {
     }();
     return handle;
 }
-}
+
+// Persistent pinned buffer that only grows when requested, reusable across calls. Copying into
+// a pinned buffer first then transferring from that to device avoids the allocation cost.
+template <typename T>
+struct PinnedBuffer {
+    T* ptr = nullptr;
+    size_t capacity = 0;
+
+    T* get(size_t n) {
+        if (n > capacity) {
+            if (ptr) cudaFreeHost(ptr);
+            cudaMallocHost(reinterpret_cast<void**>(&ptr), n * sizeof(T));
+            capacity = n;
+        }
+        return ptr;
+    }
+};
+
+} // namespace
+
 void cublas_dgemm(const int M, const int N, const int K, const double alpha, const double beta,
                  const double* A, const double* B, double* C) {
 
@@ -69,24 +88,29 @@ void cublas_dgemm(const int M, const int N, const int K, const double alpha, con
 void cublas_sgemm(const int M, const int N, const int K, const double alpha, const double beta,
                    const double* A, const double* B, double* C) {
 
-    std::vector<float> hA(static_cast<size_t>(M) * K);
-    std::vector<float> hB(static_cast<size_t>(K) * N);
-    std::vector<float> hC(static_cast<size_t>(M) * N);
-    for (size_t i = 0; i < hA.size(); ++i) hA[i] = static_cast<float>(A[i]);
-    for (size_t i = 0; i < hB.size(); ++i) hB[i] = static_cast<float>(B[i]);
+    const size_t sizeA = static_cast<size_t>(M) * K;
+    const size_t sizeB = static_cast<size_t>(K) * N;
+    const size_t sizeC = static_cast<size_t>(M) * N;
+
+    static PinnedBuffer<float> pinA, pinB, pinC;
+    float* hA = pinA.get(sizeA);
+    float* hB = pinB.get(sizeB);
+    float* hC = pinC.get(sizeC);
+    for (size_t i = 0; i < sizeA; ++i) hA[i] = static_cast<float>(A[i]);
+    for (size_t i = 0; i < sizeB; ++i) hB[i] = static_cast<float>(B[i]);
     if (beta != 0.0) {
-        for (size_t i = 0; i < hC.size(); ++i) hC[i] = static_cast<float>(C[i]);
+        for (size_t i = 0; i < sizeC; ++i) hC[i] = static_cast<float>(C[i]);
     }
 
     float *d_A, *d_B, *d_C;
-    cudaMalloc((void**)&d_A, M * K * sizeof(float));
-    cudaMalloc((void**)&d_B, K * N * sizeof(float));
-    cudaMalloc((void**)&d_C, M * N * sizeof(float));
+    cudaMalloc((void**)&d_A, sizeA * sizeof(float));
+    cudaMalloc((void**)&d_B, sizeB * sizeof(float));
+    cudaMalloc((void**)&d_C, sizeC * sizeof(float));
 
-    cudaMemcpy(d_A, hA.data(), M * K * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_B, hB.data(), K * N * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_A, hA, sizeA * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, hB, sizeB * sizeof(float), cudaMemcpyHostToDevice);
     if (beta != 0.0) {
-        cudaMemcpy(d_C, hC.data(), M * N * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_C, hC, sizeC * sizeof(float), cudaMemcpyHostToDevice);
     }
 
     cublasHandle_t handle = get_handle();
@@ -104,8 +128,8 @@ void cublas_sgemm(const int M, const int N, const int K, const double alpha, con
                 &beta_f,
                 d_C, N);
 
-    cudaMemcpy(hC.data(), d_C, M * N * sizeof(float), cudaMemcpyDeviceToHost);
-    for (size_t i = 0; i < hC.size(); ++i) C[i] = static_cast<double>(hC[i]);
+    cudaMemcpy(hC, d_C, sizeC * sizeof(float), cudaMemcpyDeviceToHost);
+    for (size_t i = 0; i < sizeC; ++i) C[i] = static_cast<double>(hC[i]);
 
     cudaFree(d_A);
     cudaFree(d_B);
