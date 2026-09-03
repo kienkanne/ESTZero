@@ -49,8 +49,9 @@ Starting from version 3.0.0, the focus shifted to optimizing the backend of the 
 The results reported here are timings for a matrix multiplcation task: C = alpha\*\(A\*\B) + beta\*\C. Single-core peak GFLOPs on this machine (AMD Ryzen 9 7950X) = ~4.5 clock(GHz) * 8 doubles/zmm * 2 FMA units * 2 flops/FMA = 144 GFLOPs. GFLOPs of each run is calculated as (2.0 * M * N * K) / (avg_ms * 1e6).
 
 ```bash
-python3 bench/gemm_bench.py                                                  # default: avx_*/openblas/eigen at size 510,1022,2045
-python3 bench/gemm_bench.py --legacy --sizes 1022                            # include the frozen naive/mkn/mnk routes
+python3 bench/gemm_bench.py                                                  # default: GPU family (cublas_*/cuN_*)
+python3 bench/gemm_bench.py --cpu                                            # add CPU family (avx_*/openblas/eigen)
+python3 bench/gemm_bench.py --legacy --sizes 1022                            # old naive/mkn/mnk routes
 python3 bench/gemm_bench.py --routes openblas,avx_8x8,mkn_8x1 --sizes 1022   # just these
 ```
 

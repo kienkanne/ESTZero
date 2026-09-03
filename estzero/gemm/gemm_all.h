@@ -72,6 +72,6 @@ void cublas_dgemm(const int M, const int N, const int K, const double alpha, con
 void cublas_sgemm(const int M, const int N, const int K, const double alpha, const double beta,
                 const double* A, const double* B, double* C, double* kernel_ms = nullptr);
 
-void cuda_ladder(const int M, const int N, const int K, const double alpha, const double beta,
+void cu_d_ladder(const int M, const int N, const int K, const double alpha, const double beta,
                  const double* A, const double* B, double* C, int ladder, double* kernel_ms = nullptr);
 #endif

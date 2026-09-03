@@ -29,7 +29,7 @@ GPU_FP64_PEAK_GFLOPS = GPU_FP32_PEAK_GFLOPS / 64
 
 
 def peak_gflops_for(route):
-    if route == "cublas_sgemm":
+    if "sgemm" in route:  # cublas_sgemm, cu1_naive_sgemm, cu2_coalesce_sgemm, ...
         return GPU_FP32_PEAK_GFLOPS
     if is_gpu_route(route):
         return GPU_FP64_PEAK_GFLOPS

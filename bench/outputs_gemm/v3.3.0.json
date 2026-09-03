@@ -1,0 +1,184 @@
+{
+  "510x510x510": {
+    "cublas_sgemm": {
+      "avg_ms": 0.019,
+      "gflops": 13963.263157894737,
+      "ok": true,
+      "max_diff": 1.674e-05
+    },
+    "cublas_dgemm": {
+      "avg_ms": 0.226,
+      "gflops": 1173.9026548672566,
+      "ok": true,
+      "max_diff": 5.684e-14
+    },
+    "cu1d_naive": {
+      "avg_ms": 0.208,
+      "gflops": 1275.4903846153845,
+      "ok": true,
+      "max_diff": 5.684e-14
+    },
+    "cu2d_coalesce": {
+      "avg_ms": 0.217,
+      "gflops": 1222.589861751152,
+      "ok": true,
+      "max_diff": 5.684e-14
+    }
+  },
+  "1022x1022x1022": {
+    "cublas_sgemm": {
+      "avg_ms": 0.06,
+      "gflops": 35582.088266666666,
+      "ok": true,
+      "max_diff": 0.0001178
+    },
+    "cublas_dgemm": {
+      "avg_ms": 1.723,
+      "gflops": 1239.074460824144,
+      "ok": true,
+      "max_diff": 1.99e-13
+    },
+    "cu1d_naive": {
+      "avg_ms": 1.596,
+      "gflops": 1337.6724912280702,
+      "ok": true,
+      "max_diff": 1.99e-13
+    },
+    "cu2d_coalesce": {
+      "avg_ms": 1.663,
+      "gflops": 1283.7794924834636,
+      "ok": true,
+      "max_diff": 1.99e-13
+    }
+  },
+  "1024x1024x1024": {
+    "cublas_sgemm": {
+      "avg_ms": 0.062,
+      "gflops": 34636.833032258066,
+      "ok": true,
+      "max_diff": 0.0001115
+    },
+    "cublas_dgemm": {
+      "avg_ms": 1.721,
+      "gflops": 1247.8115328297501,
+      "ok": true,
+      "max_diff": 2.132e-13
+    },
+    "cu1d_naive": {
+      "avg_ms": 3.224,
+      "gflops": 666.0929429280397,
+      "ok": true,
+      "max_diff": 2.132e-13
+    },
+    "cu2d_coalesce": {
+      "avg_ms": 1.666,
+      "gflops": 1289.0057911164465,
+      "ok": true,
+      "max_diff": 2.132e-13
+    }
+  },
+  "2045x2045x2045": {
+    "cublas_sgemm": {
+      "avg_ms": 0.341,
+      "gflops": 50159.7719941349,
+      "ok": true,
+      "max_diff": 7.489e-05
+    },
+    "cublas_dgemm": {
+      "avg_ms": 14.634,
+      "gflops": 1168.817975263086,
+      "ok": true,
+      "max_diff": 4.263e-13
+    },
+    "cu1d_naive": {
+      "avg_ms": 13.293,
+      "gflops": 1286.7285225306553,
+      "ok": true,
+      "max_diff": 4.263e-13
+    },
+    "cu2d_coalesce": {
+      "avg_ms": 13.208,
+      "gflops": 1295.0092557540884,
+      "ok": true,
+      "max_diff": 4.263e-13
+    }
+  },
+  "4096x4096x4096": {
+    "cublas_sgemm": {
+      "avg_ms": 2.4,
+      "gflops": 57266.23061333333,
+      "ok": true,
+      "max_diff": 0.0002113
+    },
+    "cublas_dgemm": {
+      "avg_ms": 109.604,
+      "gflops": 1253.959284989599,
+      "ok": true,
+      "max_diff": 1.052e-12
+    },
+    "cu1d_naive": {
+      "avg_ms": 205.833,
+      "gflops": 667.7206933387746,
+      "ok": true,
+      "max_diff": 1.052e-12
+    },
+    "cu2d_coalesce": {
+      "avg_ms": 106.1,
+      "gflops": 1295.3718517624882,
+      "ok": true,
+      "max_diff": 1.052e-12
+    }
+  },
+  "6144x6144x6144": {
+    "cublas_sgemm": {
+      "avg_ms": 7.856,
+      "gflops": 59044.86608553972,
+      "ok": true,
+      "max_diff": 0.000793
+    },
+    "cublas_dgemm": {
+      "avg_ms": 369.734,
+      "gflops": 1254.5680623583442,
+      "ok": true,
+      "max_diff": 1.535e-12
+    },
+    "cu1d_naive": {
+      "avg_ms": 699.707,
+      "gflops": 662.929580478686,
+      "ok": true,
+      "max_diff": 1.535e-12
+    },
+    "cu2d_coalesce": {
+      "avg_ms": 358.514,
+      "gflops": 1293.830834968788,
+      "ok": true,
+      "max_diff": 1.535e-12
+    }
+  },
+  "8192x8192x8192": {
+    "cublas_sgemm": {
+      "avg_ms": 18.045,
+      "gflops": 60931.65019540039,
+      "ok": true,
+      "max_diff": 0.001053
+    },
+    "cublas_dgemm": {
+      "avg_ms": 878.554,
+      "gflops": 1251.5014760344839,
+      "ok": true,
+      "max_diff": 1.933e-12
+    },
+    "cu1d_naive": {
+      "avg_ms": 1650.42,
+      "gflops": 666.2011050375056,
+      "ok": true,
+      "max_diff": 1.933e-12
+    },
+    "cu2d_coalesce": {
+      "avg_ms": 851.668,
+      "gflops": 1291.0096748686108,
+      "ok": true,
+      "max_diff": 1.933e-12
+    }
+  }
+}

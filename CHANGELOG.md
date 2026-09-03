@@ -2,6 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.3.0] Hand-written double-precision GPU GEMM kernels (`cu1_naive`/`cu2_coalescing`), microbenchmark moved to kernel-only timing
+
+- Added `cu1_naive` and `cu2_coalesce` (`estzero/gemm/cuda_ladder.cc`), the start of a from-scratch CUDA GEMM ladder alongside cuBLAS.
+- `gemm_bench`'s timing moved inside the GEMM call itself, as `cublas_dgemm`/`cublas_sgemm`/`cuda_ladder` now take an optional `kernel_ms` out-param, measured with a persistent `cudaEvent_t` pair around just the kernel/cublas launch, excluding the memory allocation steps, allowing for a better measurenment on FLOPs by excluding the overhead cost.
+- `gemm_bench` now defaults to the GPU route family only, the CPU family has to be called via `--cpu`. The default matrix sizes are raised up to 8192 to match the GPU's performance.
+- `cu2_coalesce` is already comparable with `cublas_dgemm` even at size 8192, reaching ~90-100% of the ~1.3 TFLOP/s ceiling for double-precision. This GPU's FP64 rate is capped to ~1:64 of FP32, so even the naive version already comparable with `cublas_dgemm`.
+
 ## [v3.2.3] Persistent `cublasHandle_t` + pinned staging for `cublas_sgemm`: why the cuBLAS routes were far from peak, and the fix
 
 - Both `cublas_dgemm` and `cublas_sgemm` called `cublasCreate`/`cublasDestroy` on every GEMM, and these are avoidable costs by reusing a similar idea in v3.1.7a by using a persistent global buffer. A single `cublasHandle_t` is created once via a local function static and reused for every call.

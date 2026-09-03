@@ -3,7 +3,7 @@
 #include "gemm_all.h"
 
 // Singel thread, naive baseline version
-__global__ void cu1_naive(const int M, const int N, const int K, const double alpha, const double beta,
+__global__ void cu1d_naive(const int M, const int N, const int K, const double alpha, const double beta,
 				const double* A, const double* B, double* C) {
 
 	const unsigned int row = blockIdx.x * blockDim.x + threadIdx.x;
@@ -18,7 +18,7 @@ __global__ void cu1_naive(const int M, const int N, const int K, const double al
 	}
 }
 
-__global__ void cu2_coalescing(const int M, const int N, const int K, const double alpha, const double beta,
+__global__ void cu2d_coalesce(const int M, const int N, const int K, const double alpha, const double beta,
                 const double* A, const double* B, double* C) {
     // Along the wrap threadIdx.x moves the fastest, so we want to align that with the contiguous
     // axis in both B and C (col), so col gets the + `threadIdx.x` here so threads within a wrap
@@ -49,7 +49,7 @@ Events& get_events() {
 }
 }  // namespace
 
-void cuda_ladder(const int M, const int N, const int K, const double alpha, const double beta,
+void cu_d_ladder(const int M, const int N, const int K, const double alpha, const double beta,
                  const double* A, const double* B, double* C, int ladder, double* kernel_ms) {
 
     double *d_A, *d_B, *d_C;
@@ -76,8 +76,8 @@ void cuda_ladder(const int M, const int N, const int K, const double alpha, cons
     if (kernel_ms) cudaEventRecord(ev.start);
 
 	switch (ladder) {
-		case 1: cu1_naive<<<grid, block>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
-        case 2: cu2_coalescing<<<grid, block>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
+		case 1: cu1d_naive<<<grid, block>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
+        case 2: cu2d_coalesce<<<grid, block>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
 	}
 
     if (kernel_ms) {
