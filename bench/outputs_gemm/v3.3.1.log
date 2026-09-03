@@ -1,0 +1,140 @@
+
+Shape: 510x510x510
+route             avg_ms  %OpenBLAS    GFLOP/s    %peak  check
+──────────────────────────────────────────────────────────────────────
+cublas_sgemm      0.0180          -   14739.00     17.8   PASS
+cu2s_coalesce     0.0630          -    4211.14      5.1   PASS
+cu1s_naive        0.1420          -    1868.32      2.3   PASS
+cu1d_naive        0.2170          -    1222.59     94.7   PASS
+cu2d_coalesce     0.2270          -    1168.73     90.6   PASS
+cublas_dgemm      0.2400          -    1105.42     85.7   PASS
+
+Shape: 1022x1022x1022
+route             avg_ms  %OpenBLAS    GFLOP/s    %peak  check
+──────────────────────────────────────────────────────────────────────
+cublas_sgemm      0.0650          -   32845.00     39.8   PASS
+cu2s_coalesce     0.4450          -    4797.58      5.8   PASS
+cu1s_naive        1.0380          -    2056.77      2.5   PASS
+cu1d_naive        1.6960          -    1258.80     97.5   PASS
+cu2d_coalesce     1.7730          -    1204.13     93.3   PASS
+cublas_dgemm      1.8350          -    1163.45     90.1   PASS
+
+Shape: 1024x1024x1024
+route             avg_ms  %OpenBLAS    GFLOP/s    %peak  check
+──────────────────────────────────────────────────────────────────────
+cublas_sgemm      0.0590          -   36398.03     44.1   PASS
+cu2s_coalesce     0.4260          -    5041.04      6.1   PASS
+cu2d_coalesce     1.6800          -    1278.26     99.0   PASS
+cublas_dgemm      1.7360          -    1237.03     95.8   PASS
+cu1s_naive        3.1650          -     678.51      0.8   PASS
+cu1d_naive        3.2490          -     660.97     51.2   PASS
+
+Shape: 2045x2045x2045
+route             avg_ms  %OpenBLAS    GFLOP/s    %peak  check
+──────────────────────────────────────────────────────────────────────
+cublas_sgemm      0.3230          -   52955.05     64.1   PASS
+cu2s_coalesce     3.2510          -    5261.30      6.4   PASS
+cu1s_naive        7.8630          -    2175.31      2.6   PASS
+cu1d_naive       13.0240          -    1313.30    101.8   PASS
+cu2d_coalesce    13.2660          -    1289.35     99.9   PASS
+cublas_dgemm     13.7510          -    1243.87     96.4   PASS
+
+Shape: 4096x4096x4096
+route             avg_ms  %OpenBLAS    GFLOP/s    %peak  check
+──────────────────────────────────────────────────────────────────────
+cublas_sgemm      2.4110          -   57004.96     69.0   PASS
+cu2s_coalesce    34.9730          -    3929.86      4.8   PASS
+cu2d_coalesce   106.3190          -    1292.70    100.2   PASS
+cublas_dgemm    110.1500          -    1247.74     96.7   PASS
+cu1s_naive      200.8950          -     684.13      0.8   PASS
+cu1d_naive      206.2960          -     666.22     51.6   PASS
+
+Shape: 6144x6144x6144
+route             avg_ms  %OpenBLAS    GFLOP/s    %peak  check
+──────────────────────────────────────────────────────────────────────
+cublas_sgemm      7.8820          -   58850.10     71.2   PASS
+cu2s_coalesce   197.6930          -    2346.35      2.8   PASS
+cu2d_coalesce   359.8750          -    1288.94     99.9   PASS
+cublas_dgemm    371.6790          -    1248.00     96.7   PASS
+cu1s_naive      685.2700          -     676.90      0.8   PASS
+cu1d_naive      701.8130          -     660.94     51.2   PASS
+
+Shape: 8192x8192x8192
+route             avg_ms  %OpenBLAS    GFLOP/s    %peak  check
+──────────────────────────────────────────────────────────────────────
+cublas_sgemm     18.1310          -   60642.64     73.4   PASS
+cu2s_coalesce   476.6580          -    2306.71      2.8   PASS
+cu2d_coalesce   853.2940          -    1288.55     99.8   PASS
+cublas_dgemm    880.7140          -    1248.43     96.7   PASS
+cu1s_naive     1607.0220          -     684.19      0.8   PASS
+cu1d_naive     1653.9610          -     664.77     51.5   PASS
+
+Shape: 510x510x510
+| Route | Avg(ms) | %OpenBLAS | GFLOP/s | %Peak | Note |
+| --- | --- | --- | --- | --- | --- |
+| cublas_sgemm | 0.018 | - | 14739.00 | 17.8 | - |
+| cu2s_coalesce | 0.063 | - | 4211.14 | 5.1 | - |
+| cu1s_naive | 0.142 | - | 1868.32 | 2.3 | - |
+| cu1d_naive | 0.217 | - | 1222.59 | 94.7 | - |
+| cu2d_coalesce | 0.227 | - | 1168.73 | 90.6 | - |
+| cublas_dgemm | 0.240 | - | 1105.42 | 85.7 | - |
+
+Shape: 1022x1022x1022
+| Route | Avg(ms) | %OpenBLAS | GFLOP/s | %Peak | Note |
+| --- | --- | --- | --- | --- | --- |
+| cublas_sgemm | 0.065 | - | 32845.00 | 39.8 | - |
+| cu2s_coalesce | 0.445 | - | 4797.58 | 5.8 | - |
+| cu1s_naive | 1.038 | - | 2056.77 | 2.5 | - |
+| cu1d_naive | 1.696 | - | 1258.80 | 97.5 | - |
+| cu2d_coalesce | 1.773 | - | 1204.13 | 93.3 | - |
+| cublas_dgemm | 1.835 | - | 1163.45 | 90.1 | - |
+
+Shape: 1024x1024x1024
+| Route | Avg(ms) | %OpenBLAS | GFLOP/s | %Peak | Note |
+| --- | --- | --- | --- | --- | --- |
+| cublas_sgemm | 0.059 | - | 36398.03 | 44.1 | - |
+| cu2s_coalesce | 0.426 | - | 5041.04 | 6.1 | - |
+| cu2d_coalesce | 1.680 | - | 1278.26 | 99.0 | - |
+| cublas_dgemm | 1.736 | - | 1237.03 | 95.8 | - |
+| cu1s_naive | 3.165 | - | 678.51 | 0.8 | - |
+| cu1d_naive | 3.249 | - | 660.97 | 51.2 | - |
+
+Shape: 2045x2045x2045
+| Route | Avg(ms) | %OpenBLAS | GFLOP/s | %Peak | Note |
+| --- | --- | --- | --- | --- | --- |
+| cublas_sgemm | 0.323 | - | 52955.05 | 64.1 | - |
+| cu2s_coalesce | 3.251 | - | 5261.30 | 6.4 | - |
+| cu1s_naive | 7.863 | - | 2175.31 | 2.6 | - |
+| cu1d_naive | 13.024 | - | 1313.30 | 101.8 | - |
+| cu2d_coalesce | 13.266 | - | 1289.35 | 99.9 | - |
+| cublas_dgemm | 13.751 | - | 1243.87 | 96.4 | - |
+
+Shape: 4096x4096x4096
+| Route | Avg(ms) | %OpenBLAS | GFLOP/s | %Peak | Note |
+| --- | --- | --- | --- | --- | --- |
+| cublas_sgemm | 2.411 | - | 57004.96 | 69.0 | - |
+| cu2s_coalesce | 34.973 | - | 3929.86 | 4.8 | - |
+| cu2d_coalesce | 106.319 | - | 1292.70 | 100.2 | - |
+| cublas_dgemm | 110.150 | - | 1247.74 | 96.7 | - |
+| cu1s_naive | 200.895 | - | 684.13 | 0.8 | - |
+| cu1d_naive | 206.296 | - | 666.22 | 51.6 | - |
+
+Shape: 6144x6144x6144
+| Route | Avg(ms) | %OpenBLAS | GFLOP/s | %Peak | Note |
+| --- | --- | --- | --- | --- | --- |
+| cublas_sgemm | 7.882 | - | 58850.10 | 71.2 | - |
+| cu2s_coalesce | 197.693 | - | 2346.35 | 2.8 | - |
+| cu2d_coalesce | 359.875 | - | 1288.94 | 99.9 | - |
+| cublas_dgemm | 371.679 | - | 1248.00 | 96.7 | - |
+| cu1s_naive | 685.270 | - | 676.90 | 0.8 | - |
+| cu1d_naive | 701.813 | - | 660.94 | 51.2 | - |
+
+Shape: 8192x8192x8192
+| Route | Avg(ms) | %OpenBLAS | GFLOP/s | %Peak | Note |
+| --- | --- | --- | --- | --- | --- |
+| cublas_sgemm | 18.131 | - | 60642.64 | 73.4 | - |
+| cu2s_coalesce | 476.658 | - | 2306.71 | 2.8 | - |
+| cu2d_coalesce | 853.294 | - | 1288.55 | 99.8 | - |
+| cublas_dgemm | 880.714 | - | 1248.43 | 96.7 | - |
+| cu1s_naive | 1607.022 | - | 684.19 | 0.8 | - |
+| cu1d_naive | 1653.961 | - | 664.77 | 51.5 | - |

@@ -29,7 +29,7 @@ GPU_FP64_PEAK_GFLOPS = GPU_FP32_PEAK_GFLOPS / 64
 
 
 def peak_gflops_for(route):
-    if "sgemm" in route:  # cublas_sgemm, cu1_naive_sgemm, cu2_coalesce_sgemm, ...
+    if is_single_precision_route(route):
         return GPU_FP32_PEAK_GFLOPS
     if is_gpu_route(route):
         return GPU_FP64_PEAK_GFLOPS
@@ -52,6 +52,17 @@ def is_gpu_route(name):
     inside the GEMM call itself (kernel-only, excluding cudaMalloc/H2D/D2H/free) and never run
     under `perf stat`, which is meaningless for processes running on GPU."""
     return name.startswith("cu")
+
+
+SINGLE_PRECISION_RE = re.compile(r"^cu\d+s_")
+
+
+def is_single_precision_route(name):
+    """True for cublas_sgemm and any hand-written single-precision ladder route, i.e. "cu<N>s_*"
+    (cu1s_naive, cu2s_coalesce, ...) as opposed to the double-precision "cu<N>d_*" ones. Matching
+    on "sgemm" alone isn't enough since the ladder routes mark precision with the s/d right after
+    the digit instead of a dgemm/sgemm suffix."""
+    return "sgemm" in name or bool(SINGLE_PRECISION_RE.match(name))
 
 
 def parse(text):
