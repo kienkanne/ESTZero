@@ -33,7 +33,12 @@ static void add_gpu_routes(std::vector<Route>& routes) {
     routes.push_back({"cublas_sgemm", true,
         [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C, double* kernel_ms) {
                   cublas_sgemm(M, N, K, alpha, beta, A, B, C, kernel_ms); }});
-
+    routes.push_back({"cu1_naive", true,
+        [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C, double* kernel_ms) {
+                  cuda_ladder(M, N, K, alpha, beta, A, B, C, 1, kernel_ms); }});
+    routes.push_back({"cu2_coalesce", true,
+        [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C, double* kernel_ms) {
+                  cuda_ladder(M, N, K, alpha, beta, A, B, C, 2, kernel_ms); }});
 }
 
 // CPU family via --cpu
