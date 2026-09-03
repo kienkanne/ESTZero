@@ -25,7 +25,6 @@ cublasHandle_t get_handle() {
     return handle;
 }
 
-// Persistent cudaEvent_t pair for kernel-only timing. This is created once and reused for every call
 struct Events {
     cudaEvent_t start, stop;
     Events() { cudaEventCreate(&start); cudaEventCreate(&stop); }
@@ -35,8 +34,6 @@ Events& get_events() {
     return e;
 }
 
-// Persistent pinned buffer that only grows when requested, reusable across calls. Copying into
-// a pinned buffer first then transferring from that to device avoids the allocation cost.
 template <typename T>
 struct PinnedBuffer {
     T* ptr = nullptr;

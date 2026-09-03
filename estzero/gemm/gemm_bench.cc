@@ -2,6 +2,7 @@
 // large square matrices. This is preparation for the future manually written GEMM optimizations.
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -27,12 +28,20 @@ struct Route {
 
 // GPU family: always available regardless of --cpu, since this is gemm_bench's default focus now
 static void add_gpu_routes(std::vector<Route>& routes) {
-    routes.push_back({"cublas_dgemm", true,
-        [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C, double* kernel_ms) {
-                  cublas_dgemm(M, N, K, alpha, beta, A, B, C, kernel_ms); }});
     routes.push_back({"cublas_sgemm", true,
         [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C, double* kernel_ms) {
                   cublas_sgemm(M, N, K, alpha, beta, A, B, C, kernel_ms); }});
+    routes.push_back({"cublas_dgemm", true,
+        [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C, double* kernel_ms) {
+                  cublas_dgemm(M, N, K, alpha, beta, A, B, C, kernel_ms); }});
+
+    routes.push_back({"cu1s_naive", true,
+        [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C, double* kernel_ms) {
+                  cu_s_ladder(M, N, K, alpha, beta, A, B, C, 1, kernel_ms); }});
+    routes.push_back({"cu2s_coalesce", true,
+        [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C, double* kernel_ms) {
+                  cu_s_ladder(M, N, K, alpha, beta, A, B, C, 2, kernel_ms); }});
+
     routes.push_back({"cu1d_naive", true,
         [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C, double* kernel_ms) {
                   cu_d_ladder(M, N, K, alpha, beta, A, B, C, 1, kernel_ms); }});
@@ -158,6 +167,18 @@ static std::vector<std::string> parse_names(const char* arg) {
     return names;
 }
 
+// True for cublas_sgemm and any hand-written single-precision ladder route, i.e. "cu<N>s_*"
+// (cu1s_naive, cu2s_coalesce, ...) as opposed to the double-precision "cu<N>d_*" ones. Matching on
+// "sgemm" alone (cublas_sgemm/cublas_dgemm) isn't enough since the cuN_ ladder routes don't carry
+// that suffix -- they mark precision with the s/d right after the digit instead.
+static bool is_single_precision_route(const std::string& name) {
+    if (name.find("sgemm") != std::string::npos) return true;
+    if (name.size() < 3 || name[0] != 'c' || name[1] != 'u') return false;
+    size_t i = 2;
+    while (i < name.size() && std::isdigit(static_cast<unsigned char>(name[i]))) ++i;
+    return i < name.size() && name[i] == 's';
+}
+
 // Default sizes are family-dependent. Larger default sizes for GPU to actually stress test
 static const std::vector<int> CPU_DEFAULT_SIZES = {510, 1022, 1024, 2045};
 static const std::vector<int> GPU_DEFAULT_SIZES = {510, 1022, 1024, 2045, 4096, 6144, 8192};
@@ -255,13 +276,15 @@ int main(int argc, char** argv) {
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
                     M, N, K, alpha, A.data(), K, B.data(), N, beta, C_ref.data(), N);
 
-        // Correctness pass. cublas_sgemm accumulates in float (~1e-7 relative precision vs.
-        // double's ~1e-16), so it needs a much looser tolerance -- same "error scales with K"
-        // shape, just the coefficient bumped by float's ~1e6 worse precision. This is an
-        // EXPECTED, correct-behavior difference (the whole point of trying sgemm), not a bug --
-        // the raw max_diff is still printed either way so the actual accuracy tradeoff is visible.
+        // Correctness pass. Single-precision routes (cublas_sgemm, and any hand-written cuN_s_*
+        // ladder route -- see is_single_precision_route()) accumulate in float (~1e-7 relative
+        // precision vs. double's ~1e-16), so they need a much looser tolerance -- same "error
+        // scales with K" shape, just the coefficient bumped by float's ~1e6 worse precision. This
+        // is an EXPECTED, correct-behavior difference (the whole point of trying single
+        // precision), not a bug -- the raw max_diff is still printed either way so the actual
+        // accuracy tradeoff is visible.
         for (const auto& r : routes) {
-            const double tol = (r.name == "cublas_sgemm") ? 1e-3 * K : 1e-9 * K;
+            const double tol = is_single_precision_route(r.name) ? 1e-3 * K : 1e-9 * K;
             std::fill(C.begin(), C.end(), 1.0);
             r.run(M, N, K, alpha, beta, A.data(), B.data(), C.data(), nullptr);
             double max_diff = 0.0;
@@ -274,7 +297,7 @@ int main(int argc, char** argv) {
 
         // One warmup call, then repeats (timer module measure the total, average, and num calls).
         // GPU routes (`is_gpu`) report their own kernel-only elapsed time (cudaEvents inside
-        // cublas_dgemm/cublas_sgemm/cuda_ladder -- see gemm_all.h's `kernel_ms`), fed straight into
+        // cublas_dgemm/cublas_sgemm/cu_s_ladder/cu_d_ladder -- see gemm_all.h's `kernel_ms`), fed straight into
         // timing::add, so cudaMalloc/H2D/D2H/free around the kernel are excluded from the number.
         // CPU routes keep the old wall-clock `timing::Scoped` wrap.
         for (const auto& r : routes) {
