@@ -25,6 +25,16 @@ cublasHandle_t get_handle() {
     return handle;
 }
 
+// Persistent cudaEvent_t pair for kernel-only timing. This is created once and reused for every call
+struct Events {
+    cudaEvent_t start, stop;
+    Events() { cudaEventCreate(&start); cudaEventCreate(&stop); }
+};
+Events& get_events() {
+    static Events e;
+    return e;
+}
+
 // Persistent pinned buffer that only grows when requested, reusable across calls. Copying into
 // a pinned buffer first then transferring from that to device avoids the allocation cost.
 template <typename T>
@@ -45,7 +55,7 @@ struct PinnedBuffer {
 } // namespace
 
 void cublas_dgemm(const int M, const int N, const int K, const double alpha, const double beta,
-                 const double* A, const double* B, double* C) {
+                 const double* A, const double* B, double* C, double* kernel_ms) {
 
     const size_t sizeA = static_cast<size_t>(M) * K;
     const size_t sizeB = static_cast<size_t>(K) * N;
@@ -64,6 +74,9 @@ void cublas_dgemm(const int M, const int N, const int K, const double alpha, con
 
     cublasHandle_t handle = get_handle();
 
+    Events& ev = get_events();
+    if (kernel_ms) cudaEventRecord(ev.start);
+
     // Pass in as (N, M, K, B, ldb=N, A, lda=K, C, ldc=N)
     // This means computing CT = BT * AT in column-major,
     cublasDgemm(handle,
@@ -74,6 +87,14 @@ void cublas_dgemm(const int M, const int N, const int K, const double alpha, con
                 d_A, K, // AT
                 &beta,
                 d_C, N); // CT
+
+    if (kernel_ms) {
+        cudaEventRecord(ev.stop);
+        cudaEventSynchronize(ev.stop);
+        float ms = 0.0f;
+        cudaEventElapsedTime(&ms, ev.start, ev.stop);
+        *kernel_ms = ms;
+    }
 
     // CT in column-major is C in row-major
     cudaMemcpy(C, d_C, sizeC * sizeof(double), cudaMemcpyDeviceToHost);
@@ -86,7 +107,7 @@ void cublas_dgemm(const int M, const int N, const int K, const double alpha, con
 // Single-precision path to explore the performance vs accuracy tradeoff. The double to float 
 // casting happens here.
 void cublas_sgemm(const int M, const int N, const int K, const double alpha, const double beta,
-                   const double* A, const double* B, double* C) {
+                   const double* A, const double* B, double* C, double* kernel_ms) {
 
     const size_t sizeA = static_cast<size_t>(M) * K;
     const size_t sizeB = static_cast<size_t>(K) * N;
@@ -118,6 +139,9 @@ void cublas_sgemm(const int M, const int N, const int K, const double alpha, con
     const float alpha_f = static_cast<float>(alpha);
     const float beta_f = static_cast<float>(beta);
 
+    Events& ev = get_events();
+    if (kernel_ms) cudaEventRecord(ev.start);
+
     // Same row-major-via-column-major swap trick as cublas_dgemm.
     cublasSgemm(handle,
                 CUBLAS_OP_N, CUBLAS_OP_N,
@@ -127,6 +151,14 @@ void cublas_sgemm(const int M, const int N, const int K, const double alpha, con
                 d_A, K,
                 &beta_f,
                 d_C, N);
+
+    if (kernel_ms) {
+        cudaEventRecord(ev.stop);
+        cudaEventSynchronize(ev.stop);
+        float ms = 0.0f;
+        cudaEventElapsedTime(&ms, ev.start, ev.stop);
+        *kernel_ms = ms;
+    }
 
     cudaMemcpy(hC, d_C, sizeC * sizeof(float), cudaMemcpyDeviceToHost);
     for (size_t i = 0; i < sizeC; ++i) C[i] = static_cast<double>(hC[i]);
@@ -141,7 +173,7 @@ void cublas_sgemm(const int M, const int N, const int K, const double alpha, con
 #include <stdexcept>
 
 void cublas_dgemm(const int, const int, const int, const double, const double,
-                  const double*, const double*, double*) {
+                  const double*, const double*, double*, double*) {
     throw std::runtime_error(
         "gemm_cublas: this build was compiled without EST_HAVE_CUBLAS -- the cuBLAS block in "
         "CMakeLists.txt is commented out (clean CPU-only build). Un-comment it to use "
@@ -149,7 +181,7 @@ void cublas_dgemm(const int, const int, const int, const double, const double,
 }
 
 void cublas_sgemm(const int, const int, const int, const double, const double,
-                   const double*, const double*, double*) {
+                   const double*, const double*, double*, double*) {
     throw std::runtime_error(
         "gemm_cublas: this build was compiled without EST_HAVE_CUBLAS -- the cuBLAS block in "
         "CMakeLists.txt is commented out (clean CPU-only build). Un-comment it to use "

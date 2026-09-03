@@ -20,8 +20,20 @@ CHECK_RE = re.compile(
 # timing::report() row: "<name> <seconds> <calls> <avg_ms>", name carries the shape
 PHASE_RE = re.compile(r"^\s*(.*?)\s+(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+(?:\.\d+)?)\s*$")
 
-# 7950X single-core peak: ~4.5 clock(GHz) * 8 doubles/zmm * 2 FMA units * 2 flops/FMA.
-PEAK_GFLOPS = 4.5 * 8 * 2 * 2
+# 7950X single-core: ~4.5GHz * 8 doubles/zmm * 2 FMA units * 2 flops/FMA
+CPU_PEAK_GFLOPS = 4.5 * 8 * 2 * 2
+# RTX 4090 (Ada, compute 8.9): FP32 (CUDA-core/SIMT) peak ~82.6 TFLOP/s (16384 cores * 2 flops/FMA *
+# ~2.52GHz). Consumer Ada caps FP64 matrix throughput to ~1:64 of that.
+GPU_FP32_PEAK_GFLOPS = 82.6e3
+GPU_FP64_PEAK_GFLOPS = GPU_FP32_PEAK_GFLOPS / 64
+
+
+def peak_gflops_for(route):
+    if route == "cublas_sgemm":
+        return GPU_FP32_PEAK_GFLOPS
+    if is_gpu_route(route):
+        return GPU_FP64_PEAK_GFLOPS
+    return CPU_PEAK_GFLOPS
 
 # `perf stat` trackings
 PERF_EVENTS = "cycles,instructions,L1-dcache-loads,L1-dcache-load-misses,cache-references,cache-misses"
@@ -33,6 +45,13 @@ LEGACY_ROUTES = {
     "naive_mnk", "naive_mkn", "mkn_4x1", "mkn_8x1",
     "mnk_4x1", "mnk_1x4", "mnk_8x1", "mnk_1x8", "mnk_4x4", "mnk_8x8",
 }
+
+
+def is_gpu_route(name):
+    """GPU routes all share the "cu" prefix, and no CPU route does. They're timed via cudaEvents
+    inside the GEMM call itself (kernel-only, excluding cudaMalloc/H2D/D2H/free) and never run
+    under `perf stat`, which is meaningless for processes running on GPU."""
+    return name.startswith("cu")
 
 
 def parse(text):
@@ -113,8 +132,11 @@ def discover_routes(only=None):
     return only
 
 
-def run_plain(sizes, repeats, enable_legacy):
-    """Existing single-invocation path: binary loops every route internally. Returns stdout."""
+def run_plain(sizes, repeats, enable_legacy, routes=None):
+    """Single-invocation path: binary loops every requested route (and size) internally in one
+    process. Returns stdout. `routes`, when given, is passed through as --routes so only those
+    are run; otherwise the binary's own default selection applies (GPU family only, plus CPU
+    with --legacy)."""
     cmd = [str(BINARY)]
     if sizes:
         cmd += ["--sizes", sizes]
@@ -122,6 +144,8 @@ def run_plain(sizes, repeats, enable_legacy):
         cmd += ["--repeats", str(repeats)]
     if enable_legacy:
         cmd += ["--legacy"]
+    if routes:
+        cmd += ["--routes", ",".join(routes)]
 
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
@@ -168,7 +192,7 @@ def report(results, logger, noperf=False):
         # Rank fastest first.
         for route, d in sorted(routes.items(), key=lambda kv: -kv[1]["gflops"]):
             pct_ob = f"{100 * d['gflops'] / ref:.1f}" if ref else "-"
-            pct_pk = f"{100 * d['gflops'] / PEAK_GFLOPS:.1f}"
+            pct_pk = f"{100 * d['gflops'] / peak_gflops_for(route):.1f}"
             check = "-" if d["ok"] is None else ("PASS" if d["ok"] else "FAIL")
             line = (f"{route:<13} {d['avg_ms']:>10.4f} {pct_ob:>10} "
                     f"{d['gflops']:>10.2f} {pct_pk:>8} {check:>6}")
@@ -196,7 +220,7 @@ def report_markdown(results, logger, noperf=False):
             logger.info("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")   
         for route, d in sorted(routes.items(), key=lambda kv: -kv[1]["gflops"]):
             pct_ob = f"{100 * d['gflops'] / ref:.1f}" if ref else "-"
-            pct_pk = f"{100 * d['gflops'] / PEAK_GFLOPS:.1f}"
+            pct_pk = f"{100 * d['gflops'] / peak_gflops_for(route):.1f}"
             name = DISPLAY_NAME.get(route, route)
             if noperf:
                 logger.info(f"| {name} | {d['avg_ms']:.3f} | {pct_ob} | {d['gflops']:.2f} | {pct_pk} | - |")
@@ -210,17 +234,19 @@ def main():
     ap.add_argument("--sizes", help="comma-separated square dims, e.g. 256,512,1024")
     ap.add_argument("--repeats", type=int)
     ap.add_argument("--legacy", action="store_true",
-                     help="include the pre-AVX routes (naive_*/mkn_RxR/mnk_RxR), frozen as of "
-                          "v3.1.3 and excluded from the default route set")
+                     help="include the pre-AVX CPU routes (naive_*/mkn_RxR/mnk_RxR), frozen as of "
+                          "v3.1.3 -- implies --cpu")
+    ap.add_argument("--cpu", action="store_true",
+                     help="also run the CPU family (openblas/eigen/avx*/avx_blis*) through the "
+                          "perf-stat sweep. gemm_bench defaults to the GPU family only (cublas_*, "
+                          "cuN_* hand-written kernels) since v3.3.0 -- see CHANGELOG.md")
     ap.add_argument("--noperf", action="store_true",
-                     help="run the binary directly for all paths without perf for separate routes")
-    ap.add_argument("--routes", help="comma-separated route names (only valid without --noperf); "
-                                      "default: every non-legacy route gemm_bench --list-routes "
-                                      "reports (add --legacy to include the frozen pre-AVX ones)")
+                     help="run CPU routes directly without perf; GPU routes never use perf "
+                          "regardless (their own cudaEvent kernel-only timing is already precise, "
+                          "and perf's CPU hardware counters don't mean anything for GPU work)")
+    ap.add_argument("--routes", help="comma-separated route names, overriding the default "
+                                      "GPU-only (or GPU+CPU with --cpu/--legacy) selection")
     args = ap.parse_args()
-
-    if args.routes and args.noperf:
-        ap.error("--routes only applies without --noperf ")
 
     if not BINARY.exists():
         raise RuntimeError(f"Binary not found: {BINARY} (build the gemm_bench target)")
@@ -231,21 +257,41 @@ def main():
     logger.addHandler(logging.FileHandler(log_path, mode='w'))
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
-    if not args.noperf:
-        if args.routes:
-            routes = discover_routes(args.routes.split(","))
-        else:
-            routes = discover_routes(None)
-            if not args.legacy:
-                routes = [r for r in routes if r not in LEGACY_ROUTES]
-        sizes = [int(s) for s in args.sizes.split(",")] if args.sizes else [1022, 1024, 2045, 2048]
-        results = run_all_perf(routes, sizes, args.repeats or 3, logger)
+    if args.routes:
+        requested = discover_routes(args.routes.split(","))
     else:
-        stdout = run_plain(args.sizes, args.repeats, args.legacy)
-        results = parse(stdout)
+        requested = discover_routes(None)
+        if not args.legacy:
+            requested = [r for r in requested if r not in LEGACY_ROUTES]
+        if not (args.cpu or args.legacy):
+            requested = [r for r in requested if is_gpu_route(r)]
 
-    report(results, logger, noperf=args.noperf)
-    report_markdown(results, logger, noperf=args.noperf)
+    gpu_routes = [r for r in requested if is_gpu_route(r)]
+    cpu_routes = [r for r in requested if not is_gpu_route(r)]
+
+    results = {}
+
+    if gpu_routes:
+        stdout = run_plain(args.sizes, args.repeats, False, routes=gpu_routes)
+        for shape, route_dict in parse(stdout).items():
+            results.setdefault(shape, {}).update(route_dict)
+
+    if cpu_routes:
+        if args.noperf:
+            stdout = run_plain(args.sizes, args.repeats, args.legacy, routes=cpu_routes)
+            for shape, route_dict in parse(stdout).items():
+                results.setdefault(shape, {}).update(route_dict)
+        else:
+            sizes = [int(s) for s in args.sizes.split(",")] if args.sizes else [1022, 1024, 2045, 2048]
+            cpu_results = run_all_perf(cpu_routes, sizes, args.repeats or 3, logger)
+            for shape, route_dict in cpu_results.items():
+                results.setdefault(shape, {}).update(route_dict)
+
+    # Column layout follows what was actually measured, not a CLI flag: GPU-only runs never have
+    # perf fields to show, mixed GPU+CPU (--cpu, without --noperf) do.
+    has_perf = any("ipc" in d for route_dict in results.values() for d in route_dict.values())
+    report(results, logger, noperf=not has_perf)
+    report_markdown(results, logger, noperf=not has_perf)
 
     (OUT_DIR / f"{args.name}.json").write_text(json.dumps(results, indent=2))
 
