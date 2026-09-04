@@ -54,8 +54,8 @@ __global__ void cu2s_coalesce(const int M, const int N, const int K, const float
     // Along the wrap threadIdx.x moves the fastest, so we want to align that with the contiguous
     // axis in both B and C (col), so col gets the + `threadIdx.x` here so threads within a wrap
     // points to a contiguous block of memory (row in C and row in B)
-    const unsigned int row = blockIdx.x * BLOCKSIZE + threadIdx.y;
-    const unsigned int col = blockIdx.y * BLOCKSIZE + threadIdx.x;
+    const unsigned int row = blockIdx.x * BLOCKSIZE + threadIdx.x / BLOCKSIZE;
+    const unsigned int col = blockIdx.y * BLOCKSIZE + threadIdx.x % BLOCKSIZE;
 
     if (row < M && col < N) {
         float tmp = 0.0;
@@ -66,6 +66,10 @@ __global__ void cu2s_coalesce(const int M, const int N, const int K, const float
     }
 }
 
+#define BM 32
+#define BN 32
+#define BK 32
+
 // The idea here is basically identical to cache blocking KC in GEMM by breaking 
 // up K into KC length blocks (BLOCKSIZE length in this case)
 __global__ void cu3s_smem_block(const int M, const int N, const int K, const float alpha, const float beta,
@@ -75,8 +79,8 @@ __global__ void cu3s_smem_block(const int M, const int N, const int K, const flo
     const unsigned int blk_row = blockIdx.x * BLOCKSIZE;
     const unsigned int blk_col = blockIdx.y * BLOCKSIZE;
 
-    const unsigned int thr_row = threadIdx.y;
-    const unsigned int thr_col = threadIdx.x;
+    const unsigned int thr_row = threadIdx.x / BLOCKSIZE;
+    const unsigned int thr_col = threadIdx.x % BLOCKSIZE;
 
     const unsigned int global_row = blk_row + thr_row;
     const unsigned int global_col = blk_col + thr_col;
@@ -87,35 +91,35 @@ __global__ void cu3s_smem_block(const int M, const int N, const int K, const flo
     
     // Fixed on block size, so all threads can access this. This is loaded into the
     // shared memory (SM) that doesn't get evicted automatically.
-    __shared__ float A_blk[BLOCKSIZE * BLOCKSIZE];
-    __shared__ float B_blk[BLOCKSIZE * BLOCKSIZE];
+    __shared__ float A_blk[BM * BK];
+    __shared__ float B_blk[BK * BN];
 
     float tmp = 0.0f;
-    for (int bkIdx = 0; bkIdx < K; bkIdx += BLOCKSIZE) {
+    for (int bkIdx = 0; bkIdx < K; bkIdx += BK) {
         // Safe load for A with boundary checks, creating a contiguous block of data that
         // follows the wrap fastest axis. Basically similar to packing.
         if (global_row < M && (bkIdx + thr_col) < K) {
-            A_blk[thr_row * BLOCKSIZE + thr_col] = A_start[thr_row * lda + thr_col];
+            A_blk[thr_row * BK + thr_col] = A_start[thr_row * lda + thr_col];
         } else {
-            A_blk[thr_row * BLOCKSIZE + thr_col] = 0.0f; // at the end: the excessive threads
+            A_blk[thr_row * BK + thr_col] = 0.0f; // at the end: the excessive threads
         }
 
         // Similar for B
         if ((bkIdx + thr_row) < K && global_col < N) {
-            B_blk[thr_row * BLOCKSIZE + thr_col] = B_start[thr_row * ldb + thr_col];
+            B_blk[thr_row * BN + thr_col] = B_start[thr_row * ldb + thr_col];
         } else {
-            B_blk[thr_row * BLOCKSIZE + thr_col] = 0.0f;
+            B_blk[thr_row * BN + thr_col] = 0.0f;
         }
 
         // Wait until all threads finish loading shared memory
         __syncthreads();
 
-        A_start += BLOCKSIZE;
-        B_start += BLOCKSIZE * ldb;
+        A_start += BK;
+        B_start += BN * ldb;
 
         // Dot product computation
-        for (int i = 0; i < BLOCKSIZE; ++i) {
-            tmp += A_blk[thr_row * BLOCKSIZE + i] * B_blk[i * BLOCKSIZE + thr_col];
+        for (int i = 0; i < BK; ++i) {
+            tmp += A_blk[thr_row * BK + i] * B_blk[i * BN + thr_col];
         }
 
         // Wait until all threads finish reading shared memory before the next loop iteration overwrites it
@@ -125,6 +129,87 @@ __global__ void cu3s_smem_block(const int M, const int N, const int K, const flo
     // Safe write-back to C with boundary checks
     if (global_row < M && global_col < N) {
         C_start[thr_row * ldc + thr_col] = alpha * tmp + beta * C_start[thr_row * ldc + thr_col];
+    }
+}
+
+#undef BM
+#undef BN
+#undef BK
+
+#define BM 64
+#define BN 64
+#define BK 8
+#define TM 8
+
+// Simple idea: each thread does more than one job. Here, each thread calculates a column size TM.
+__global__ void cu4s_thread_mul(const int M, const int N, const int K, const float alpha, const float beta,
+                const float* A, const float* B, float* C) {
+    const int lda = K; const int ldb = N; const int ldc = N;
+
+    const unsigned int blk_row = blockIdx.x * BM;
+    const unsigned int blk_col = blockIdx.y * BN;
+
+    // Renaming so it's clear and consistent
+    const unsigned int innerRowA = threadIdx.x / BK;
+    const unsigned int innerColA = threadIdx.x % BK;
+    
+    // B and C shares the same ldb, so their inner rows/cols match
+    const unsigned int innerRowBC = threadIdx.x / BN;
+    const unsigned int innerColBC = threadIdx.x % BN;
+    
+    // Global as to C, but can be used to check bounds for both A and B
+    const unsigned int global_row = blk_row + innerRowBC * TM;
+    const unsigned int global_col = blk_col + innerColBC;
+
+    const float* A_start = A + blk_row * lda;
+    const float* B_start = B + blk_col;
+    float* C_start = C + blk_row * ldc + blk_col;
+
+    __shared__ float A_blk[BM * BK];
+    __shared__ float B_blk[BK * BN];
+
+    float thread_results[TM] = {};
+
+    for (int bkIdx = 0; bkIdx < K; bkIdx += BK) {
+        if ((blk_row + innerRowA) < M && (bkIdx + innerColA) < K) {
+            A_blk[innerRowA * BK + innerColA] = A_start[innerRowA * lda + innerColA];
+        } else {
+            A_blk[innerRowA * BK + innerColA] = 0.0f; // at the end: the excessive threads
+        }
+
+        if ((bkIdx + innerRowBC) < K && global_col < N) {
+            B_blk[innerRowBC * BN + innerColBC] = B_start[innerRowBC * ldb + innerColBC];
+        } else {
+            B_blk[innerRowBC * BN + innerColBC] = 0.0f;
+        }
+        // Wait until all threads finish loading shared memory
+        __syncthreads();
+
+        A_start += BK;
+        B_start += BK * ldb;
+
+        // Dot product computation
+        for (int i = 0; i < BK; ++i) {
+            float B_val = B_blk[i * BN + innerColBC]; // Fetch once, reuse as move down the column
+            for (int row_tm = 0; row_tm < TM; ++row_tm) {
+                thread_results[row_tm] += A_blk[(innerRowBC * TM + row_tm) * BK + i] * B_val;
+            }
+        }
+        // Wait until all threads finish reading shared memory before the next loop iteration overwrites it
+        __syncthreads();
+    }
+
+    // Safe write-back to C with boundary checks
+    // inner for B, but C can basically reuse
+    if (global_row < M && global_col < N) {
+        for (int row_tm = 0; row_tm < TM; ++row_tm) {
+            if (global_row + row_tm >= M) break;
+
+            C_start[(innerRowBC * TM + row_tm) * ldc + innerColBC] = 
+                alpha * thread_results[row_tm] 
+                + beta * C_start[(innerRowBC * TM + row_tm) * ldc + innerColBC];
+        }
+        
     }
 }
 
@@ -161,14 +246,21 @@ void cu_s_ladder(const int M, const int N, const int K, const double alpha, cons
         (M + block.x - 1) / block.x,
         (N + block.y - 1) / block.y
     );
+    
+    // uses the macros instead
+    dim3 grid_flex(
+        (M + BM - 1) / BM,
+        (N + BN - 1) / BN
+    );
 
     Events& ev = get_events();
     if (kernel_ms) cudaEventRecord(ev.start);
 
 	switch (ladder) {
 		case 1: cu1s_naive<<<grid, block>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
-        case 2: cu2s_coalesce<<<grid, block>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
-        case 3: cu3s_smem_block<<<grid, block>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
+        case 2: cu2s_coalesce<<<grid, dim3(32*32)>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
+        case 3: cu3s_smem_block<<<grid, dim3(32*32)>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
+        case 4: cu4s_thread_mul<<<grid_flex, dim3(BM*BK)>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
 	}
 
     if (kernel_ms) {
@@ -209,8 +301,8 @@ __global__ void cu2d_coalesce(const int M, const int N, const int K, const doubl
     // Along the wrap threadIdx.x moves the fastest, so we want to align that with the contiguous
     // axis in both B and C (col), so col gets the + `threadIdx.x` here so threads within a wrap
     // points to a contiguous block of memory (row in C and row in B)
-    const unsigned int row = blockIdx.x * BLOCKSIZE + threadIdx.y;
-    const unsigned int col = blockIdx.y * BLOCKSIZE + threadIdx.x;
+    const unsigned int row = blockIdx.x * BLOCKSIZE + threadIdx.x / BLOCKSIZE;
+    const unsigned int col = blockIdx.y * BLOCKSIZE + threadIdx.x % BLOCKSIZE;
 
     if (row < M && col < N) {
         double tmp = 0.0;
@@ -228,8 +320,8 @@ __global__ void cu3d_smem_block(const int M, const int N, const int K, const dou
     const unsigned int blk_row = blockIdx.x * BLOCKSIZE;
     const unsigned int blk_col = blockIdx.y * BLOCKSIZE;
     
-    const unsigned int thr_row = threadIdx.y;
-    const unsigned int thr_col = threadIdx.x;
+    const unsigned int thr_row = threadIdx.x / BLOCKSIZE;
+    const unsigned int thr_col = threadIdx.x % BLOCKSIZE;
 
     const unsigned int global_row = blk_row + thr_row;
     const unsigned int global_col = blk_col + thr_col;
@@ -307,8 +399,8 @@ void cu_d_ladder(const int M, const int N, const int K, const double alpha, cons
 
 	switch (ladder) {
 		case 1: cu1d_naive<<<grid, block>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
-        case 2: cu2d_coalesce<<<grid, block>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
-        case 3: cu3d_smem_block<<<grid, block>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
+        case 2: cu2d_coalesce<<<grid, dim3(32*32)>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
+        case 3: cu3d_smem_block<<<grid, dim3(32*32)>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
 	}
 
     if (kernel_ms) {

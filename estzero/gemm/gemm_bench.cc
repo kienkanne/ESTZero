@@ -44,6 +44,9 @@ static void add_gpu_routes(std::vector<Route>& routes) {
     routes.push_back({"cu3s_smem", true,
         [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C, double* kernel_ms) {
                   cu_s_ladder(M, N, K, alpha, beta, A, B, C, 3, kernel_ms); }});
+    routes.push_back({"cu4s_thread_mul", true,
+        [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C, double* kernel_ms) {
+                  cu_s_ladder(M, N, K, alpha, beta, A, B, C, 4, kernel_ms); }});
 
     routes.push_back({"cu1d_naive", true,
         [](int M, int N, int K, double alpha, double beta, const double* A, const double* B, double* C, double* kernel_ms) {
