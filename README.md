@@ -17,6 +17,7 @@ This repository is inspired by the following projects, which are also the refere
 **General Matrix Multiplication**
 - https://github.com/flame/how-to-optimize-gemm
 - https://github.com/flame/blislab
+- https://siboehm.com/articles/22/CUDA-MMM
 
 ## Benchmarking
 

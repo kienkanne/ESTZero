@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.3.2] Added Shared Memory Cache Blocking: `cu3s_smem`/`cu3d_smem`
+
+- The idea here is basically similar to `KC` cache blocking implemented in the `avx_blis` family, meaning that the innermost iteration is broken into blocks (size 32, GPU block size), and going along it loops through C titles K/BLOCKSIZE times. It's also somewhat a packing idea, with each block packing the 32x32 block into the shared memory on every chunk, so that the fastest data read axis aligns with that of the wrap
+- `cu3s_smem` reached 6.163 TFLOPs, ~2.67x faster than `cu2s_coalesce`, but is only 10% of `cublas_sgemm`. Caching the block is a major improvement, but the ladder can continue be extended following the tutorial.
+- `cu3d_smem`, as expected, doesn't improve by any, and is basically equivalent to `cublas_dgemm` also even on large matrices due to the capped F64. In the next patches the double-precision version won't be mentioned, but they will still appear in the logs. 
+
 ## [v3.3.1] Single-precision counterparts of GPU GEMM ladder (`cu1s_naive`/`cu2s_coalesce`)
 
 - Added `cu1s_naive`/`cu2s_coalesce` (`estzero/gemm/cuda_ladder.cc`) via `cu_s_ladder`. Basically same to `cu_d_ladder`, but with a double to float case inside the wrapper using a pinned buffer just like `cublas_sgemm`.
@@ -11,7 +17,7 @@ All version updates to this project will be documented in this file. The perform
 
 ## [v3.3.0] Hand-written double-precision GPU GEMM kernels (`cu1d_naive`/`cu2d_coalescing`), microbenchmark moved to kernel-only timing
 
-- Added `cu1d_naive` and `cu2d_coalesce` (`estzero/gemm/cuda_ladder.cc`), the start of a from-scratch CUDA GEMM ladder alongside cuBLAS.
+- Added `cu1d_naive` and `cu2d_coalesce` (`estzero/gemm/cuda_ladder.cc`), the start of a from-scratch CUDA GEMM ladder alongside cuBLAS. The ladder here follows this tutorial: https://siboehm.com/articles/22/CUDA-MMM
 - `gemm_bench`'s timing moved inside the GEMM call itself, as `cublas_dgemm`/`cublas_sgemm`/`cu_s_ladder`/`cu_d_ladder` now take an optional `kernel_ms` out-param, measured with a persistent `cudaEvent_t` pair around just the kernel/cublas launch, excluding the memory allocation steps, allowing for a better measurenment on FLOPs by excluding the overhead cost.
 - `gemm_bench` now defaults to the GPU route family only, the CPU family has to be called via `--cpu`. The default matrix sizes are raised up to 8192 to match the GPU's performance.
 - `cu2d_coalesce` is already comparable with `cublas_dgemm` even at size 8192, reaching ~90-100% of the ~1.3 TFLOP/s ceiling for double-precision. This GPU's FP64 rate is capped to ~1:64 of FP32, so even the naive version already comparable with `cublas_dgemm`.
