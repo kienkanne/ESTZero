@@ -141,7 +141,8 @@ __global__ void cu3s_smem_block(const int M, const int N, const int K, const flo
 #define BK 8
 #define TM 8
 
-// Simple idea: each thread does more than one job. Here, each thread calculates a column size TM.
+// The idea is that each thread still only populates one value in A/B, but with this choice of BLOCKSIZE
+// each thread can fill 8 C titles.
 __global__ void cu4s_thread_mul(const int M, const int N, const int K, const float alpha, const float beta,
                 const float* A, const float* B, float* C) {
     const int lda = K; const int ldb = N; const int ldc = N;

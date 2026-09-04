@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.3.3] Added `cu4s_thread_mul`: each thread calculates 8 C titles
+
+- To improve data reuse, each thread calculates a column of 8 rows (TM=8) in the innermost loop. Previously the block size was fixed to 32x32, but here it was set to changable macros (BM=BN=64, BK=8, TM=8). At this stage, each thread still only populates one value in A/B, but the smart choice of shapes exploit that the resulting C block (64x8 @ 8x64 -> 64x64) is 8 times larger than the number of threads per block, which is 64x8 only.
+- Variables definitions and names were renamed to be more readable and consistent.
+- `cu4s_thread_mul` reached 12.8 TFLOPs as it requires less memory access, doubling the peformance of `cu3s_smem`.
+
 ## [v3.3.2] Added Shared Memory Cache Blocking: `cu3s_smem`/`cu3d_smem`
 
 - The idea here is basically similar to `KC` cache blocking implemented in the `avx_blis` family, meaning that the innermost iteration is broken into blocks (size 32, GPU block size), and going along it loops through C titles K/BLOCKSIZE times. It's also somewhat a packing idea, with each block packing the 32x32 block into the shared memory on every chunk, so that the fastest data read axis aligns with that of the wrap
