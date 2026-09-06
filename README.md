@@ -9,14 +9,15 @@ The test used to evaluate the performance of the engine is formaldehyde at the d
 This repository is inspired by the following projects, which are also the references for the equations and programming materials:
 
 **Electronic Structure Theory**
-- Psi4Numpy: https://github.com/psi4/psi4numpy/
+- Psi4Numpy: https://github.com/psi4/psi4numpy
 - CCQC's summer program: https://github.com/CCQC/summer-program
-- Dr. Crawford's C++ Programming Projects: https://github.com/CrawfordGroup/ProgrammingProjects/
-- Dr. Crawford's PyCC: https://github.com/CrawfordGroup/pycc/
+- Dr. Crawford's C++ Programming Projects: https://github.com/CrawfordGroup/ProgrammingProjects
+- Dr. Crawford's PyCC: https://github.com/CrawfordGroup/pycc
 
 **General Matrix Multiplication**
 - https://github.com/flame/how-to-optimize-gemm
 - https://github.com/flame/blislab
+- https://github.com/siboehm/SGEMM_CUDA
 - https://siboehm.com/articles/22/CUDA-MMM
 
 ## Benchmarking
@@ -45,7 +46,7 @@ freeze_core false
 
 ## 1. GEMM Microbenchmark
 
-Starting from version 3.0.0, the focus shifted to optimizing the backend of the manually implemented `einsum`, which is the backbone of the post-HF methods implemented here. This update wired Eigen to call GEMM instead of the previous odometer scheme for `einsum` contractions. Version 3.1.0 introduced a specialized microbenchmark for GEMM, with the intention to walk up the optimization ladder starting from the naive baseline GEMM. Version 3.1.1 reorganized the route naming into three families: `naive_*` (unoptimized references), `mkn_RxR` (loop order `mnk`, blocks rows of A reused against B), `mnk_RxR` (tiles a block of C held as accumulators that live in registers across the k reduction, or "register blocking"). Version 3.1.3/3.1.4 added a fourth family, `avx_RxNR`, using `<immintrin.h>` AVX-512 intrinsics directly instead of hoping the auto-vectorizer packs named scalar accumulators (`avx_12x8`/`avx_16x8`/`avx_20x8`/`avx_24x8` are generated using macros from the same logic as `avx_8x8`).
+Starting from version 3.0.0, the focus shifted to optimizing the backend of the manually implemented `einsum`, which is the backbone of the post-HF methods implemented here. This update wired Eigen to call GEMM instead of the previous odometer scheme for `einsum` contractions. Version 3.1.0 introduced a specialized microbenchmark for GEMM, with the intention to walk up the optimization ladder starting from the naive baseline GEMM. Version 3.1.1 reorganized the route naming into three families: `naive_*` (unoptimized references), `mkn_RxR` (loop order `mnk`, blocks rows of A reused against B), `mnk_RxR` (tiles a block of C held as accumulators that live in registers across the k reduction, or "register blocking"). Version 3.1.3/3.1.4 added a fourth family, `avx_RxNR`, using `<immintrin.h>` AVX-512 intrinsics directly instead of hoping the auto-vectorizer packs named scalar accumulators (`avx_12x8`/`avx_16x8`/`avx_20x8`/`avx_24x8` are generated using macros from the same logic as `avx_8x8`). 3.3.0-3.3.4 is a similar patch series that target GPU GEMM instead with hand-written CUDA kernels to compare with `cuBLAS`.
 
 The results reported here are timings for a matrix multiplcation task: C = alpha\*\(A\*\B) + beta\*\C. Single-core peak GFLOPs on this machine (AMD Ryzen 9 7950X) = ~4.5 clock(GHz) * 8 doubles/zmm * 2 FMA units * 2 flops/FMA = 144 GFLOPs. GFLOPs of each run is calculated as (2.0 * M * N * K) / (avg_ms * 1e6).
 
@@ -55,6 +56,22 @@ python3 bench/gemm_bench.py --cpu                                            # a
 python3 bench/gemm_bench.py --legacy --sizes 1022                            # old naive/mkn/mnk routes
 python3 bench/gemm_bench.py --routes openblas,avx_8x8,mkn_8x1 --sizes 1022   # just these
 ```
+
+### GPU ladder snapshot (v3.3.0-v3.3.4a, single-precision)
+
+Shape: 8192x8192x8192
+| Route | Avg(ms) | %OpenBLAS | GFLOP/s | %Peak | Note |
+| --- | --- | --- | --- | --- | --- |
+| cublas_sgemm | 18.090 | - | 60780.08 | 73.6 | - |
+| cu5s_2d_title | 43.770 | - | 25120.21 | 30.4 | - |
+| cu4s_thread_mul | 85.775 | - | 12818.56 | 15.5 | - |
+| cu3s_smem | 178.935 | - | 6144.75 | 7.4 | - |
+| cu2s_coalesce | 480.751 | - | 2287.07 | 2.8 | - |
+| cu3d_smem | 836.251 | - | 1314.81 | 101.9 | - |
+| cu2d_coalesce | 845.817 | - | 1299.94 | 100.7 | - |
+| cublas_dgemm | 880.691 | - | 1248.46 | 96.7 | - |
+| cu1s_naive | 1606.262 | - | 684.52 | 0.8 | - |
+| cu1d_naive | 1650.368 | - | 666.22 | 51.6 | - |
 
 ### Full ladder snapshot (frozen as of v3.1.4, before packing)
 
