@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.3.4] Added `cu5s_2d_title`: each thread calculates 16 C titles (4x4) block
+
+- Making each thread calculate a 4x4 block would push arithmetic intensity even higher, and each thread fills 8 values (4 for A, 4 for B: twice as much as before, so only 256 threads per block) in the SM cache filling step. A simple `strideA`/`strideB` (dividing `numthreads` by `BK`/`BN`) helps achieve this easily. The block values here are BM=BN=64, BK=TM=TN=4.
+- Peformance of `cu5s_2d_title` again doubled compared to the previous version, `cu4s_thread_mul`, as it reached 23.36 TFLOPs, or about 38% of `cublas_sgemm`.
+
 ## [v3.3.3] Added `cu4s_thread_mul`: each thread calculates 8 C titles
 
 - To improve data reuse, each thread calculates a column of 8 rows (TM=8) in the innermost loop. Previously the block size was fixed to 32x32, but here it was set to changable macros (BM=BN=64, BK=8, TM=8). At this stage, each thread still only populates one value in A/B, but the smart choice of shapes exploit that the resulting C block (64x8 @ 8x64 -> 64x64) is 8 times larger than the number of threads per block, which is 64x8 only.

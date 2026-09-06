@@ -215,6 +215,109 @@ __global__ void cu4s_thread_mul(const int M, const int N, const int K, const flo
 }
 
 
+// The idea is expanded, each thread now loads in MULTIPLE values.
+#undef BM
+#undef BN
+#undef BK
+#undef TM
+
+#define BM 64
+#define BN 64
+#define BK 4
+#define TM 4
+#define TN 4
+
+__global__ void cu5s_2d_tile(const int M, const int N, const int K, const float alpha, const float beta,
+                const float* A, const float* B, float* C) {
+    const int lda = K; const int ldb = N; const int ldc = N;
+    
+    // 256 (each loads 8, twice as much as before, so we only need 512/2=256 threads per block now)
+    const uint numthreads = blockDim.x; 
+    // these strides allow us to sweep all of A_blk and B_blk using threadIdx
+    const uint strideA = blockDim.x / BK; // 32
+    const uint strideB = blockDim.x / BN; // 4
+    // these now mean WITHIN the assigned C block (4x4) of THIS thread
+    const uint threadRow = threadIdx.x / (BN / TN); // ranges 0, BM/TM
+    const uint threadCol = threadIdx.x % (BN / TN); // ranges 0, BN/TN
+
+    const unsigned int blk_row = blockIdx.x * BM;
+    const unsigned int blk_col = blockIdx.y * BN;
+
+    const unsigned int innerRowA = threadIdx.x / BK;
+    const unsigned int innerColA = threadIdx.x % BK;
+    
+    const unsigned int innerRowBC = threadIdx.x / BN;
+    const unsigned int innerColBC = threadIdx.x % BN;
+    
+    const float* A_start = A + blk_row * lda;
+    const float* B_start = B + blk_col;
+    float* C_start = C + blk_row * ldc + blk_col;
+
+    __shared__ float A_blk[BM * BK];
+    __shared__ float B_blk[BK * BN];
+
+    float thread_results[TM * TN] = {};
+    
+    float regM[TM] = {0.0};
+    float regN[TN] = {0.0};
+
+    for (int bkIdx = 0; bkIdx < K; bkIdx += BK) {
+        // populate the SMEM caches
+        for (uint offset = 0; offset < BM; offset += strideA) {
+            if ((blk_row + innerRowA + offset) < M && (bkIdx + innerColA) < K) {
+                A_blk[(innerRowA + offset) * BK + innerColA] =
+                    A_start[(innerRowA + offset) * K + innerColA];
+            } else {
+                A_blk[(innerRowA + offset) * BK + innerColA] = 0;
+            }
+        }
+        for (uint offset = 0; offset < BK; offset += strideB) {
+            if ((bkIdx + innerRowBC + offset) < K && (blk_col + innerColBC) < N) {
+                B_blk[(innerRowBC + offset) * BN + innerColBC] =
+                    B_start[(innerRowBC + offset) * N + innerColBC];
+            } else {
+                B_blk[(innerRowBC + offset) * BN + innerColBC] = 0;
+            }
+        }
+        __syncthreads();
+
+        A_start += BK;
+        B_start += BK * ldb; 
+
+        // calculate per-thread results
+        for (uint dotIdx = 0; dotIdx < BK; ++dotIdx) {
+            // Similar to register blocking style in CPU, we get the two mini vectors, 
+            for (uint i = 0; i < TM; ++i) {
+                regM[i] = A_blk[(threadRow * TM + i) * BK + dotIdx];
+            }
+            for (uint i = 0; i < TN; ++i) {
+                regN[i] = B_blk[dotIdx * BN + threadCol * TN + i];   
+            }
+            // and then perform outer product
+            for (uint resIdxM = 0; resIdxM < TM; ++resIdxM) {
+                for (uint resIdxN = 0; resIdxN < TN; ++resIdxN) {
+                thread_results[resIdxM * TN + resIdxN] +=
+                    regM[resIdxM] * regN[resIdxN];
+                }
+            }
+        }
+        __syncthreads();
+    }
+
+    const unsigned int global_row = blk_row + threadRow * TM;
+    const unsigned int global_col = blk_col + threadCol * TN;
+    // Fill data with bounds check
+    for (int resIdxM = 0; resIdxM < TM; ++resIdxM) {
+        if (global_row + resIdxM >= M) break;
+        for (int resIdxN = 0; resIdxN < TN; ++resIdxN) {
+            if (global_col + resIdxN >= N) continue;
+            int idx = (threadRow * TM + resIdxM) * ldc + (threadCol * TN + resIdxN);
+            C_start[idx] = alpha * thread_results[resIdxM * TN + resIdxN] + beta * C_start[idx];
+        }
+    }
+}
+
+
 void cu_s_ladder(const int M, const int N, const int K, const double alpha, const double beta,
                  const double* A, const double* B, double* C, int ladder, double* kernel_ms) {
     const size_t sizeA = static_cast<size_t>(M) * K;
@@ -248,11 +351,7 @@ void cu_s_ladder(const int M, const int N, const int K, const double alpha, cons
         (N + block.y - 1) / block.y
     );
     
-    // uses the macros instead
-    dim3 grid_flex(
-        (M + BM - 1) / BM,
-        (N + BN - 1) / BN
-    );
+    dim3 grid64((M + BM - 1) / BM,(N + BN - 1) / BN);
 
     Events& ev = get_events();
     if (kernel_ms) cudaEventRecord(ev.start);
@@ -261,7 +360,8 @@ void cu_s_ladder(const int M, const int N, const int K, const double alpha, cons
 		case 1: cu1s_naive<<<grid, block>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
         case 2: cu2s_coalesce<<<grid, dim3(32*32)>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
         case 3: cu3s_smem_block<<<grid, dim3(32*32)>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
-        case 4: cu4s_thread_mul<<<grid_flex, dim3(BM*BK)>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
+        case 4: cu4s_thread_mul<<<grid64, dim3(64*8)>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
+        case 5: cu5s_2d_tile<<<grid64, dim3((BM*BN)/(TM*TN))>>>(M, N, K, alpha, beta, d_A, d_B, d_C); break;
 	}
 
     if (kernel_ms) {
