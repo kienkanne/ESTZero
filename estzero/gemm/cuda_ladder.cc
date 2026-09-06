@@ -227,10 +227,12 @@ __global__ void cu4s_thread_mul(const int M, const int N, const int K, const flo
 #define TM 4
 #define TN 4
 
+// Kernel 6 in the original tutorial is baked in here too, it is literally a single line change to
+// transpose A_blk upon creation so that the regsiter loading step is contiguous. Not worth another 100 lines.
 __global__ void cu5s_2d_tile(const int M, const int N, const int K, const float alpha, const float beta,
                 const float* A, const float* B, float* C) {
     const int lda = K; const int ldb = N; const int ldc = N;
-    
+
     // 256 (each loads 8, twice as much as before, so we only need 512/2=256 threads per block now)
     const uint numthreads = blockDim.x; 
     // these strides allow us to sweep all of A_blk and B_blk using threadIdx
@@ -265,10 +267,10 @@ __global__ void cu5s_2d_tile(const int M, const int N, const int K, const float 
         // populate the SMEM caches
         for (uint offset = 0; offset < BM; offset += strideA) {
             if ((blk_row + innerRowA + offset) < M && (bkIdx + innerColA) < K) {
-                A_blk[(innerRowA + offset) * BK + innerColA] =
-                    A_start[(innerRowA + offset) * K + innerColA];
+                A_blk[(innerColA + offset) * BM + innerRowA] = // TRANSPOSE!!!!
+                    A_start[(innerRowA + offset) * K + innerColA]; 
             } else {
-                A_blk[(innerRowA + offset) * BK + innerColA] = 0;
+                A_blk[(innerColA + offset) * BM + innerRowA] = 0; // and here
             }
         }
         for (uint offset = 0; offset < BK; offset += strideB) {
@@ -288,7 +290,7 @@ __global__ void cu5s_2d_tile(const int M, const int N, const int K, const float 
         for (uint dotIdx = 0; dotIdx < BK; ++dotIdx) {
             // Similar to register blocking style in CPU, we get the two mini vectors, 
             for (uint i = 0; i < TM; ++i) {
-                regM[i] = A_blk[(threadRow * TM + i) * BK + dotIdx];
+                regM[i] = A_blk[dotIdx * BM + threadRow * TM + i]; // this right here WAS non-contiguous: (threadRow * TM + i) * BK + dotIdx
             }
             for (uint i = 0; i < TN; ++i) {
                 regN[i] = B_blk[dotIdx * BN + threadCol * TN + i];   

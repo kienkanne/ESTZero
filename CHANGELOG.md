@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.3.4a] Made `A_blk` transposed so that the register loading step is contiguous
+
+- A few simple character changes of indices at three lines of `A_blk` made it transposed so that the register loading step `regM[i] = A_blk[(threadRow * TM + i) * BK + dotIdx]` becomes `regM[i] = A_blk[dotIdx * BM + threadRow * TM + i]`.
+- It's a small change, so there is no similar doubling in performance, but it still improved somewhat, from 23.36 TFLOPs (v3.3.4) to 25.1 TFLOPs, or about ~42% of `cublas_sgemm`.
+
 ## [v3.3.4] Added `cu5s_2d_title`: each thread calculates 16 C titles (4x4) block
 
 - Making each thread calculate a 4x4 block would push arithmetic intensity even higher, and each thread fills 8 values (4 for A, 4 for B: twice as much as before, so only 256 threads per block) in the SM cache filling step. A simple `strideA`/`strideB` (dividing `numthreads` by `BK`/`BN`) helps achieve this easily. The block values here are BM=BN=64, BK=TM=TN=4.
