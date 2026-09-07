@@ -2,6 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.5.0] Added `cuTENSOR` as an additional backend for `einsum`
+
+- `cuTENSOR` supports binary tensor contractions (`A,B->C`) via `cutensorCreateContraction`/`cutensorContract`, which fits perfectly into this project where there are numerous contractions for post-HF algorithms (the reason why `einsum` was built in the first place). It's considered an `einsum` "GEMM" backend as it still runs through the same string parsing machinery. It's routed through `try_cutensor` instead of `try_gemm` as it doesn't need the flattening steps and permutating back, as the requested shape is provided. This route can be called via `--gemm-scheme cutensor`.
+- In terms of raw performance, `cutensor` is expected to outperform the `try_gemm` variants. However, in full benchmarks where total wall time is counted where overhead setup cost adds up, it doesn't have an edge. For example, large systems with few contractions like MP3 `pyrimidine/6-31g` (nbf=62), `cutensor` took 2.927s, while the best `try_gemm` is `cublas_dgemm` at 4.216s for GPU and `eigen` at 4.292s for CPU.
+- The massive number of repeated small `einsum` calls in the perbutative triples hurt `cutensor` the most, much worse than `cublas` which also requires moving data to device. Calculating this term for `pyrimidine/sto-3g` (nbf=34) took 72.024s for `cutensor`, 27.067s for `cublas_dgemm` (v3.2.3), and 22.262s for `eigen` (v3.2.0).
+- The vikings algorithm for the perbutative triples greatly avoids large memory usage compared to the naive version, but it's currently routed through `einsum` for every contraction, creating a lot of overhead cost that is tanked by every gemm schemes (in fact, the odometer performs the best just in the calculation time of this term at 19.168s (v3.2.0)). The next goal will be rewrite this algorithm by calling GEMM directly instead of routing through `einsum`.
+
 ## [v3.3.4a] Made `A_blk` transposed so that the register loading step is contiguous
 
 - A few simple character changes of indices at three lines of `A_blk` made it transposed so that the register loading step `regM[i] = A_blk[(threadRow * TM + i) * BK + dotIdx]` becomes `regM[i] = A_blk[dotIdx * BM + threadRow * TM + i]`.

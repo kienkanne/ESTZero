@@ -196,6 +196,7 @@ Version v1.0.0 included MP2 for RHF. The baseline is the 4 step MO transformatio
 | v3.2.2 | 6.731 | 1.732 | 136.6 | 13 | 2.599 | 487.0 | 2915.4 | cublas_sgemm |
 | v3.2.3 | 6.440 | 1.734 | 136.6 | 13 | 2.304 | 492.1 | 2679.4 | cublas_dgemm, persistent handle |
 | v3.2.3 | 6.889 | 1.732 | 137.2 | 13 | 2.638 | 496.0 | 3498.5 | cublas_sgemm, persistent handle + pinned staging |
+| v3.5.0 | 5.008 | 1.941 | 138.2 | 13 | 0.847 | 217.9 | 3014.1 | cutensor |
 
 > (2) Version v1.5.5c tried replacing all `einsum` with `Tensor` arithemic operators, but performance is identical, showing the fixed cost lie in `Tensor` setups.
 
@@ -230,6 +231,7 @@ UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alp
 | v3.2.2 | 7.107 | 1.434 | 140.4 | 14 | 1.561 | 33.3 | 2585.3 | cublas_sgemm, **FAILS** 1e-6 Psi4 tol (|dE|=1.59e-6) |
 | v3.2.3 | 6.990 | 1.436 | 140.0 | 14 | 1.442 | 34.0 | 1974.8 | cublas_dgemm, persistent handle |
 | v3.2.3 | 7.339 | 1.439 | 140.8 | 14 | 1.661 | 39.5 | 2720.9 | cublas_sgemm, persistent handle + pinned staging. Still **FAILS** |
+| v3.5.0 | 6.512 | 1.605 | 141.3 | 14 | 0.715 | 28.8 | 2478.3 | cutensor |
 
 > (3) v1.3.0-v1.5.0 didn't use intermediate 2 of Iaa to build Iab when using the new `einsum`, so performance was heavily impacted. This is fixed in v1.5.1
 >
@@ -260,6 +262,7 @@ Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports t
 | v3.2.2 | 4.384 | 0.448 | 10.3 | 21 | 1.695 | 0.732 | 1061.5 | cublas_sgemm |
 | v3.2.3 | 4.216 | 0.434 | 10.1 | 21 | 1.604 | 0.736 | 1007.8 | cublas_dgemm, persistent handle |
 | v3.2.3 | 4.298 | 0.432 | 10.1 | 21 | 1.665 | 0.723 | 1177.9 | cublas_sgemm, persistent handle + pinned staging |
+| v3.5.0 | 2.927 | 0.438 | 10.3 | 21 | 0.534 | 0.448 | 1466.5 | cutensor |
 
 #### UHF
 
@@ -282,6 +285,7 @@ Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports t
 | v3.2.2 | 2.371 | 0.055 | 0.9 | 24 | 0.465 | 0.537 | 900.6 | cublas_sgemm, **FAILS** 1e-6 Psi4 tol (|dE|=1.35e-6) |
 | v3.2.3 | 2.335 | 0.055 | 0.9 | 24 | 0.450 | 0.534 | 855.4 | cublas_dgemm, persistent handle |
 | v3.2.3 | 2.362 | 0.055 | 0.9 | 24 | 0.456 | 0.537 | 922.4 | cublas_sgemm, persistent handle + pinned staging. Still **FAILS** |
+| v3.5.0 | 2.195 | 0.055 | 0.9 | 24 | 0.382 | 0.425 | 1409.9 | cutensor |
 
 ### CCSD(T)
 
@@ -310,6 +314,7 @@ Version 2.1.0 introduced CCSD for RHF. The baseline use equations adopted from [
 | v3.2.2 | 5.091 | 0.127 | 1.0 | 21 | 0.299 | 295.1 | 15 | 55.192 | 485.7 | cublas_sgemm, PertT only ~2% faster than cublas_dgemm, so it's setup cost bottleneck |
 | v3.2.3 | 5.319 | 0.126 | 1.0 | 21 | 0.276 | 292.4 | 16 | 27.067 | 427.6 | cublas_dgemm, persistent handle |
 | v3.2.3 | 5.066 | 0.127 | 1.0 | 21 | 0.292 | 293.3 | 15 | 26.896 | 496.9 | cublas_sgemm, persistent handle + pinned staging |
+| v3.5.0 | 3.740 | 0.127 | 1.0 | 21 | 0.746 | 162.7 | 16 | 72.024 | 1001.2 | cutensor |
 
 #### UHF
 
@@ -339,6 +344,7 @@ Version 2.0.0 introduced CCSD for UHF. The baseline use the formulated equations
 | v3.2.2 | 5.039 | 0.015 | 0.1 | 22 | 0.189 | 218.7 | 21 | 38.272 | 477.7 | cublas_sgemm |
 | v3.2.3 | 4.801 | 0.015 | 0.1 | 22 | 0.191 | 218.4 | 20 | 22.125 | 420.6 | cublas_dgemm, persistent handle |
 | v3.2.3 | 5.116 | 0.015 | 0.1 | 22 | 0.198 | 222.6 | 21 | 21.370 | 481.2 | cublas_sgemm, persistent handle + pinned staging |
+| v3.5.0 | 3.445 | 0.015 | 0.1 | 22 | 0.355 | 141.2 | 20 | 49.112 | 1006.3 | cutensor |
 
 > (5) From version v2.3.0: In the benchmark runs that produced these numbers, only CCSD(T) was requested as it prints both the CCSD energy baseline as well as the corrected energy CCSD(T). The timings of all steps are printed, and the total CCSD wall time reported here is the actual total wall time subtracted by the run time of the perbutative triples calculation. This is done to save benchmarking run time.
 >
