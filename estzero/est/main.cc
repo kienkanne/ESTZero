@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
         std::println(R"(Usage: {} <xyz-file> <basis> [--reference <val>] [--method <val>]
             [--mult <val>] [--charge <val>]
             [--eri-scheme <vector|tensor>]
-            [--gemm-scheme <odometer|eigen|blas|avx_8x8|avx_16x8|avx_24x8>] [--gemm-min <val>]
+            [--gemm-scheme <odometer|eigen|blas|cublas_dgemm|cublas_sgemm|avx_8x8|avx_16x8|avx_24x8|cutensor>] [--gemm-min <val>]
             [--econv <val>] [--max-iter <val>] [--verbose <val>])", argv[0]);
         return EXIT_FAILURE;
     }

@@ -9,7 +9,7 @@
 
 enum class GEMMScheme {
     ODO, EIGEN, BLAS, CUBLAS_DGEMM, CUBLAS_SGEMM,
-    AVX_8x8, AVX_16x8, AVX_24x8,
+    AVX_8x8, AVX_16x8, AVX_24x8, CUTENSOR,
 };
 inline GEMMScheme gs;
 
@@ -26,6 +26,7 @@ inline void set_gemm_scheme(std::string g) {
     else if (g == "avx_8x8")    gs = GEMMScheme::AVX_8x8;
     else if (g == "avx_16x8")   gs = GEMMScheme::AVX_16x8;
     else if (g == "avx_24x8")   gs = GEMMScheme::AVX_24x8;
+    else if (g == "cutensor")   gs = GEMMScheme::CUTENSOR;
     else throw std::runtime_error("Unknown gemm-scheme: " + g);
 }
 
@@ -46,14 +47,8 @@ inline auto raw_gemm =
         else throw std::runtime_error("raw_gemm: unknown GEMMScheme");
     };
 
-// Move `parse_subscripts` here so `cutensor_einsum` can reuse
-struct ParsedSubscripts {
-    std::vector<std::string> terms_strings;
-    std::unordered_map<char, int> char_to_dim;
-    std::unordered_map<char, int> char_to_col;
-};
 
-ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::vector<Tensor>& operands);
+bool try_cutensor(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands, Tensor& result);
 
 // General-purpose einsum, implemented from scratch (no Eigen math), operating
 // on the row-major Tensor container defined in tensor.h.

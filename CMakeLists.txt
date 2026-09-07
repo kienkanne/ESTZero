@@ -45,7 +45,7 @@ add_library(est_core STATIC
     estzero/est/cc_triples.cc
     estzero/linalg/einsum.cc
 
-    estzero/gemm/cutensor_einsum.cc
+    estzero/gemm/cutensor_gemm.cc
     estzero/gemm/cublas_gemm.cc
     estzero/gemm/cuda_ladder.cc
     estzero/gemm/avx512.cc
@@ -76,7 +76,7 @@ target_compile_options(est_core PUBLIC
     -march=native
 )
 
-set_source_files_properties(estzero/gemm/cutensor_einsum.cc PROPERTIES LANGUAGE CUDA)
+set_source_files_properties(estzero/gemm/cutensor_gemm.cc PROPERTIES LANGUAGE CUDA)
 set_source_files_properties(estzero/gemm/cublas_gemm.cc PROPERTIES LANGUAGE CUDA)
 set_source_files_properties(estzero/gemm/cuda_ladder.cc PROPERTIES LANGUAGE CUDA)
 
@@ -92,6 +92,13 @@ set_source_files_properties(estzero/gemm/cuda_ladder.cc PROPERTIES LANGUAGE CUDA
 # change, as cublas_gemm.cc's EST_HAVE_CUBLAS guard makes --gemm-scheme cublas throw a clear runtime error
 target_compile_definitions(est_core PUBLIC EST_HAVE_CUBLAS)
 target_link_libraries(est_core PRIVATE CUDA::cublas)
+# ================================================
+# cuTENSOR backend for einsum's --gemm-scheme cutensor (estzero/gemm/cutensor_gemm.cc).
+
+# Same tradeoff/toggle pattern as cuBLAS above. Comment out these two lines for a clean CPU-only build. 
+# cutensor_gemm.cc's EST_HAVE_CUTENSOR guard makes --gemm-scheme cutensor throw a runtime error similarly
+target_compile_definitions(est_core PUBLIC EST_HAVE_CUTENSOR)
+target_link_libraries(est_core PRIVATE cutensor)
 # ================================================
 
 add_executable(ESTZero estzero/est/main.cc)
