@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.6.0] Added Schwarz screening for ERI building
+
+- `compute_schwarz_bounds` is added to help with eri building by computing over unique shell PAIRS first, returning a matrix `Q` containing the bounds of the pair. In the main ERI loop, a quartet is dropped when `|(s1 s2|s3 s4)| <= Q(s1,s2)*Q(s3,s4)`, avoiding calling `libint2` for the integrals.
+- However, the selected systems for benchmarking are relatively small for SCF (RHF: benzene/def2-svp, UHF: ch3/aug-cc-pvdz), especially the radical methyl where Schwarz screening doesn't do anything because the molecule is tiny. For benzene, 10% of shell quartets were skipped, and the ERI building step is just faster by less than 10%.
+- The benchmarking systems was selected based on the wall time of the first version that was introduced, which put a constraint on them being relatively small. Throughout many optimization updates, the wall time of the latests versions have shrinked significantly, so future updates will plan to reorganize benchmarking systems.
+
 ## [v3.5.0] Added `cuTENSOR` as an additional backend for `einsum`
 
 - `cuTENSOR` supports binary tensor contractions (`A,B->C`) via `cutensorCreateContraction`/`cutensorContract`, which fits perfectly into this project where there are numerous contractions for post-HF algorithms (the reason why `einsum` was built in the first place). It's considered an `einsum` "GEMM" backend as it still runs through the same string parsing machinery. It's routed through `try_cutensor` instead of `try_gemm` as it doesn't need the flattening steps and permutating back, as the requested shape is provided. This route can be called via `--gemm-scheme cutensor`.

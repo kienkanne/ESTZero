@@ -151,6 +151,7 @@ For RHF, the test used to track through different versions is benzene/def2-svp (
 | v1.5.0 (tensor) | 5.727 | 2.535 | 193.7 | 16 | 1300.8 | ERI build ~2x slower, JK build ~2.3x faster, and RSS ~7.4x as the vector exploited the 8-fold symmetry |
 | v1.5.2 | 4.018 | 1.756 | 139.7 | 16 | 1301.0 | Tensor's shared_ptr view rewrite (`swapaxes`/`slice`) switched element access to bounds-checked `.at()`, regressing every Tensor-touching phase |
 | v1.5.3 | 3.985 | 1.769 | 136.7 | 16 | 1301.0 | Fix: `.at()` replaced with unchecked indexing in `Tensor`. JK faster than v1.5.2; ERI still slower than v1.5.0 (vector), now purely from the 8-fold write expansion, not indexing overhead |
+| v3.6.0 | 3.489 | 1.634 | 137.4 | 13 | 1504.5 | Added Schwarz screening for ERI building, 10% shell quartets skipped, and the gain is small. This is due to benzene itself is a small molecule. |
 
 #### UHF
 
@@ -163,6 +164,7 @@ Version 1.1.0 reorganize the benchmark suite to separate the reference and the m
 | v1.5.0 (tensor) | 7.971 | 2.216 | 376.2 | 15 | 1352.9 | Similar speed up to RHF, but build JK is significantly faster because of both alpha and beta building per iteration |
 | v1.5.2 | 5.835 | 1.465 | 288.5 | 15 | 1352.9 | Same `.at()` regression as RHF SCF (`Tensor` is shared across references) |
 | v1.5.3 | 5.725 | 1.460 | 281.6 | 15 | 1352.9 | Same fix and gains as RHF SCF |
+| v3.6.0 | 5.453 | 1.432 | 140.6 | 14 | 1557.2 | Added Schwarz screening for ERI building. The build doesn't speed up by any because CH3 is small, all atoms are close |
 
 > (1) Total time for both alpha and beta calculation time per iteration
 
