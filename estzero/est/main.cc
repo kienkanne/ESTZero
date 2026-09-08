@@ -12,6 +12,7 @@ int main(int argc, char* argv[]) {
     std::string method = "scf";
     std::string eri_scheme_str = "tensor";
     std::string gemm_scheme_str = "blas";
+    std::string guess_str = "core";
     int mult = 1;
     int charge = 0;
     double econv = 1e-8;
@@ -26,6 +27,7 @@ int main(int argc, char* argv[]) {
         else if ((arg == "--eri-scheme") && i + 1 < argc) { eri_scheme_str = argv[++i]; }
         else if ((arg == "--gemm-scheme") && i + 1 < argc) { gemm_scheme_str = argv[++i]; }
         else if ((arg == "--gemm-min") && i + 1 < argc) { gemm_threshold = std::stoul(argv[++i]); }
+        else if ((arg == "--guess") && i + 1 < argc) { guess_str = argv[++i]; }
         else if ((arg == "--mult") && i + 1 < argc) { mult = std::stoi(argv[++i]); }
         else if ((arg == "--charge") && i + 1 < argc) { charge = std::stoi(argv[++i]); }
         else if ((arg == "--econv") && i + 1 < argc) { econv = std::stod(argv[++i]); }
@@ -43,7 +45,7 @@ int main(int argc, char* argv[]) {
     if (xyz_file.empty() || basis.empty()) {
         std::println(R"(Usage: {} <xyz-file> <basis> [--reference <val>] [--method <val>]
             [--mult <val>] [--charge <val>]
-            [--eri-scheme <vector|tensor>]
+            [--eri-scheme <vector|tensor>] [--guess <core|gwh>]
             [--gemm-scheme <odometer|eigen|blas|cublas_dgemm|cublas_sgemm|avx_8x8|avx_16x8|avx_24x8|cutensor>] [--gemm-min <val>]
             [--econv <val>] [--max-iter <val>] [--verbose <val>])", argv[0]);
         return EXIT_FAILURE;
@@ -60,7 +62,7 @@ int main(int argc, char* argv[]) {
         wfn.get_integrals(eri_scheme_str, verbose);
         
         double E;
-        E = wfn.get_energy(reference, method, econv, max_iter, verbose);
+        E = wfn.get_energy(reference, method, econv, max_iter, verbose, parse_guess_scheme(guess_str));
         std::println("Final energy: {:.8f}", E);
         
         libint2::finalize();

@@ -116,20 +116,21 @@ double WaveFunction::get_Vnn() {
 }
 
 
-double WaveFunction::get_energy(const std::string reference, const std::string method, 
-                                const double econv=1e-8, const int max_iter=200, const int verbose=2) {
+double WaveFunction::get_energy(const std::string reference, const std::string method,
+                                const double econv=1e-8, const int max_iter=200, const int verbose=2,
+                                GuessScheme guess) {
     double E_scf;
     SCFResult sr;
 
     if (reference == "rhf") {
         if (this->n_docc != this-> n_alpha) { throw std::runtime_error("Cannot use RHF with multiplicity other than 1!"); }
 
-        sr = rhf_scf(*this, econv, max_iter, verbose);
+        sr = rhf_scf(*this, econv, max_iter, verbose, guess);
         E_scf = sr.E_scf;
     }
 
     else if (reference == "uhf") {
-        sr = sr = uhf_scf(*this, econv, max_iter, verbose);
+        sr = sr = uhf_scf(*this, econv, max_iter, verbose, guess);
         E_scf = sr.E_scf;
     }
 

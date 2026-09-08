@@ -9,15 +9,17 @@
 #include "timer.h"
 #include "sym_ortho.h"
 #include "diis.h"
+#include "guess.h"
 
-SCFResult uhf_scf(WaveFunction wfn, double econv, int max_iter, int verbose) {
+SCFResult uhf_scf(WaveFunction wfn, double econv, int max_iter, int verbose, GuessScheme guess) {
     const Matrix S = wfn.get_S();
     const Matrix X = sym_ortho(S);
     const Matrix H = wfn.get_T() + wfn.get_V();
 
     int nbf = H.rows();
-    Matrix FA = H;
-    Matrix FB = H;
+    Matrix F0 = initial_guess(H, S, guess);
+    Matrix FA = F0;
+    Matrix FB = F0;
 
     double E_scf = 0.0;
 	double E_scf_last = 0.0;

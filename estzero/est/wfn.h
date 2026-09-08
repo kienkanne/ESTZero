@@ -6,6 +6,7 @@
 #include <libint2.hpp>
 #include <tensor.h>
 #include "integrals.h"
+#include "guess.h"
 
 struct SCFResult {
     double E_scf;
@@ -40,7 +41,8 @@ public:
     void get_integrals(std::string eri_scheme_str = "tensor", int verbose = 2);
     double get_Vnn();
     double get_energy(const std::string reference, const std::string method,
-                      const double econv, const int max_iter, const int verbose);
+                      const double econv, const int max_iter, const int verbose,
+                      GuessScheme guess = GuessScheme::CORE);
 
     // Read-only accessors for tests: expose the AO integrals and electron
     // counts computed by loader()/get_integrals() without duplicating the

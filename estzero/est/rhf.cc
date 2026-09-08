@@ -12,15 +12,16 @@
 #include "tensor.h"
 #include "sym_ortho.h"
 #include "diis.h"
+#include "guess.h"
 
 
-SCFResult rhf_scf(WaveFunction wfn, double econv, int max_iter, int verbose) {
+SCFResult rhf_scf(WaveFunction wfn, double econv, int max_iter, int verbose, GuessScheme guess) {
     const Matrix S = wfn.get_S();
     const Matrix X = sym_ortho(S);
     const Matrix H = wfn.get_T() + wfn.get_V();
 
     int nbf = H.rows();
-    Matrix F = H;
+    Matrix F = initial_guess(H, S, guess);
 
     double E_scf = 0.0;
 	double E_scf_last = 0.0;
