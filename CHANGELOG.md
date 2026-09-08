@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.6.1] Added GWH initial guess, selectable via `--guess core|gwh`
+
+- Added the Generalized Wolfsberg-Helmholz guess (`estzero/linalg/guess.h`): `F_pq = 0.5 * K * S_pq * (H_pp + H_qq)` (cheap closed form). It's an additional option to the simple core Hamiltonian guess (`F = H`), now selectable via a new `--guess core|gwh`.
+- Across benchmarking systems, GWH consistently saved 1-2 SCF iterations (benzene/def2-svp 13->11, ch3/aug-cc-pvtz 14->13, o2/def2-tzvppd 13->12), and considerably more on some (pyrimidine/sto-3g CCSD(T) 21->13, pyrimidine/6-31g MP3 21->15).
+- However, GWH doesn't seem to be a safe default for some UHF systems. `o2/sto-3g` (triplet, UHF) converges to a different UHF solution with lower energy under GWH than core guess: `-147.63396961` (gwh) vs `-147.37890118` (core), the latter matching Psi4's. This is a problem of systems with multiple solutions like in UHF. Given that, the default stays `--guess core`.
+
 ## [v3.6.0] Added Schwarz screening for ERI building
 
 - `compute_schwarz_bounds` is added to help with eri building by computing over unique shell PAIRS first, returning a matrix `Q` containing the bounds of the pair. In the main ERI loop, a quartet is dropped when `|(s1 s2|s3 s4)| <= Q(s1,s2)*Q(s3,s4)`, avoiding calling `libint2` for the integrals.
