@@ -37,7 +37,7 @@ public:
         loader(xyz, basis, mult, charge);
     }
 
-    void get_integrals(std::string eri_scheme_str = "tensor");
+    void get_integrals(std::string eri_scheme_str = "tensor", int verbose = 2);
     double get_Vnn();
     double get_energy(const std::string reference, const std::string method,
                       const double econv, const int max_iter, const int verbose);

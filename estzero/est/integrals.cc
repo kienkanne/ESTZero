@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <cmath>
+#include <print>
 #include <vector>
 #include <libint2.hpp>
 
@@ -37,19 +40,67 @@ Matrix build_one_center(libint2::Engine& engine, const libint2::BasisSet& obs) {
 }
 
 
-Tensor build_eri_tensor(libint2::Engine& engine, const libint2::BasisSet& obs) {
+namespace {
+void report_schwarz(int verbose, size_t skipped, size_t total) {
+    if (verbose < 1 || total == 0) return;
+    std::println("Schwarz screening: skipped {} / {} shell quartets ({:.1f}%)",
+                  skipped, total, 100.0 * static_cast<float>(skipped) / static_cast<float>(total));
+}
+} // namespace
+
+Matrix compute_schwarz_bounds(libint2::Engine& engine, const libint2::BasisSet& obs) {
+    int n_shells = static_cast<int>(obs.size());
+    Matrix Q(n_shells, n_shells);
+    Q.setZero();
+
+    const auto& buf_vec = engine.results();
+
+    for (int s1 = 0; s1 != n_shells; ++s1) {
+    for (int s2 = s1; s2 != n_shells; ++s2) { // unique pairs only
+        engine.compute(obs[s1], obs[s2], obs[s1], obs[s2]);
+        auto ints = buf_vec[0];
+
+        double max_val = 0.0;
+        if (ints != nullptr) {
+            int n1 = obs[s1].size();
+            int n2 = obs[s2].size();
+
+            for (int f1 = 0; f1 != n1; ++f1) {
+            for (int f2 = 0; f2 != n2; ++f2) {
+                // Only check diagonal elements (f1 f2|f1 f2) within the (s1 s2 s1 s2) shell
+                // quartet row-major format (dims n1,n2,n1,n2; f3==f1, f4==f2).
+                int idx = ((f1 * n2 + f2) * n1 + f1) * n2 + f2;
+                max_val = std::max(max_val, std::abs(ints[idx]));
+            }}
+        }
+
+        double bound = std::sqrt(max_val);
+        Q(s1, s2) = bound;
+        Q(s2, s1) = bound;
+    }}
+
+    return Q;
+}
+
+Tensor build_eri_tensor(libint2::Engine& engine, const libint2::BasisSet& obs, int verbose) {
     int nbf = obs.nbf();
     Tensor eri_tensor({nbf, nbf, nbf, nbf});
     eri_tensor.fill(0.0);
 
     auto shell2bf = obs.shell2bf();
     const auto& buf_vec = engine.results();
+    Matrix Q = compute_schwarz_bounds(engine, obs);
+
+    size_t total_quartets = 0, skipped_quartets = 0;
 
     for (int s1 = 0; s1 != obs.size(); ++s1) {
     for (int s2 = s1; s2 != obs.size(); ++s2) {
     for (int s3 = s1; s3 != obs.size(); ++s3) {
         int s4_min = (s1 == s3) ? s2 : s3;
     for (int s4 = s4_min;  s4 != obs.size(); ++s4) {
+        ++total_quartets;
+        if (Q(s1, s2) * Q(s3, s4) < SCHWARZ_TOL) { ++skipped_quartets; continue; }
+
         engine.compute(obs[s1], obs[s2], obs[s3], obs[s4]);
         auto ints = buf_vec[0];
         if (ints == nullptr) continue;
@@ -87,16 +138,20 @@ Tensor build_eri_tensor(libint2::Engine& engine, const libint2::BasisSet& obs) {
         }}}}
     }}}}
 
+    report_schwarz(verbose, skipped_quartets, total_quartets);
     return eri_tensor;
 }
 
-std::vector<double> build_eri_vector(libint2::Engine& engine, const libint2::BasisSet& obs) {
+std::vector<double> build_eri_vector(libint2::Engine& engine, const libint2::BasisSet& obs, int verbose) {
     int nbf = obs.nbf();
     int n_pairs = nbf * (nbf + 1) / 2;
     std::vector<double> eri_vector(n_pairs * (n_pairs + 1) / 2, 0.0);
 
     auto shell2bf = obs.shell2bf();
     const auto& buf_vec = engine.results();
+    Matrix Q = compute_schwarz_bounds(engine, obs);
+
+    size_t total_quartets = 0, skipped_quartets = 0;
 
     // Loop over shell quartets
     for (int s1 = 0; s1 != obs.size(); ++s1) {
@@ -104,6 +159,9 @@ std::vector<double> build_eri_vector(libint2::Engine& engine, const libint2::Bas
     for (int s3 = s1; s3 != obs.size(); ++s3) {
         int s4_min = (s1 == s3) ? s2 : s3;
     for (int s4 = s4_min;  s4 != obs.size(); ++s4) {
+        ++total_quartets;
+        if (Q(s1, s2) * Q(s3, s4) < SCHWARZ_TOL) { ++skipped_quartets; continue; }
+
         engine.compute(obs[s1], obs[s2], obs[s3], obs[s4]);
         auto ints = buf_vec[0];
         if (ints == nullptr) continue;
@@ -134,6 +192,7 @@ std::vector<double> build_eri_vector(libint2::Engine& engine, const libint2::Bas
         }}}}
     }}}}
 
+    report_schwarz(verbose, skipped_quartets, total_quartets);
     return eri_vector;
 }
 

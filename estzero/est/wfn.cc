@@ -60,7 +60,7 @@ ERIScheme parse_eri_scheme(const std::string& s) {
 }
 
 
-void WaveFunction::get_integrals(std::string eri_scheme_str) {
+void WaveFunction::get_integrals(std::string eri_scheme_str, int verbose) {
     this->eri_scheme_ = parse_eri_scheme(eri_scheme_str);
 
     if (!libint2::initialized()) { libint2::initialize(); }
@@ -89,10 +89,10 @@ void WaveFunction::get_integrals(std::string eri_scheme_str) {
     
     if (this->eri_scheme_ == ERIScheme::Tensor) {
         timing::Scoped _t("ERI build");
-        this->eri_tensor = build_eri_tensor(eri_engine, obs);
+        this->eri_tensor = build_eri_tensor(eri_engine, obs, verbose);
     } else {
         timing::Scoped _t("ERI build");
-        this->eri_vector = build_eri_vector(eri_engine, obs);
+        this->eri_vector = build_eri_vector(eri_engine, obs, verbose);
     }
 }
 

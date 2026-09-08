@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
         libint2::initialize();
 
         auto wfn = WaveFunction(xyz_file, basis, mult, charge);
-        wfn.get_integrals(eri_scheme_str);
+        wfn.get_integrals(eri_scheme_str, verbose);
         
         double E;
         E = wfn.get_energy(reference, method, econv, max_iter, verbose);
