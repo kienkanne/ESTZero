@@ -7,10 +7,11 @@
 #include "einsum.h"
 #include "cc_build.h"
 
-
-Dia_Dijab build_Dia_Dijab(const Tensor& FN, const int nbf, const int n_occ, bool spin) {
-    const int dim = spin ? 2*nbf : nbf;
-    const int n_virt = dim - n_occ;
+// Now uses directly the provided Sli to get the occ and virt info
+Dia_Dijab build_Dia_Dijab(const Tensor& FN, Sli O, Sli V) {
+    const int dim = FN.shape[0];
+    const int n_occ = O.stop - O.start;
+    const int n_virt = V.stop - V.start;
 
     Tensor FN_diag({dim});
     for (int i=0; i != dim; ++i) { FN_diag(i) = FN(i, i); }
@@ -20,11 +21,12 @@ Dia_Dijab build_Dia_Dijab(const Tensor& FN, const int nbf, const int n_occ, bool
 
     for (int i = 0; i < n_occ; ++i) {
     for (int a = 0; a < n_virt; ++a) {
-        Dia(i, a) = FN_diag(i) - FN_diag(n_occ + a);
+        Dia(i, a) = FN_diag(O.start + i) - FN_diag(V.start + a);
 
         for (int j = 0; j < n_occ; ++j) {
         for (int b = 0; b < n_virt; ++b) {
-            Dijab(i, j, a, b) = FN_diag(i) + FN_diag(j) - FN_diag(n_occ + a) - FN_diag(n_occ + b);
+            Dijab(i, j, a, b) = FN_diag(O.start + i) + FN_diag(O.start + j)
+                              - FN_diag(V.start + a) - FN_diag(V.start + b);
     }}}}
 
     return {Dia, Dijab};

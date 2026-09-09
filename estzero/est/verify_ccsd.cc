@@ -44,13 +44,14 @@ int main() {
     Tensor HB = mat_to_tensor(Matrix(r.CB.transpose() * (T + V) * r.CB));
     Tensor DEprqs = Iprqs - Iprqs.swapaxes(2, 3);
     Tensor FN = build_spin_FN(HA, HB, DEprqs, n_alpha, n_beta);
-    auto [Dia, Dijab] = build_Dia_Dijab(FN, nbf, n_alpha + n_beta, true);
-    double E_testmp2 = test_mp2_energy(DEprqs, Dia, Dijab, n_alpha + n_beta);
 
     // Test using newly built ccsd energy equation
     const int n_occ = n_alpha + n_beta;
     const Sli O_sli{0, n_occ};
     const Sli V_sli{n_occ, Iprqs.shape[0]};
+
+    auto [Dia, Dijab] = build_Dia_Dijab(FN, O_sli, V_sli);
+    double E_testmp2 = test_mp2_energy(DEprqs, Dia, Dijab, n_alpha + n_beta);
     Tensor t1_zero(Dia.shape);
     Tensor t2_mp2 = DEprqs.slice(O_sli, O_sli, V_sli, V_sli) / Dijab;
     auto [tau, tilde_tau] = build_taus(t1_zero, t2_mp2, true);

@@ -16,7 +16,8 @@
 // over the full range, the normal-ordered Fock matrix, and the energy denominators.
 struct CCInputs { Tensor Iprqs, DEprqs, FN, Dia, Dijab; Sli O, V; bool spin; };
 
-inline CCInputs build_cc_inputs(WaveFunction& wfn, const SCFResult& sr, const std::string& reference) {
+inline CCInputs build_cc_inputs(WaveFunction& wfn, const SCFResult& sr, const std::string& reference,
+                                 int n_frozen = 0) {
     CCInputs ccin;
     const Sli All{};
 
@@ -28,7 +29,8 @@ inline CCInputs build_cc_inputs(WaveFunction& wfn, const SCFResult& sr, const st
     if (reference == "rhf") {
         ccin.spin = false;
 
-        ccin.O = Sli{0, n_occ};
+        const Sli O_full{0, n_occ}; // used only to build FN
+        ccin.O = Sli{n_frozen, n_occ}; // used for anything else downstream
         ccin.V = Sli{n_occ, nbf};
 
         const Matrix& H_ao = wfn.get_T() + wfn.get_V();
@@ -39,13 +41,17 @@ inline CCInputs build_cc_inputs(WaveFunction& wfn, const SCFResult& sr, const st
         ccin.Iprqs = transmo_spat_pqrs(wfn.get_eri_tensor(), sr.CA).swapaxes(1, 2);
         ccin.DEprqs = ccin.Iprqs * 2 - ccin.Iprqs.swapaxes(2, 3);
 
-        ccin.FN = H + einsum("piqi->pq", {ccin.DEprqs.slice(All, ccin.O, All, ccin.O)});
+        ccin.FN = H + einsum("piqi->pq", {ccin.DEprqs.slice(All, O_full, All, O_full)});
 
-        auto dd = build_Dia_Dijab(ccin.FN, nbf, n_occ, false);
+        auto dd = build_Dia_Dijab(ccin.FN, ccin.O, ccin.V);
         ccin.Dia = dd.Dia; ccin.Dijab = dd.Dijab;
     }
 
     else if (reference == "uhf") {
+        if (n_frozen > 0) {
+            throw std::runtime_error("frozen core is not yet supported for UHF");
+        }
+
         ccin.spin = true;
 
         ccin.O = Sli {0, n_alpha + n_beta};
@@ -67,7 +73,7 @@ inline CCInputs build_cc_inputs(WaveFunction& wfn, const SCFResult& sr, const st
         Tensor HB = mat_to_tensor(Matrix(CB.transpose() * (T_ints + V_ints) * CB));
         ccin.FN = build_spin_FN(HA, HB, ccin.DEprqs, n_alpha, n_beta);
 
-        auto dd = build_Dia_Dijab(ccin.FN, nbf, n_alpha + n_beta, true);
+        auto dd = build_Dia_Dijab(ccin.FN, ccin.O, ccin.V);
         ccin.Dia = dd.Dia; ccin.Dijab = dd.Dijab;
 
     } else {
@@ -78,19 +84,22 @@ inline CCInputs build_cc_inputs(WaveFunction& wfn, const SCFResult& sr, const st
 }
 
 inline CCResult cc_driver(WaveFunction wfn, SCFResult sr, std::string method, std::string reference,
-                         double econv, int max_iter, int verbose) {
+                         double econv, int max_iter, int verbose, int n_frozen = 0) {
     bool is_CCD = (method == "ccd");
 
     const std::array<std::string, 3> METHODS{"ccd", "ccsd", "ccsd_t"};
     auto it = std::find(std::begin(METHODS), std::end(METHODS), method);
     if (it == std::end(METHODS)) { throw std::runtime_error("Unknown cc method: " + method); }
 
-    CCInputs in = build_cc_inputs(wfn, sr, reference);
+    CCInputs in = build_cc_inputs(wfn, sr, reference, n_frozen);
 
     CCResult ccresult = cc_iterate(econv, max_iter, verbose, in.Iprqs, in.DEprqs, in.FN, in.Dia, in.Dijab,
                                     in.O, in.V, in.spin, is_CCD);
     if (method == "ccsd_t") {
-        const int n_occ_triples = in.spin ? (wfn.get_n_alpha() + wfn.get_n_beta()) : wfn.get_n_docc();
+        // The local width of the (possibly frozen-core-narrowed) occupied slice -- calc_pert_triples's
+        // n_occ loop bound indexes into already-O-sliced tensors (t1, t2, F_occ, ...), not FN's global
+        // diagonal, so it must match in.O's width, not the raw electron count.
+        const int n_occ_triples = in.O.stop - in.O.start;
         ccresult.E_pert_t = calc_pert_triples(in.Iprqs, in.DEprqs, ccresult.t1, ccresult.t2, in.FN,
                                                wfn.get_nbf(), n_occ_triples, in.O, in.V, in.spin);
     }

@@ -163,12 +163,12 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
     }
 
     else if (method == "mp3") {
-        CCInputs in = build_cc_inputs(*this, sr, reference);
+        CCInputs in = build_cc_inputs(*this, sr, reference, n_frozen);
         return E_scf + calc_mp3_E(in.Iprqs, in.DEprqs, in.FN, in.Dia, in.Dijab, in.O, in.V, in.spin);
     }
 
     else if (method.starts_with("cc")) {
-        CCResult ccresult = cc_driver(*this, sr, method, reference, econv, max_iter, verbose);
+        CCResult ccresult = cc_driver(*this, sr, method, reference, econv, max_iter, verbose, n_frozen);
         if (method == "ccsd_t") {
             // Printed unconditionally (not gated by verbose) so a single ccsd_t run gives both the CCSD and 
             // CCSD(T) energies, which can be parsed by the benchmarking module, without re-running CCSD.
