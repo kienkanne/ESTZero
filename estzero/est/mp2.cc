@@ -2,22 +2,23 @@
 #include "tensor.h"
 #include "timer.h"
 
-double calc_rhf_mp2_E(const Tensor& Iiajb, const Vector& eps, int n_occ) {
+double calc_rhf_mp2_E(const Tensor& Iiajb, const Vector& eps, int n_occ, int n_frozen) {
     timing::Scoped _t("MP2 Energy Calculation");
 
     const int nbf = eps.size();
     const int n_virt = nbf - n_occ;
+    const int n_occ_active = n_occ - n_frozen;
 
     Tensor eps_t = vec_to_tensor(eps);
-
-    const Tensor& eps_occ = eps_t.slice(Sli{0, n_occ});
+    
+    const Tensor& eps_occ = eps_t.slice(Sli{n_frozen, n_occ});
     const Tensor& eps_virt = eps_t.slice(Sli{n_occ, -1});
 
-    Tensor Eiajb({n_occ, n_virt, n_occ, n_virt});
+    Tensor Eiajb({n_occ_active, n_virt, n_occ_active, n_virt});
 
-    for (int i = 0; i < n_occ; ++i) {
+    for (int i = 0; i < n_occ_active; ++i) {
     for (int a = 0; a < n_virt; ++a) {
-    for (int j = 0; j < n_occ; ++j) {
+    for (int j = 0; j < n_occ_active; ++j) {
     for (int b = 0; b < n_virt; ++b) {
         Eiajb(i, a, j, b) = 1.0 / (eps_occ(i) - eps_virt(a) + eps_occ(j)  - eps_virt(b));
     }}}}

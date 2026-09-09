@@ -42,7 +42,7 @@ public:
     double get_Vnn();
     double get_energy(const std::string reference, const std::string method,
                       const double econv, const int max_iter, const int verbose,
-                      GuessScheme guess = GuessScheme::CORE);
+                      GuessScheme guess = GuessScheme::CORE, bool frozen_core = false);
 
     // Read-only accessors for tests: expose the AO integrals and electron
     // counts computed by loader()/get_integrals() without duplicating the

@@ -8,7 +8,7 @@ struct SpinMO {
     Tensor I_AA; Tensor I_BB; Tensor I_AB;
 };
 
-Tensor  transmo_spat_iajb(const Tensor& eri_tensor, const Matrix& C, int n_occ);
+Tensor  transmo_spat_iajb(const Tensor& eri_tensor, const Matrix& C, int n_occ, int n_frozen = 0);
 SpinMO  transmo_spin_iajb(const Tensor& eri_tensor, const Matrix& CA, int n_alpha, const Matrix& CB, int n_beta);
 
 // Full-space (p,q,r,s all spanning the whole MO range) versions, needed for

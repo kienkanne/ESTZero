@@ -33,13 +33,14 @@ Tensor transmo(const Tensor& start,
 } // namespace
 
 
-Tensor transmo_spat_iajb(const Tensor& eri_tensor, const Matrix& C, int n_occ) {
+Tensor transmo_spat_iajb(const Tensor& eri_tensor, const Matrix& C, int n_occ, int n_frozen) {
     timing::Scoped _t("MO Transformation");
 
     const int nbf = static_cast<int>(C.rows());
     const int n_virt = nbf - n_occ;
 
-    Tensor Cocc = mat_to_tensor(C.leftCols(n_occ));
+    // Frozen core orbitals are not transformed
+    Tensor Cocc = mat_to_tensor(C.middleCols(n_frozen, n_occ - n_frozen));
     Tensor Cvirt = mat_to_tensor(C.rightCols(n_virt));
 
     return transmo(eri_tensor, Cocc, Cvirt, Cocc, Cvirt);

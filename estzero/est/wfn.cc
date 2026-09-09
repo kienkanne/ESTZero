@@ -17,6 +17,7 @@
 #include "mp3.h"
 #include "transmo.h"
 #include "cc_driver.h"
+#include "frozen_core.h"
 
 
 void WaveFunction::loader(const std::string xyz, const std::string basis, 
@@ -118,7 +119,12 @@ double WaveFunction::get_Vnn() {
 
 double WaveFunction::get_energy(const std::string reference, const std::string method,
                                 const double econv=1e-8, const int max_iter=200, const int verbose=2,
-                                GuessScheme guess) {
+                                GuessScheme guess, bool frozen_core) {
+    if (frozen_core && reference == "uhf") {
+        throw std::runtime_error("frozen core not yet supported for UHF");
+    }
+    const int n_frozen = count_frozen_core(this->atoms);
+
     double E_scf;
     SCFResult sr;
 
@@ -145,8 +151,8 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
 
     else if (method == "mp2") {
         if (reference == "rhf") {
-            const Tensor Iiajb = transmo_spat_iajb(this->eri_tensor, sr.CA, this->n_docc);
-            return E_scf + calc_rhf_mp2_E(Iiajb, sr.epsA, this->n_docc);
+            const Tensor Iiajb = transmo_spat_iajb(this->eri_tensor, sr.CA, this->n_docc, n_frozen);
+            return E_scf + calc_rhf_mp2_E(Iiajb, sr.epsA, this->n_docc, n_frozen);
         }
         else if (reference == "uhf") {
             const auto& [Iiajb_AA, Iiajb_BB, Iiajb_AB] = transmo_spin_iajb(
