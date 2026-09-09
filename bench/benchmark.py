@@ -69,14 +69,16 @@ def parse_output(text):
     return energy, nbf, phases, rss_mb, n_iter, ccsd_e, ptriples
 
 
-def run_once(xyz, basis, method, reference, mult, charge, maxiter, econv, erischeme, gemmscheme):
+def run_once(xyz, basis, method, reference, mult, charge, maxiter, econv, erischeme, gemmscheme,
+             frozen_core=False):
     t0   = time.perf_counter()
     proc = subprocess.run(
         [BINARY, os.path.join(ROOT, xyz), basis,
          "--reference", reference, "--method", method,
          "--mult", str(mult), "--charge", str(charge),
-         "--max-iter", str(maxiter), "--econv", str(econv), 
-         "--eri-scheme", erischeme, "--gemm-scheme", gemmscheme],
+         "--max-iter", str(maxiter), "--econv", str(econv),
+         "--eri-scheme", erischeme, "--gemm-scheme", gemmscheme,
+         "--frozen-core", "true" if frozen_core else "false"],
         capture_output=True, text=True,
     )
     wall = time.perf_counter() - t0
@@ -319,6 +321,9 @@ def main():
                     help="GEMM scheme for einsum (default: blas)")
     ap.add_argument("--version", default="vX.X.X",
                     help="version string stamped into the README.md row output (e.g. v3.1.2)")
+    ap.add_argument("--frozen-core", action="store_true",
+                    help="choose frozen core for the binary and compare with that energy in Psi4")
+    
     args = ap.parse_args()
 
     with open(ROOT / "bench" / "systems.json") as fh:
@@ -369,7 +374,8 @@ def main():
                         system.get("reference", "rhf"),
                         system.get("mult", 1),
                         system.get("charge", 0),
-                        args.maxiter, args.econv, args.erischeme, args.gemmscheme)
+                        args.maxiter, args.econv, args.erischeme, args.gemmscheme,
+                        args.frozen_core)
                     if best is None or wall < best[0]:
                         best = (wall, energy, nbf, phases, n_iter, ccsd_e, ptriples)
                     if math.isnan(peak_rss) or rss_mb > peak_rss:
@@ -378,25 +384,30 @@ def main():
                 wall, energy, nbf, phases, n_iter, ccsd_e, ptriples = best
                 outputs[label].setdefault("nbf", nbf)
 
+                # frozen core doesn't change scf
+                energy_key = "frozen_energy" if (args.frozen_core and method != "scf") else "energy"
+
                 mref = sys_ref.get(method)
-                if mref is None:
+                ref_energy = mref.get(energy_key) if mref else None
+                if ref_energy is None:
                     status, dE, ref_wall = "NOREF", math.nan, math.nan
                 else:
-                    dE       = abs(energy - mref["energy"])
+                    dE       = abs(energy - ref_energy)
                     ref_wall = mref.get("wall", math.nan)
                     ok       = dE < args.tol
                     all_pass = all_pass and ok
                     status   = "PASS" if ok else "FAIL"
 
-                # ccsd_t gives both the CCSD and (T)-corrected energy from one run. The reported |dE|/status 
-                # above tracks CCSD(T) only (matching every other table). The intermediate CCSD is still checked 
-                # against its own Psi4 reference here, only appears as an explicit warning when CCSD(T) matching 
+                # ccsd_t gives both the CCSD and (T)-corrected energy from one run. The reported |dE|/status
+                # above tracks CCSD(T) only (matching every other table). The intermediate CCSD is still checked
+                # against its own Psi4 reference here, only appears as an explicit warning when CCSD(T) matching
                 # while CCSD itself doesn't - probably wouldn't happen, but just in case.
                 dE_ccsd = math.nan
                 if method == "ccsd_t":
                     ccsd_ref = sys_ref.get("ccsd")
-                    if ccsd_ref is not None and ccsd_e is not None:
-                        dE_ccsd = abs(ccsd_e - ccsd_ref["energy"])
+                    ccsd_ref_energy = ccsd_ref.get(energy_key) if ccsd_ref else None
+                    if ccsd_ref_energy is not None and ccsd_e is not None:
+                        dE_ccsd = abs(ccsd_e - ccsd_ref_energy)
                         if dE_ccsd >= args.tol:
                             logger.info(
                                 f"[mySCF/{method}] {label} WARNING: intermediate CCSD |dE|={dE_ccsd:.2e} "

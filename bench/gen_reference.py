@@ -74,6 +74,34 @@ def main():
 
             psi4.core.clean()
 
+            # freeze_core=true (SCF unaffected by), only needed for post-HF methods, so it needs its own oracle value
+            if method != "scf":
+                psi4.set_options({
+                    "basis":         basis,
+                    "scf_type":      "pk",
+                    "reference":     reference,
+                    "e_convergence": 1e-8,
+                    "d_convergence": 1e-8,
+                    "maxiter":      200,
+                    "guess":        "core",
+                    "mp2_type":     "conv",
+                    "mp_type":      "conv",
+                    "freeze_core":  "true",
+                    "cc_maxiter":   200,
+                    "r_convergence": 1e-8,
+                })
+                mol = psi4.geometry(geom)
+                frozen_energy = psi4.energy(psi4_method, molecule=mol)
+                entry[method]["frozen_energy"] = float(frozen_energy)
+                print(f"  E (frozen_core) = {frozen_energy:.10f}")
+
+                if method == "ccsd_t" and "frozen_energy" not in entry["ccsd"]:
+                    ccsd_frozen_e = float(psi4.variable("CCSD TOTAL ENERGY"))
+                    entry["ccsd"]["frozen_energy"] = ccsd_frozen_e
+                    print(f"  (piggybacked) CCSD E (frozen_core) = {ccsd_frozen_e:.10f}")
+
+                psi4.core.clean()
+
     ref_path.write_text(json.dumps(references, indent=2))
     print(f"\nWrote {len(references)} systems to {ref_path}")
 
