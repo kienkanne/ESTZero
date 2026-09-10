@@ -2,6 +2,14 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.7.0] Added frozen core approximation for MP2/MP3/CCSD(T), RHF and UHF
+
+- Added `--frozen-core true|false` (default `false`), excluding the core orbitals per atom (H/He freeze 0, Li-Ne freeze 1 (`1s`), Na-Ar freeze 5 (`1s,2s,2p x3`)) to speed up post-HF methods. All energies are verified against Psi4's `freeze_core=true` with tol=1e-06 (actually difference is about 1e-09).
+- Only the active (non-frozen-occ + virtual) columns of `C` from the start are used for the MO transformation (`transmo_*`) by slicing out the frozen orbitals on the left since it's already sorted by energy that's just `C.rightCols(nbf_active)`. All functions are consistently using the Slices object (`Sli O, Sli V`) instead of taking `nbf`/`n_occ` to account for the frozen core.
+- Simplified the building of normal-ordered Fock matrix `FN` directly from the orbital energies instead of building it again from the two-electron sum. `FN` is diagonal by definition, so it's just the energy orbitals being laid out. The frozen core scheme directly impact this to as it's just a simple slicing on the left.
+- Performance improvement is substantial, since both the CC amplitude iterations and (T)'s triples loop scale strongly with the occupied count. `pyrimidine/sto-3g` CCSD(T) (RHF) 27.588s -> 9.686s (2.85x), its PertT step alone 22.461s -> 7.856s (2.86x), CC iterations 16 -> 11 and got individually cheaper (293.1ms -> 135.7ms/iter). `propargyl/sto-3g` CCSD(T) (UHF) 13.296s -> 8.466s (1.57x), PertT 8.499s -> 6.247s (1.36x). MP3 saw similar wins, and MP2 gains are smaller (see `README.md`)
+- Same observation as v3.6.0: the tracked benchmarking systems (chosen when wall times were much larger) are getting too small to show the full performance now many optimizations are wired in.
+
 ## [v3.6.1] Added GWH initial guess, selectable via `--guess core|gwh`
 
 - Added the Generalized Wolfsberg-Helmholz guess (`estzero/linalg/guess.h`): `F_pq = 0.5 * K * S_pq * (H_pp + H_qq)` (cheap closed form). It's an additional option to the simple core Hamiltonian guess (`F = H`), now selectable via a new `--guess core|gwh`.

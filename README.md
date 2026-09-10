@@ -133,6 +133,7 @@ This log tracks the update in features and their performance in the most computa
 > - **v3.0.2a** fixed **threading=1 for OpenBLAS GEMM**. The allowed threading by default for OpenBLAS in the previous version created significant overhead, relative to the small system size used here.
 > - **v3.0.3** fixed the v3.0.1 guard, now gating on the contraction's total work (`left_size * summed_size * right_size`) rather any operand's raw element count. **v3.0.1 through v3.0.2a all ran with this bug, so the Eigen vs OpenBLAS comparison in those versions is unreliable. v3.0.3 (eigen) vs. v3.0.3 (blas) is the first fair comparison between the two backends.**
 > **v3.2.0** wires the hand-written `estzero/gemm/` ladder (v3.1.0-v3.1.8, see `README.md`'s GEMM Microbenchmark section above) into `einsum` as three more selectable `--gemm-scheme` backends (`avx_8x8`/`avx_16x8`/`avx_24x8`), alongside the existing `odometer`/`eigen`/`blas`. The tables below add one row per scheme for this version, and this is the first version where all six can be compared fairly, side by side, on the same real post-HF methods. **v3.2.1** introduced another backend, `cublas_dgemm`, but since other are kept the same, it's also directly comparable. **v3.2.2** adds `cublas_sgemm` (single-precision cuBLAS) alongside it, to explore the performance/accuracy tradeoff. **v3.2.3** changed `cublasCreate`/`cublasDestroy` into a single handle created once and reused, instead of being called every `einsum`, significantly improving PertT.
+> - If a backend GEMM is not stated in the notes after v3.0.0, the default is OpenBLAS.
 
 ### SCF
 
@@ -202,6 +203,7 @@ Version v1.0.0 included MP2 for RHF. The baseline is the 4 step MO transformatio
 | v3.2.3 | 6.889 | 1.732 | 137.2 | 13 | 2.638 | 496.0 | 3498.5 | cublas_sgemm, persistent handle + pinned staging |
 | v3.5.0 | 5.008 | 1.941 | 138.2 | 13 | 0.847 | 217.9 | 3014.1 | cutensor |
 | v3.6.1 | 5.816 | 1.636 | 137.4 | 11 | 2.118 | 484.4 | 2564.8 | Added GWH initial guess, saved 2 iterations. |
+| v3.7.0 | 5.249 | 1.641 | 136.6 | 13 | 1.510 | 250.8 | 2262.5 | Added frozen core, 1.34x faster |
 
 > (2) Version v1.5.5c tried replacing all `einsum` with `Tensor` arithemic operators, but performance is identical, showing the fixed cost lie in `Tensor` setups.
 
@@ -238,6 +240,7 @@ UHF MP2 are built on top of the Ca and Cb matrices to transform ERI into the alp
 | v3.2.3 | 7.339 | 1.439 | 140.8 | 14 | 1.661 | 39.5 | 2720.9 | cublas_sgemm, persistent handle + pinned staging. Still **FAILS** |
 | v3.5.0 | 6.512 | 1.605 | 141.3 | 14 | 0.715 | 28.8 | 2478.3 | cutensor |
 | v3.6.1 | 6.453 | 1.432 | 140.6 | 13 | 1.248 | 35.0 | 1845.8 | Added GWH initial guess, saved 1 iteration. |
+| v3.7.0 | 6.480 | 1.436 | 141.3 | 14 | 0.980 | 22.1 | 1787.6 | Added frozen core, 1.11x faster |
 
 > (3) v1.3.0-v1.5.0 didn't use intermediate 2 of Iaa to build Iab when using the new `einsum`, so performance was heavily impacted. This is fixed in v1.5.1
 >
@@ -270,6 +273,7 @@ Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports t
 | v3.2.3 | 4.298 | 0.432 | 10.1 | 21 | 1.665 | 0.723 | 1177.9 | cublas_sgemm, persistent handle + pinned staging |
 | v3.5.0 | 2.927 | 0.438 | 10.3 | 21 | 0.534 | 0.448 | 1466.5 | cutensor |
 | v3.6.1 | 4.145 | 0.427 | 10.3 | 15 | 1.510 | 0.850 | 892.5 | Added GWH initial guess, saved 6 iterations. |
+| v3.7.0 | 3.141 | 0.427 | 10.2 | 21 | 1.236 | 0.453 | 807.9 | Added frozen core, 1.45x faster |
 
 #### UHF
 
@@ -294,6 +298,7 @@ Version v2.4.0 introduced MP3 for both RHF and UHF. The baseline version ports t
 | v3.2.3 | 2.362 | 0.055 | 0.9 | 24 | 0.456 | 0.537 | 922.4 | cublas_sgemm, persistent handle + pinned staging. Still **FAILS** |
 | v3.5.0 | 2.195 | 0.055 | 0.9 | 24 | 0.382 | 0.425 | 1409.9 | cutensor |
 | v3.6.1 | 2.196 | 0.055 | 0.9 | 22 | 0.293 | 0.609 | 730.9 | Added GWH initial guess, saved 2 iterations. |
+| v3.7.0 | 1.532 | 0.055 | 0.9 | 24 | 0.242 | 0.356 | 582.8 | Added frozen core, 1.44x faster |
 
 ### CCSD(T)
 
@@ -324,6 +329,7 @@ Version 2.1.0 introduced CCSD for RHF. The baseline use equations adopted from [
 | v3.2.3 | 5.066 | 0.127 | 1.0 | 21 | 0.292 | 293.3 | 15 | 26.896 | 496.9 | cublas_sgemm, persistent handle + pinned staging |
 | v3.5.0 | 3.740 | 0.127 | 1.0 | 21 | 0.746 | 162.7 | 16 | 72.024 | 1001.2 | cutensor |
 | v3.6.1 | 5.174 | 0.130 | 1.0 | 13 | 0.128 | 296.9 | 16 | 21.843 | 276.4 | Added GWH initial guess, saved 8 iterations. |
+| v3.7.0 | 1.830 | 0.131 | 1.0 | 21 | 0.088 | 135.7 | 11 | 7.856 | 263.8 | Added frozen core, overall 2.85x faster. |
 
 #### UHF
 
@@ -355,6 +361,7 @@ Version 2.0.0 introduced CCSD for UHF. The baseline use the formulated equations
 | v3.2.3 | 5.116 | 0.015 | 0.1 | 22 | 0.198 | 222.6 | 21 | 21.370 | 481.2 | cublas_sgemm, persistent handle + pinned staging |
 | v3.5.0 | 3.445 | 0.015 | 0.1 | 22 | 0.355 | 141.2 | 20 | 49.112 | 1006.3 | cutensor |
 | v3.6.1 | 4.713 | 0.018 | 0.1 | 19 | 0.034 | 224.7 | 20 | 18.603 | 267.3 | Added GWH initial guess (`--guess core\|gwh`), saves 3 iterations. |
+| v3.7.0 | 2.218 | 0.016 | 0.1 | 22 | 0.025 | 103.6 | 20 | 6.247 | 240.7 | Added frozen core, overall 1.57x faster. |
 
 > (5) From version v2.3.0: In the benchmark runs that produced these numbers, only CCSD(T) was requested as it prints both the CCSD energy baseline as well as the corrected energy CCSD(T). The timings of all steps are printed, and the total CCSD wall time reported here is the actual total wall time subtracted by the run time of the perbutative triples calculation. This is done to save benchmarking run time.
 >
