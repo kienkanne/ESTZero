@@ -8,7 +8,7 @@
 #include "gemm_all.h"
 
 enum class GEMMScheme {
-    ODO, EIGEN, BLAS, CUBLAS_DGEMM, CUBLAS_SGEMM,
+    ODO, EIGEN, OPENBLAS, CUBLAS_DGEMM, CUBLAS_SGEMM,
     AVX_8x8, AVX_16x8, AVX_24x8, CUTENSOR,
 };
 inline GEMMScheme gs;
@@ -20,7 +20,7 @@ inline size_t gemm_threshold = 1024;
 inline void set_gemm_scheme(std::string g) {
     if      (g == "odometer")   gs = GEMMScheme::ODO;
     else if (g == "eigen")      gs = GEMMScheme::EIGEN;
-    else if (g == "blas")       gs = GEMMScheme::BLAS;
+    else if (g == "openblas")   gs = GEMMScheme::OPENBLAS;
     else if (g == "cublas_dgemm")   gs = GEMMScheme::CUBLAS_DGEMM;
     else if (g == "cublas_sgemm")   gs = GEMMScheme::CUBLAS_SGEMM;
     else if (g == "avx_8x8")    gs = GEMMScheme::AVX_8x8;
@@ -35,7 +35,7 @@ inline auto raw_gemm =
     [](GEMMScheme gs, int M, int N, int K, const double *A, const double *B, double *C) {
         double alpha = 1.0; double beta = 0.0;
 
-        if (gs == GEMMScheme::BLAS) {
+        if (gs == GEMMScheme::OPENBLAS) {
             cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
                 M, N, K, alpha, A, K /*lda*/, B, N /*ldb*/, beta, C, N /*ldc*/);
         }

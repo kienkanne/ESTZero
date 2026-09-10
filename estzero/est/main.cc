@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
     std::string reference = "rhf";
     std::string method = "scf";
     std::string eri_scheme_str = "tensor";
-    std::string gemm_scheme_str = "blas";
+    std::string gemm_scheme_str = "openblas";
     std::string guess_str = "core";
     bool frozen_core = false;
     int mult = 1;
@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
         std::println(R"(Usage: {} <xyz-file> <basis> [--reference <val>] [--method <val>]
             [--mult <val>] [--charge <val>]
             [--eri-scheme <vector|tensor>] [--guess <core|gwh>] [--frozen-core <true|false>]
-            [--gemm-scheme <odometer|eigen|blas|cublas_dgemm|cublas_sgemm|avx_8x8|avx_16x8|avx_24x8|cutensor>] [--gemm-min <val>]
+            [--gemm-scheme <odometer|eigen|openblas|cublas_dgemm|cublas_sgemm|avx_8x8|avx_16x8|avx_24x8|cutensor>] [--gemm-min <val>]
             [--econv <val>] [--max-iter <val>] [--verbose <val>])", argv[0]);
         return EXIT_FAILURE;
     }

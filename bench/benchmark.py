@@ -28,6 +28,8 @@ CC_ITER_RE   = re.compile(r"^CC\S*\s+Iteration")
 CC_MO_KEY    = "MO Transformation (CC)"
 PTRIPLES_KEY = "Perbutative Triples"
 MP3_KEY      = "MP3 Energy Calculation"
+BUILD_T3_KEY = "Build T3"
+ONE_ELEC_KEY = "One-electron (S,T,V)"
 
 
 def _cc_iter_phase(phases):
@@ -105,6 +107,21 @@ def nan_to_null(obj):
     return obj
 
 
+def _scf_cols_header(compact):
+    """The SCF-detail column segment shared by the mp2/mp3/ccsd/ccsd_t tables: three columns
+    (ERI/JK/iters) normally, or one summed 'SCF(s)' column under --compact. Not used by
+    _print_scf itself, whose whole point is that per-phase SCF breakdown."""
+    if compact:
+        return f" {'SCF(s)':>8}"
+    return f" {'ERI(s)':>7} {'JK/it(ms)':>10} {'scf_it':>6}"
+
+
+def _scf_cols_row(d, compact):
+    if compact:
+        return f" {fmt(d['scf_total_s'],'8.3f'):>8}"
+    return f" {fmt(d['eri_s'],'7.3f'):>7} {fmt(d['jk_ms'],'10.1f'):>10} {d['n_iter']:>6}"
+
+
 def _print_scf(collected, logger: logging.Logger):
     hdr = (f"{'system':<20} {'ref':>3} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
            f" {'psi4(s)':>8} {'wall(s)':>8} {'ERI(s)':>7} {'JK/it(ms)':>10}"
@@ -126,10 +143,10 @@ def _json_scf(d):
     return {"wall(s)": d["wall"], "eri(s)": d["eri_s"], "jk(ms)": d["jk_ms"]}
 
 
-def _print_mp2(collected, logger: logging.Logger):
+def _print_mp2(collected, logger: logging.Logger, compact_scf=False):
     hdr = (f"{'system':<20} {'ref':>3} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
-           f" {'psi4(s)':>8} {'wall(s)':>8} {'ERI(s)':>7} {'JK/it(ms)':>10}"
-           f" {'iters':>6} {'MO(s)':>8}"
+           f" {'psi4(s)':>8} {'wall(s)':>8}{_scf_cols_header(compact_scf)}"
+           f" {'MO(s)':>8}"
            f" {'MP2(ms)':>7} {'RSS(MB)':>8}")
     logger.info(f"\n── MP2 {'─' * (len(hdr) - 6)}")
     logger.info(hdr)
@@ -139,8 +156,7 @@ def _print_mp2(collected, logger: logging.Logger):
             continue
         d = sys_data["mp2"]
         logger.info(f"{label:<20} {d['reference']:>3} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
-              f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f} {fmt(d['eri_s'],'7.3f'):>7}"
-              f" {fmt(d['jk_ms'],'10.1f'):>10} {d['n_iter']:>6}"
+              f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f}{_scf_cols_row(d, compact_scf)}"
               f" {fmt(d['mo_s'],'7.3f'):>7} {fmt(d['mp2_ms'],'8.1f'):>8}"
               f" {fmt(d['peak_rss'],'8.1f'):>8}")
     logger.info("─" * len(hdr))
@@ -150,10 +166,10 @@ def _json_mp2(d):
             "mo(s)": d["mo_s"], "mp2(ms)": d["mp2_ms"]}
 
 
-def _print_ccsd(collected, logger: logging.Logger):
+def _print_ccsd(collected, logger: logging.Logger, compact_scf=False):
     hdr = (f"{'system':<20} {'ref':>3} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
-           f" {'psi4(s)':>8} {'wall(s)':>8} {'ERI(s)':>7} {'JK/it(ms)':>10}"
-           f" {'scf_it':>6} {'MO(s)':>7} {'CCSD/it(ms)':>12} {'cc_it':>6}"
+           f" {'psi4(s)':>8} {'wall(s)':>8}{_scf_cols_header(compact_scf)}"
+           f" {'MO(s)':>7} {'CCSD/it(ms)':>12} {'cc_it':>6}"
            f" {'RSS(MB)':>8}")
     logger.info(f"\n── CCSD {'─' * (len(hdr) - 7)}")
     logger.info(hdr)
@@ -163,8 +179,7 @@ def _print_ccsd(collected, logger: logging.Logger):
             continue
         d = sys_data["ccsd"]
         logger.info(f"{label:<20} {d['reference']:>3} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
-              f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f} {fmt(d['eri_s'],'7.3f'):>7}"
-              f" {fmt(d['jk_ms'],'10.1f'):>10} {d['n_iter']:>6}"
+              f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f}{_scf_cols_row(d, compact_scf)}"
               f" {fmt(d['mo_cc_s'],'7.3f'):>7} {fmt(d['cc_ms'],'12.1f'):>12} {fmt(d['cc_iters'],'6.0f'):>6}"
               f" {fmt(d['peak_rss'],'8.1f'):>8}")
     logger.info("─" * len(hdr))
@@ -174,15 +189,18 @@ def _json_ccsd(d):
             "mo(s)": d["mo_cc_s"], "cc(ms)": d["cc_ms"], "cc_iters": d["cc_iters"]}
 
 
-def _print_ccsd_t(collected, logger: logging.Logger):
+def _print_ccsd_t(collected, logger: logging.Logger, compact_scf=False):
     # One ccsd_t run yields both the CCSD and the (T)-corrected energy; |dE|/ok below track
     # CCSD(T) only (matching every other table). The intermediate CCSD is checked against its
     # own Psi4 reference too, but only ever surfaces as an explicit WARNING line in the run log
-    # if it disagrees -- see the main loop.
+    # if it disagrees.
+    # T3/it(ms) and T3_it come from the "Build T3" sub-phase inside "Perbutative Triples".
+    # The per-(i,j,k) connected-T3 batch build, called n_occ^3 times; PertT(s) is the whole
+    # triples phase (T3 build + the x1/x2 accumulation einsums + the final energy contraction).
     hdr = (f"{'system':<20} {'ref':>3} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
-           f" {'psi4(s)':>8} {'wall(s)':>8} {'ERI(s)':>7} {'JK/it(ms)':>10}"
-           f" {'scf_it':>6} {'MO(s)':>7} {'CCSD/it(ms)':>12} {'cc_it':>6}"
-           f" {'CCSD(s)':>8} {'PertT(s)':>8} {'RSS(MB)':>8}")
+           f" {'psi4(s)':>8} {'wall(s)':>8}{_scf_cols_header(compact_scf)}"
+           f" {'MO(s)':>7} {'CCSD/it(ms)':>12} {'cc_it':>6}"
+           f" {'CCSD(s)':>8} {'PertT(s)':>8} {'T3/it(ms)':>10} {'T3_it':>6} {'RSS(MB)':>8}")
     logger.info(f"\n── CCSD(T) {'─' * (len(hdr) - 10)}")
     logger.info(hdr)
     logger.info("─" * len(hdr))
@@ -191,23 +209,26 @@ def _print_ccsd_t(collected, logger: logging.Logger):
             continue
         d = sys_data["ccsd_t"]
         logger.info(f"{label:<20} {d['reference']:>3} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
-              f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f} {fmt(d['eri_s'],'7.3f'):>7}"
-              f" {fmt(d['jk_ms'],'10.1f'):>10} {d['n_iter']:>6}"
+              f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f}{_scf_cols_row(d, compact_scf)}"
               f" {fmt(d['mo_cc_s'],'7.3f'):>7} {fmt(d['cc_ms'],'12.1f'):>12} {fmt(d['cc_iters'],'6.0f'):>6}"
-              f" {fmt(d['ccsd_only_s'],'8.3f'):>8} {fmt(d['ptriples_s'],'8.3f'):>8} {fmt(d['peak_rss'],'8.1f'):>8}")
+              f" {fmt(d['ccsd_only_s'],'8.3f'):>8} {fmt(d['ptriples_s'],'8.3f'):>8}"
+              f" {fmt(d['build_t3_ms'],'10.3f'):>10} {fmt(d['build_t3_calls'],'6.0f'):>6}"
+              f" {fmt(d['peak_rss'],'8.1f'):>8}")
     logger.info("─" * len(hdr))
 
 def _json_ccsd_t(d):
     return {"wall(s)": d["wall"], "eri(s)": d["eri_s"], "jk(ms)": d["jk_ms"],
             "mo(s)": d["mo_cc_s"], "cc(ms)": d["cc_ms"], "cc_iters": d["cc_iters"],
             "ccsd(s)": d["ccsd_only_s"], "ptriples(s)": d["ptriples_s"],
-            "ptriples(E)": d["ptriples"], "dE_ccsd": d["dE_ccsd"]}
+            "ptriples(E)": d["ptriples"], "dE_ccsd": d["dE_ccsd"],
+            "build_t3(s)": d["build_t3_s"], "build_t3(ms/it)": d["build_t3_ms"],
+            "build_t3_iters": d["build_t3_calls"]}
 
 
-def _print_mp3(collected, logger: logging.Logger):
+def _print_mp3(collected, logger: logging.Logger, compact_scf=False):
     hdr = (f"{'system':<20} {'ref':>3} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
-           f" {'psi4(s)':>8} {'wall(s)':>8} {'ERI(s)':>7} {'JK/it(ms)':>10}"
-           f" {'scf_it':>6} {'MO(s)':>7} {'MP3(s)':>8} {'RSS(MB)':>8}")
+           f" {'psi4(s)':>8} {'wall(s)':>8}{_scf_cols_header(compact_scf)}"
+           f" {'MO(s)':>7} {'MP3(s)':>8} {'RSS(MB)':>8}")
     logger.info(f"\n── MP3 {'─' * (len(hdr) - 6)}")
     logger.info(hdr)
     logger.info("─" * len(hdr))
@@ -216,8 +237,7 @@ def _print_mp3(collected, logger: logging.Logger):
             continue
         d = sys_data["mp3"]
         logger.info(f"{label:<20} {d['reference']:>3} {d['nbf']:>4} {fmt(d['dE'],'10.2e'):>10} {d['status']:>5}"
-              f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f} {fmt(d['eri_s'],'7.3f'):>7}"
-              f" {fmt(d['jk_ms'],'10.1f'):>10} {d['n_iter']:>6}"
+              f" {fmt(d['ref_wall'],'8.3f'):>8} {d['wall']:>8.3f}{_scf_cols_row(d, compact_scf)}"
               f" {fmt(d['mo_cc_s'],'7.3f'):>7} {fmt(d['mp3_s'],'8.3f'):>8}"
               f" {fmt(d['peak_rss'],'8.1f'):>8}")
     logger.info("─" * len(hdr))
@@ -316,14 +336,18 @@ def main():
     ap.add_argument("--econv", type=float, default=1e-8)
     ap.add_argument("--erischeme", choices=["vector", "tensor"], default="tensor",
                     help="ERI storage scheme (default: tensor)")
-    ap.add_argument("--gemmscheme", choices=["odometer", "eigen", "blas", "cublas_dgemm", "cublas_sgemm",
-                                            "avx_8x8", "avx_16x8", "avx_24x8", "cutensor"], default="blas",
-                    help="GEMM scheme for einsum (default: blas)")
+    ap.add_argument("--gemmscheme", choices=["odometer", "eigen", "openblas", "cublas_dgemm", "cublas_sgemm",
+                                            "avx_8x8", "avx_16x8", "avx_24x8", "cutensor"], default="openblas",
+                    help="GEMM scheme for einsum (default: openblas)")
     ap.add_argument("--version", default="vX.X.X",
                     help="version string stamped into the README.md row output (e.g. v3.1.2)")
     ap.add_argument("--frozen-core", action="store_true",
                     help="choose frozen core for the binary and compare with that energy in Psi4")
-    
+    ap.add_argument("--compact", action="store_true",
+                    help="post-HF tables (mp2/mp3/ccsd/ccsd_t) only: replace the ERI(s)/"
+                         "JK/it(ms)/scf_it columns with a single summed SCF(s) column. "
+                         "The scf table itself is unaffected (that IS the SCF breakdown).")
+
     args = ap.parse_args()
 
     with open(ROOT / "bench" / "systems.json") as fh:
@@ -427,6 +451,14 @@ def main():
                 ccsd_only_s = (wall - ptriples_s) if not math.isnan(ptriples_s) else math.nan
                 mp3_s = phases.get(MP3_KEY, {}).get("seconds", math.nan)
 
+                # "Build T3": the per-(i,j,k) connected-T3 batch build inside "Perbutative
+                # Triples" (calc_pert_triples' o^3 loop) -- called once per unique (i,j,k), so
+                # its "calls" IS the iteration count (o^3, spin or spat).
+                build_t3_phase  = phases.get(BUILD_T3_KEY, {})
+                build_t3_s      = build_t3_phase.get("seconds", math.nan)
+                build_t3_ms     = build_t3_phase.get("avg_ms",  math.nan)
+                build_t3_calls  = build_t3_phase.get("calls",   math.nan)
+
                 jk_phase = phases.get("JK build")
                 if jk_phase:
                     jk_ms = jk_phase["avg_ms"]
@@ -435,6 +467,14 @@ def main():
                     jkb = phases.get("JK build", {}).get("avg_ms", 0.0)
                     jk_ms = (jka + jkb) if (jka or jkb) else math.nan
 
+                # "SCF(s)" (--compact): everything before a post-HF method starts --
+                # one-electron ints + ERI build (both can dominate over the SCF iterations
+                # themselves) + JK total (avg_ms * n_iter, a stand-in for the whole iterative
+                # loop's cost -- diag/DIIS are comparatively small and untimed on their own).
+                one_elec_s = phases.get(ONE_ELEC_KEY, {}).get("seconds", math.nan)
+                jk_total_s = jk_ms * n_iter / 1000.0
+                scf_total_s = one_elec_s + eri_s + jk_total_s
+
                 result = {
                     "nbf": nbf, "wall": wall, "n_iter": n_iter, "peak_rss": peak_rss,
                     "dE": dE, "ref_wall": ref_wall, "status": status,
@@ -442,6 +482,8 @@ def main():
                     "mo_cc_s": mo_cc_s, "cc_ms": cc_ms, "cc_iters": cc_iters,
                     "dE_ccsd": dE_ccsd, "ptriples": ptriples, "ptriples_s": ptriples_s,
                     "ccsd_only_s": ccsd_only_s, "mp3_s": mp3_s,
+                    "build_t3_s": build_t3_s, "build_t3_ms": build_t3_ms, "build_t3_calls": build_t3_calls,
+                    "scf_total_s": scf_total_s,
                     "reference": system.get("reference", "rhf"),
                 }
                 collected[label][method] = result
@@ -459,6 +501,8 @@ def main():
                     "mo_cc_s": math.nan, "cc_ms": math.nan, "cc_iters": math.nan,
                     "dE_ccsd": math.nan, "ptriples": math.nan, "ptriples_s": math.nan,
                     "ccsd_only_s": math.nan, "mp3_s": math.nan,
+                    "build_t3_s": math.nan, "build_t3_ms": math.nan, "build_t3_calls": math.nan,
+                    "scf_total_s": math.nan,
                     "reference": system.get("reference", "rhf"),
                 }
                 collected[label][method] = result
@@ -467,7 +511,10 @@ def main():
     methods_run = {m for sys_data in collected.values() for m in sys_data}
     for method, spec in METHOD_SPECS.items():
         if method in methods_run:
-            spec["printer"](collected, logger)
+            if method == "scf":
+                spec["printer"](collected, logger)
+            else:
+                spec["printer"](collected, logger, compact_scf=args.compact_scf)
 
     logger.info(f"\ntol = {args.tol:.1e} vs Psi4; wall = best of {args.repeats} runs")
 
