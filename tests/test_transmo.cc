@@ -42,6 +42,28 @@ TEST_CASE("transmo_spat_iajb: identity C reproduces AO integrals unchanged") {
         CHECK(I_mo(i, a, j, b) == doctest::Approx(eri[eri_index(i, n_occ + a, j, n_occ + b)]));
 }
 
+TEST_CASE("transmo_spat_iajb: frozen core is exactly a sub-slice of the unfrozen occupied axes") {
+    // Freezing core orbitals only removes them from the transform (columns of Cocc), and must
+    // not otherwise change the values of the orbitals that remain.
+    golden::Golden g = golden::load_golden("h2o_sto-3g");
+    const Tensor eri_tensor = eri_vector_to_tensor(g.list("eri"), g.nbf);
+    const Matrix& C = g.mat("C");
+    const int n_occ = g.n_docc;
+    const int n_frozen = 1; // O (period 2) contributes 1; the two H's contribute 0 each
+
+    Tensor I_full = transmo_spat_iajb(eri_tensor, C, n_occ);
+    Tensor I_frozen = transmo_spat_iajb(eri_tensor, C, n_occ, n_frozen);
+
+    REQUIRE(I_frozen.shape[0] == I_full.shape[0] - n_frozen);
+    REQUIRE(I_frozen.shape[2] == I_full.shape[2] - n_frozen);
+
+    for (int i = 0; i < I_frozen.shape[0]; ++i)
+    for (int a = 0; a < I_frozen.shape[1]; ++a)
+    for (int j = 0; j < I_frozen.shape[2]; ++j)
+    for (int b = 0; b < I_frozen.shape[3]; ++b)
+        CHECK(I_frozen(i, a, j, b) == doctest::Approx(I_full(i + n_frozen, a, j + n_frozen, b)));
+}
+
 TEST_CASE("transmo_spin_iajb: identity C reproduces AO integrals (all three blocks)") {
     // ch3 is open-shell (n_alpha != n_beta), so the ab block mixes two different occ/virt splits
     // eri is in the canonical vector form, so an explicit nested loop is used to check

@@ -120,10 +120,7 @@ double WaveFunction::get_Vnn() {
 double WaveFunction::get_energy(const std::string reference, const std::string method,
                                 const double econv=1e-8, const int max_iter=200, const int verbose=2,
                                 GuessScheme guess, bool frozen_core) {
-    if (frozen_core && reference == "uhf") {
-        throw std::runtime_error("frozen core not yet supported for UHF");
-    }
-    const int n_frozen = count_frozen_core(this->atoms);
+    const int n_frozen = frozen_core ? count_frozen_core(this->atoms) : 0;
 
     double E_scf;
     SCFResult sr;
@@ -156,9 +153,9 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
         }
         else if (reference == "uhf") {
             const auto& [Iiajb_AA, Iiajb_BB, Iiajb_AB] = transmo_spin_iajb(
-                this->eri_tensor, sr.CA, this->n_alpha, sr.CB, this->n_beta);
+                this->eri_tensor, sr.CA, this->n_alpha, sr.CB, this->n_beta, n_frozen);
             return E_scf + calc_uhf_mp2_E(Iiajb_AA, Iiajb_BB, Iiajb_AB, sr.epsA, sr.epsB,
-                        this->n_alpha, this->n_beta);
+                        this->n_alpha, this->n_beta, n_frozen);
         }
     }
 

@@ -69,9 +69,10 @@ Tensor t3c_ijk_spat(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
 // This is a line-by-line direct port from `t_vikings_so` / `t_vikings` in `cctriples.py` in PyCC.
 // Source: https://github.com/CrawfordGroup/pycc/blob/main/pycc/cctriples.py
 double calc_pert_triples(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor& t1, const Tensor& t2,
-                        const Tensor& FN, const int nbf, const int n_occ, Sli O, Sli V, bool spin) {
+                        const Tensor& FN, Sli O, Sli V, bool spin) {
     timing::Scoped _t("Perbutative Triples");
 
+    const int n_occ = O.stop - O.start;
     Tensor F_diag({FN.shape[0]});
     for (int i = 0; i != FN.shape[0]; ++i) { F_diag(i) = FN(i, i); }
     Tensor F_occ  = F_diag.slice(O);
@@ -143,8 +144,11 @@ double calc_pert_triples(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor
 // https://github.com/CrawfordGroup/ProgrammingProjects/tree/master/Project%2306
 // https://github.com/psi4/psi4numpy/blob/master/Coupled-Cluster/Spin_Orbitals/CCSD/CCSD_T.py
 double calc_pert_triples_noddy(const Tensor& Iprqs, const Tensor& t1, const Tensor&t2,
-                        const Tensor& FN, const int nbf, const int n_occ, Sli O, Sli V) {
+                        const Tensor& FN, Sli O, Sli V) {
     timing::Scoped _t("Perbutative Triples");
+
+    const int n_occ = O.stop - O.start;
+    const int n_virt = V.stop - V.start;
 
     // Disconnected triples
     Tensor tmp = einsum("ia,jkbc->ijkabc", {t1, Iprqs.slice(O, O, V, V)});
@@ -182,7 +186,6 @@ double calc_pert_triples_noddy(const Tensor& Iprqs, const Tensor& t1, const Tens
     }
     Tensor F_occ = F_diag.slice(O); Tensor F_virt = F_diag.slice(V);
 
-    const int n_virt = nbf * 2 - n_occ;
     Tensor Dijkabc({n_occ, n_occ, n_occ, n_virt, n_virt, n_virt});
 
     for (int i=0; i<n_occ; ++i)  for (int j=0; j<n_occ; ++j)  for (int k=0; k<n_occ; ++k)

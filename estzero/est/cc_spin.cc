@@ -83,6 +83,8 @@ Tensor build_spin_Iprqs(const Tensor& Ipqrs_AA, const Tensor& Ipqrs_BB, const Te
 // Normal-ordered Fock matrix. FN = HN + sum_m <pi||qi>.
 // Ha/Hb must each be the one-electron Hamiltonian already transformed into that spin's OWN MO basis 
 // (Ha = Ca^T (T+V) Ca, Hb = Cb^T (T+V) Cb)
+//
+// Kept for legacy only, see `build_diag_spin_FN`
 Tensor build_spin_FN(const Tensor& HA, const Tensor& HB, const Tensor& DEprqs, 
                     const int n_alpha, const int n_beta) {
     const int nbf = HA.shape[0];
@@ -109,6 +111,27 @@ Tensor build_spin_FN(const Tensor& HA, const Tensor& HB, const Tensor& DEprqs,
     Tensor two_electron = einsum("piqi->pq", {DEprqs.slice(All, O, All, O)});
 
     return HN + two_electron;
+}
+
+
+// The normal-ordered Fock matrix is diagonal by definition in the molecular orbital basis, so the 
+// builder helper here just simplifies to build directly from the orbital energies instead of doing 
+// einsum over the transformed integrals again. 
+Tensor build_diag_spin_FN(const Vector& epsA_active, const int n_alpha,
+                          const Vector& epsB_active, const int n_beta) {
+    const int nbf = static_cast<int>(epsA_active.size());
+    const auto [OA_des, OB_des, VA_des, VB_des,
+                OA_src, OB_src, VA_src, VB_src] = get_slices_ab_ov(n_alpha, n_beta, nbf);
+
+    Tensor FN({2 * nbf, 2 * nbf});
+    FN.fill(0.0);
+
+    for (int i = 0; i != n_alpha; ++i) { FN(OA_des.start + i, OA_des.start + i) = epsA_active(OA_src.start + i); }
+    for (int a = 0; a != nbf - n_alpha; ++a) { FN(VA_des.start + a, VA_des.start + a) = epsA_active(VA_src.start + a); }
+    for (int i = 0; i != n_beta; ++i) { FN(OB_des.start + i, OB_des.start + i) = epsB_active(OB_src.start + i); }
+    for (int a = 0; a != nbf - n_beta; ++a) { FN(VB_des.start + a, VB_des.start + a) = epsB_active(VB_src.start + a); }
+
+    return FN;
 }
 
 

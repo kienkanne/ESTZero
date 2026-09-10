@@ -16,7 +16,7 @@ inline int core_orbitals_for_element(int atomic_number) {
 inline int count_frozen_core(const std::vector<libint2::Atom>& atoms) {
     int n_frozen = 0;
     for (const auto& atom : atoms) { 
-        n_frozen += core_orbitals_for_element(atom.atomic_number); \
+        n_frozen += core_orbitals_for_element(atom.atomic_number);
     }
     return n_frozen;
 }

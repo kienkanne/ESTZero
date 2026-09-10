@@ -47,16 +47,18 @@ Tensor transmo_spat_iajb(const Tensor& eri_tensor, const Matrix& C, int n_occ, i
 }
 
 
-SpinMO transmo_spin_iajb(const Tensor& eri_tensor, const Matrix& CA, int n_alpha, const Matrix& CB, int n_beta) {
+SpinMO transmo_spin_iajb(const Tensor& eri_tensor, const Matrix& CA, int n_alpha, const Matrix& CB, int n_beta,
+                          int n_frozen) {
     timing::Scoped _t("MO Transformation");
 
     const int nbf = static_cast<int>(CA.rows());
     const int n_avirt = nbf - n_alpha;
     const int n_bvirt = nbf - n_beta;
 
-    Tensor Cocc_A = mat_to_tensor(CA.leftCols(n_alpha));
+    // Frozen core orbitals are not transformed
+    Tensor Cocc_A = mat_to_tensor(CA.middleCols(n_frozen, n_alpha - n_frozen));
     Tensor Cvirt_A = mat_to_tensor(CA.rightCols(n_avirt));
-    Tensor Cocc_B = mat_to_tensor(CB.leftCols(n_beta));
+    Tensor Cocc_B = mat_to_tensor(CB.middleCols(n_frozen, n_beta - n_frozen));
     Tensor Cvirt_B = mat_to_tensor(CB.rightCols(n_bvirt));
 
     Tensor Iiajb_BB = transmo(eri_tensor, Cocc_B, Cvirt_B, Cocc_B, Cvirt_B);

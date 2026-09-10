@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
     std::string eri_scheme_str = "tensor";
     std::string gemm_scheme_str = "blas";
     std::string guess_str = "core";
-    bool frozen_core = true;
+    bool frozen_core = false;
     int mult = 1;
     int charge = 0;
     double econv = 1e-8;

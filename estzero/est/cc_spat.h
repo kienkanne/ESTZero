@@ -3,6 +3,8 @@
 
 #include "tensor.h"
 
+Tensor build_diag_FN(const Vector& eps_diag);
+
 Tensor build_spat_T1(const Tensor& Iprqs, const Tensor& FN,
                 const Tensor& Fae, const Tensor& Fmi, const Tensor& Fme,
                 const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin);

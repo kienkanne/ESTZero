@@ -1,6 +1,15 @@
 #include "tensor.h"
 #include "einsum.h"
 #include "cc_spat.h"
+
+Tensor build_diag_FN(const Vector& eps_diag) {
+    const int dim = static_cast<int>(eps_diag.size());
+    Tensor FN({dim, dim});
+    FN.fill(0.0);
+    for (int i = 0; i != dim; ++i) { FN(i, i) = eps_diag(i); }
+    return FN;
+}
+
 // Stanton Eqn 1
 Tensor build_spat_T1(const Tensor& Iprqs, const Tensor& FN,
                 const Tensor& Fae, const Tensor& Fmi, const Tensor& Fme,

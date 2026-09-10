@@ -9,7 +9,8 @@ struct SpinMO {
 };
 
 Tensor  transmo_spat_iajb(const Tensor& eri_tensor, const Matrix& C, int n_occ, int n_frozen = 0);
-SpinMO  transmo_spin_iajb(const Tensor& eri_tensor, const Matrix& CA, int n_alpha, const Matrix& CB, int n_beta);
+SpinMO  transmo_spin_iajb(const Tensor& eri_tensor, const Matrix& CA, int n_alpha, const Matrix& CB, int n_beta,
+                          int n_frozen = 0);
 
 // Full-space (p,q,r,s all spanning the whole MO range) versions, needed for
 // CCSD, which indexes MO[o,o,o,o]/[v,v,v,v]/etc. -- not just the [o,v,o,v]
