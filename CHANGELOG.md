@@ -2,6 +2,11 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.7.2] Generalized GEMM backend via , added direct `cublas_dgemm` benchmarking for CCSD(T)
+
+- `raw_gemm` (renamed to `call_gemm`) previously lived in `einsum.h`, but now is moved to `est_gemm.h` so `cc_triples.cc` can use it too. This gives the vikings access to all GEMM backend, and the numbers for `cublas_dgemm` is reported in this patch.
+- As expected, without the heavy `einsum` string parsing overhead, `cublas_dgemm` gained significant performance compared to itself in v3.7.0: `indole/sto-3g` 144.965s -> 79.594s (1.82x), `parabenzyne/sto-3g` 301.772s -> 195.325s (1.54x). It has also finally outperformed OpenBLAS in v3.7.1, where the framework is identical and only the backend changed. OpenBLAS was 102.316s on `indole/sto-3g` and 261.854s on `parabenzyne/sto-3g`. However, this is still limited due cuBLAS having to move data to device every iteration, which is a problem that can be solved with persistent buffers. This will be explored next patches.
+
 ## [v3.7.1] Wired GEMM directly into `cc_triples`, bypassing `einsum` for the (T) triples loop. Added new benchmarking systems.
 
 - Added two new CCSD(T) stress systems, `indole/sto-3g` (RHF, nbf=52) and `parabenzyne/sto-3g` (UHF, 1,4-didehydrobenzene diradical, nbf=34), since the previously tracked systems are too small to show signal anymore (see v3.6.0/v3.7.0). New logs live in `bench/outputs_ccsd_t/`, not yet put into the regular tracked tables in `README.md`.
