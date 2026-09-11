@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <cblas.h>
 
+#include "est_gemm.h"
 #include "einsum.h"
 #include "odometer.h"
 
@@ -206,7 +207,7 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
     } else {
         // Non-Eigen route: works directly on a vector
         std::vector<double> result_data(left_size * right_size);
-        raw_gemm(gs, left_size, right_size, summed_size, M.data_ptr(), N.data_ptr(), result_data.data());
+        call_gemm(gs, left_size, right_size, summed_size, M.data_ptr(), N.data_ptr(), result_data.data());
 
         combined = Tensor(combined_shape, result_data);
     }

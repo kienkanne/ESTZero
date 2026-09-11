@@ -52,7 +52,8 @@ struct PinnedBuffer {
 } // namespace
 
 void cublas_dgemm(const int M, const int N, const int K, const double alpha, const double beta,
-                 const double* A, const double* B, double* C, double* kernel_ms) {
+                const double* A, const double* B, double* C, double* kernel_ms,
+                bool transA, bool transB) {
 
     const size_t sizeA = static_cast<size_t>(M) * K;
     const size_t sizeB = static_cast<size_t>(K) * N;
@@ -69,19 +70,23 @@ void cublas_dgemm(const int M, const int N, const int K, const double alpha, con
         cudaMemcpy(d_C, C, sizeC * sizeof(double), cudaMemcpyHostToDevice);
     }
 
+    // The leading dimensions of A & B must change according to the transpose (row->column if trans)
+    auto TA = (transB) ? CUBLAS_OP_T : CUBLAS_OP_N;
+    auto TB = (transA) ? CUBLAS_OP_T : CUBLAS_OP_N;
+    const int ldb_call = transB ? K : N;
+    const int lda_call = transA ? M : K;
+
     cublasHandle_t handle = get_handle();
 
     Events& ev = get_events();
     if (kernel_ms) cudaEventRecord(ev.start);
 
-    // Pass in as (N, M, K, B, ldb=N, A, lda=K, C, ldc=N)
-    // This means computing CT = BT * AT in column-major,
     cublasDgemm(handle,
-                CUBLAS_OP_N, CUBLAS_OP_N,
+                TA, TB,
                 N, M, K,
                 &alpha,
-                d_B, N, // BT
-                d_A, K, // AT
+                d_B, ldb_call, // BT
+                d_A, lda_call, // AT
                 &beta,
                 d_C, N); // CT
 
@@ -104,7 +109,8 @@ void cublas_dgemm(const int M, const int N, const int K, const double alpha, con
 // Single-precision path to explore the performance vs accuracy tradeoff. The double to float 
 // casting happens here.
 void cublas_sgemm(const int M, const int N, const int K, const double alpha, const double beta,
-                   const double* A, const double* B, double* C, double* kernel_ms) {
+                const double* A, const double* B, double* C, double* kernel_ms,
+                bool transA, bool transB) {
 
     const size_t sizeA = static_cast<size_t>(M) * K;
     const size_t sizeB = static_cast<size_t>(K) * N;
@@ -131,6 +137,11 @@ void cublas_sgemm(const int M, const int N, const int K, const double alpha, con
         cudaMemcpy(d_C, hC, sizeC * sizeof(float), cudaMemcpyHostToDevice);
     }
 
+    auto TA = (transB) ? CUBLAS_OP_T : CUBLAS_OP_N;
+    auto TB = (transA) ? CUBLAS_OP_T : CUBLAS_OP_N;
+    const int ldb_call = transB ? K : N;
+    const int lda_call = transA ? M : K;
+
     cublasHandle_t handle = get_handle();
 
     const float alpha_f = static_cast<float>(alpha);
@@ -139,13 +150,12 @@ void cublas_sgemm(const int M, const int N, const int K, const double alpha, con
     Events& ev = get_events();
     if (kernel_ms) cudaEventRecord(ev.start);
 
-    // Same row-major-via-column-major swap trick as cublas_dgemm.
     cublasSgemm(handle,
-                CUBLAS_OP_N, CUBLAS_OP_N,
+                TA, TB,
                 N, M, K,
                 &alpha_f,
-                d_B, N,
-                d_A, K,
+                d_B, ldb_call,
+                d_A, lda_call,
                 &beta_f,
                 d_C, N);
 

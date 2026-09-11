@@ -1,7 +1,7 @@
 #include "libint2/initialize.h"
 #include "wfn.h"
 #include "timer.h"
-#include "einsum.h"
+#include "est_gemm.h"
 #include <cblas.h>
 
 int main(int argc, char* argv[]) {

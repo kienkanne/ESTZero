@@ -68,9 +68,11 @@ void avx_blis_24x8(const int M, const int N, const int K, const double alpha, co
                 const double* A, const double* B, double* C);
 
 void cublas_dgemm(const int M, const int N, const int K, const double alpha, const double beta,
-                const double* A, const double* B, double* C, double* kernel_ms = nullptr);
+                const double* A, const double* B, double* C, double* kernel_ms = nullptr,
+                bool transA = false, bool transB = false);
 void cublas_sgemm(const int M, const int N, const int K, const double alpha, const double beta,
-                const double* A, const double* B, double* C, double* kernel_ms = nullptr);
+                const double* A, const double* B, double* C, double* kernel_ms = nullptr,
+                bool transA = false, bool transB = false);
 
 // Hand-written cuda kernels GEMM, single and double precision versions
 void cu_s_ladder(const int M, const int N, const int K, const double alpha, const double beta,

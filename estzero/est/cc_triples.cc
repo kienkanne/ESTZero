@@ -1,9 +1,8 @@
 #include <vector>
-#include <cblas.h>
 #include "tensor.h"
 #include "einsum.h"
 #include "timer.h"
-
+#include "est_gemm.h"
 
 // Vikings' connected-T3 batch for fixed occupied (i,j,k), spin-orbital/UHF form, called once per
 // (i,j,k) by calc_pert_triples below.
@@ -56,10 +55,8 @@ Tensor t3c_ijk_spin(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
         Tensor Wpack = Wvvvo.select(3, w_occ_idx).copy();
         const double* A = t2_slice.data_ptr();
         const double* B = Wpack.data_ptr();
-        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
-                    v, v2, v,
-                    sign, A, v, B, v,
-                    first ? 0.0 : 1.0, abc.data(), v2);
+        const double beta = first ? 0.0 : 1.0;
+        call_gemm(gs, v, v2, v, A, B, abc.data(), sign, beta, /*transA*/ false, /*transB*/ true);
     };
     add_vvvo_term(1.0,  t2.select(0, i).select(0, j), k, true);  // "ad,bcd->abc" (a,b,c)
     add_vvvo_term(-1.0, t2.select(0, k).select(0, j), i, false); // "ad,bcd->abc" (a,b,c)
@@ -72,10 +69,8 @@ Tensor t3c_ijk_spin(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
         Tensor Wpack = Wovoo.select(2, w_idx1).select(2, w_idx2).copy();
         const double* A = t2_slice.data_ptr();
         const double* B = Wpack.data_ptr();
-        cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
-                    v2, v, o,
-                    sign, A, v2, B, v,
-                    first ? 0.0 : 1.0, abc2.data(), v);
+        const double beta = first ? 0.0 : 1.0;
+        call_gemm(gs, v2, v, o, A, B, abc2.data(), sign, beta, /*transA*/ true, /*transB*/ false);
     };
     add_ovoo_term(1.0,  t2.select(0, i), j, k, true);  // "lab,lc->abc" (a,b,c)
     add_ovoo_term(-1.0, t2.select(0, j), i, k, false); // "lab,lc->abc" (a,b,c)
@@ -153,10 +148,7 @@ Tensor t3c_ijk_spat(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
         const double* A = t2_slice.data_ptr();
         Tensor Wpack = Wvvvo.select(3, w_idx1).copy();
         const double* B = Wpack.data_ptr();
-        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
-                    v, v2, v,
-                    1.0, A, v, B, v,
-                    0.0, raw.data(), v2);
+        call_gemm(gs, v, v2, v, A, B, raw.data(), 1.0, 0.0, /*transA*/ false, /*transB*/ true);
         return Tensor({v, v, v}, raw);
     };
 
@@ -165,10 +157,7 @@ Tensor t3c_ijk_spat(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
         const double* A = t2_slice.data_ptr();
         Tensor Wpack = Wovoo.select(2, w_idx1).select(2, w_idx2).copy();
         const double* B = Wpack.data_ptr();
-        cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
-                    v2, v, o,
-                    1.0, A, v2, B, v,
-                    0.0, raw.data(), v);
+        call_gemm(gs, v2, v, o, A, B, raw.data(), 1.0, 0.0, /*transA*/ true, /*transB*/ false);
         return Tensor({v, v, v}, raw);
     };
 
