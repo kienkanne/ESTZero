@@ -120,6 +120,30 @@ python3 bench/gemm_sweep.py --centers 3072 --offsets=-4,-2,0,2,4  # sweep around
 
 ## 2. EST Performance log
 
+### Latest: CCSD(T) stress test
+
+The systems tracked in the sections below are now too small to show signal (see CHANGELOG v3.6.0/v3.7.0), so new, larger CCSD(T) stress systems were added: `indole/sto-3g` (RHF, nbf=52) and `parabenzyne/sto-3g` (UHF, 1,4-didehydrobenzene diradical, nbf=34). Not yet reorganized into the rest of this log. Full logs in `bench/outputs_ccsd_t/`.
+
+**indole/sto-3g**
+
+| Config | Wall (s) | PertT (s) | T3/it (ms) |
+|---|---|---|---|
+| v3.7.0, nofrozen, openblas (einsum) | 342.123 | 297.940 | 10.001 |
+| v3.7.0, frozen, openblas (einsum) | 122.593 | 102.316 | 9.608 |
+| v3.7.0, frozen, cublas_dgemm (einsum) | 166.286 | 144.965 | 13.614 |
+| v3.7.0, frozen, cutensor (einsum) | 173.215 | 161.063 | 15.125 |
+| v3.7.1, frozen, openblas (direct GEMM) | 94.046 | 73.572 | 6.909 |
+
+**parabenzyne/sto-3g**
+
+| Config | Wall (s) | PertT (s) | T3/it (ms) |
+|---|---|---|---|
+| v3.7.0, nofrozen, openblas (einsum) | 880.925 | 814.887 | 12.730 |
+| v3.7.0, frozen, openblas (einsum) | 290.908 | 261.854 | 11.924 |
+| v3.7.0, frozen, cublas_dgemm (einsum) | 329.846 | 301.772 | 13.743 |
+| v3.7.0, frozen, cutensor (einsum) | 286.221 | 267.973 | 12.202 |
+| v3.7.1, frozen, openblas (direct GEMM) | 213.376 | 183.393 | 8.350 |
+
 This log tracks the update in features and their performance in the most computationally costly steps of different electronic structure theory methods. Versions without algorithm update for each section is not documented. See `bench/outputs` for full version peformance logs.
 
 > v1.5.0 added the ERI tensor building scheme alongside the original ERI vector building, so for this version both schemes are shown for direct comparison. From this version onward, only ERI tensor performance is shown.

@@ -2,6 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.7.1] Wired GEMM directly into `cc_triples`, bypassing `einsum` for the (T) triples loop. Added new benchmarking systems.
+
+- Added two new CCSD(T) stress systems, `indole/sto-3g` (RHF, nbf=52) and `parabenzyne/sto-3g` (UHF, 1,4-didehydrobenzene diradical, nbf=34), since the previously tracked systems are too small to show signal anymore (see v3.6.0/v3.7.0). New logs live in `bench/outputs_ccsd_t/`, not yet put into the regular tracked tables in `README.md`.
+- These confirm v3.7.0's frozen core gains are significant while still on the `einsum` route: `indole/sto-3g` 342.123s -> 122.593s (2.79x), PertT 297.940s -> 102.316s (2.91x); `parabenzyne/sto-3g` 880.925s -> 290.908s (3.03x), PertT 814.887s -> 261.854s (3.11x).
+- They also confirm the GPU-backed `einsum` backends (`cublas_dgemm`, `cutensor`) are still slower than plain `openblas` for the (T) loop specifically, even at this larger size: `indole/sto-3g` PertT 102.316s (openblas) vs 144.965s (cublas_dgemm, 1.42x slower) vs 161.063s (cutensor, 1.57x slower); `parabenzyne/sto-3g` 261.854s vs 301.772s (1.15x slower) vs 267.973s (roughly even). They are still dominated by per-call overhead (device transfer for the GPU backends)
+- This version also updates the vikings algorithm directly: `t3c_ijk_spin`/`t3c_ijk_spat` now call `cblas_dgemm` directly for every contraction instead of going through `einsum`/`try_gemm`. With frozen core, `indole/sto-3g` PertT 102.316s -> 73.572s (1.39x), T3/it 9.608ms -> 6.909ms; `parabenzyne/sto-3g` PertT 261.854s -> 183.393s (1.43x), T3/it 11.924ms -> 8.350ms.
+
 ## [v3.7.0] Added frozen core approximation for MP2/MP3/CCSD(T), RHF and UHF
 
 - Added `--frozen-core true|false` (default `false`), excluding the core orbitals per atom (H/He freeze 0, Li-Ne freeze 1 (`1s`), Na-Ar freeze 5 (`1s,2s,2p x3`)) to speed up post-HF methods. All energies are verified against Psi4's `freeze_core=true` with tol=1e-06 (actually difference is about 1e-09).
