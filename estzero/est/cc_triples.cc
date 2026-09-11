@@ -1,3 +1,5 @@
+#include <vector>
+#include <cblas.h>
 #include "tensor.h"
 #include "einsum.h"
 #include "timer.h"
@@ -7,7 +9,10 @@
 // (i,j,k) by calc_pert_triples below.
 // This is a direct line-by-line port of `t3c_ijk_so` in `cctriples.py` in PyCC.
 // Source: https://github.com/CrawfordGroup/pycc/blob/main/pycc/cctriples.py
-Tensor t3c_ijk_spin(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
+//
+// Legacy version wired through einsum. The route routed into live code is below where GEMM is called
+// directly. The repeated einsum calls in PertT makes the overhead cost the dominate.
+Tensor t3c_ijk_spin_old(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
                const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k) {
     Tensor abc = einsum("ad,bcd->abc", {t2.select(0, i).select(0, j), Wvvvo.select(3, k)});
     abc -= einsum("ad,bcd->abc", {t2.select(0, k).select(0, j), Wvvvo.select(3, i)});
@@ -31,11 +36,78 @@ Tensor t3c_ijk_spin(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
 }
 
 
+// Directly call GEMM for contractions, bypassing einsum.
+Tensor t3c_ijk_spin(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
+               const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k) {
+    const int v = Wvvvo.shape[0];
+    const int o = Wovoo.shape[0];
+    const int v2 = v * v;
+    const size_t v3 = static_cast<size_t>(v2) * v;
+
+    // t2[idx,idx,:,:] (v,v) is already contiguous because the it's the first index being sliced (largest stride), so no 
+    // packing is needed (just pass in the data_ptr that is already offsetted). Wvvvo[:,:,:,idx] is a strided  slice (last 
+    // index) and it non-contiguous, so use .copy() to pack it for GEMM.
+    //
+    // The GEMM notation is t2(a,d) * W(bc,d).T = (abc)
+    // The sizes and leading dimension are passed into cblas, so the shape can be recognized (v^2 is bc). The transpose then
+    // guarentess the output shape is abc, no permutation needed.
+    std::vector<double> abc(v3, 0.0);
+    auto add_vvvo_term = [&](double sign, const Tensor& t2_slice, int w_occ_idx, bool first) {
+        Tensor Wpack = Wvvvo.select(3, w_occ_idx).copy();
+        const double* A = t2_slice.data_ptr();
+        const double* B = Wpack.data_ptr();
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+                    v, v2, v,
+                    sign, A, v, B, v,
+                    first ? 0.0 : 1.0, abc.data(), v2);
+    };
+    add_vvvo_term(1.0,  t2.select(0, i).select(0, j), k, true);  // "ad,bcd->abc" (a,b,c)
+    add_vvvo_term(-1.0, t2.select(0, k).select(0, j), i, false); // "ad,bcd->abc" (a,b,c)
+    add_vvvo_term(-1.0, t2.select(0, i).select(0, k), j, false); // "ad,bcd->abc" (a,b,c)
+
+    // Very much similar idea here, but t2 is sliced once and W is sliced twice instead. The transpose trick is the
+    // same to get the desired output shape (abc)
+    std::vector<double> abc2(v3, 0.0);
+    auto add_ovoo_term = [&](double sign, const Tensor& t2_slice, int w_idx1, int w_idx2, bool first) {
+        Tensor Wpack = Wovoo.select(2, w_idx1).select(2, w_idx2).copy();
+        const double* A = t2_slice.data_ptr();
+        const double* B = Wpack.data_ptr();
+        cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+                    v2, v, o,
+                    sign, A, v2, B, v,
+                    first ? 0.0 : 1.0, abc2.data(), v);
+    };
+    add_ovoo_term(1.0,  t2.select(0, i), j, k, true);  // "lab,lc->abc" (a,b,c)
+    add_ovoo_term(-1.0, t2.select(0, j), i, k, false); // "lab,lc->abc" (a,b,c)
+    add_ovoo_term(-1.0, t2.select(0, k), j, i, false); // "lab,lc->abc" (a,b,c)
+
+    Tensor abc_t({v, v, v}, abc);
+    Tensor abc2_t({v, v, v}, abc2);
+
+    Tensor t3 = abc_t.copy();                   // + abc[a,b,c]
+    t3 -= abc_t.swapaxes(0, 1).copy(); // - abc[b,a,c]
+    t3 -= abc_t.swapaxes(0, 2).copy(); // - abc[c,b,a]
+    t3 -= abc2_t;                               // - abc2[a,b,c]
+    t3 += abc2_t.swapaxes(0, 2).copy();// + abc2[c,b,a]
+    t3 += abc2_t.swapaxes(1, 2).copy();// + abc2[a,c,b]
+
+    Tensor denom({v, v, v});
+    const double e_ijk = F_occ(i) + F_occ(j) + F_occ(k);
+    for (int a = 0; a < v; ++a) {
+    for (int b = 0; b < v; ++b) {
+    for (int c = 0; c < v; ++c) {
+        denom(a, b, c) = e_ijk - (F_virt(a) + F_virt(b) + F_virt(c));
+    }}}
+
+    return t3 / denom;
+}
+
+
 // Vikings' connected-T3 batch for fixed occupied (i,j,k), spin-adapted/RHF form, where the six permutations 
 // are written out explicitly. Wvvvo/Wovoo are raw Iprqs slices, unlike the UHF version which uses DEprqs
 // This is a direct line-by-line port of `t3c_ijk` in `cctriples.py` in PyCC.
 // Source: https://github.com/CrawfordGroup/pycc/blob/main/pycc/cctriples.py
-Tensor t3c_ijk_spat(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
+Tensor t3c_ijk_spat_old(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
                const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k) {
     Tensor t3 = einsum("bae,ce->abc", {Wvvvo.select(3, i), t2.select(0, k).select(0, j)});
     t3 += einsum("cae,be->abc", {Wvvvo.select(3, i), t2.select(0, j).select(0, k)});
@@ -62,6 +134,73 @@ Tensor t3c_ijk_spat(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
     return t3 / denom;
 }
 
+
+Tensor t3c_ijk_spat(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
+               const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k) {
+    const int v = Wvvvo.shape[0];
+    const int o = Wovoo.shape[0];
+    const int v2 = v * v;
+    const size_t v3 = static_cast<size_t>(v2) * v;
+
+    Tensor t3({v, v, v});
+    t3.fill(0.0);
+
+    // Similar idea in UHF where t2 is already contiguous and W needs packing. However, we don't accumulate directly into 
+    // t3 because the output shape varies in the RHF scheme, unlike uhf. For example, t2(c,e) * W(ba,e).T = (cba), not
+    // abc, and this varies with all contractions. Therefore, a raw term must be permutated.
+    auto vvvo_term = [&](const Tensor& t2_slice, int w_idx1) {
+        std::vector<double> raw(v3);
+        const double* A = t2_slice.data_ptr();
+        Tensor Wpack = Wvvvo.select(3, w_idx1).copy();
+        const double* B = Wpack.data_ptr();
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+                    v, v2, v,
+                    1.0, A, v, B, v,
+                    0.0, raw.data(), v2);
+        return Tensor({v, v, v}, raw);
+    };
+
+    auto ovoo_term = [&](const Tensor& t2_slice, int w_idx1, int w_idx2) {
+        std::vector<double> raw(v3);
+        const double* A = t2_slice.data_ptr();
+        Tensor Wpack = Wovoo.select(2, w_idx1).select(2, w_idx2).copy();
+        const double* B = Wpack.data_ptr();
+        cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+                    v2, v, o,
+                    1.0, A, v2, B, v,
+                    0.0, raw.data(), v);
+        return Tensor({v, v, v}, raw);
+    };
+
+    // Permutation logic to accumulate the raw output GEMM into t3. (bac) to (abc) would be (1, 0, 2)
+    auto add_term = [&](const Tensor& raw, double sign, int pos_a, int pos_b, int pos_c) {
+        t3 += sign * raw.permute({pos_a, pos_b, pos_c});
+    };
+
+    // Comment shows the old einsum string, then the raw (physical) axis order the GEMM actually produces
+    add_term(vvvo_term(t2.select(0, k).select(0, j), i), 1.0, 2, 1, 0); // "bae,ce->abc" (c,b,a)
+    add_term(vvvo_term(t2.select(0, j).select(0, k), i), 1.0, 2, 0, 1); // "cae,be->abc" (b,c,a)
+    add_term(vvvo_term(t2.select(0, j).select(0, i), k), 1.0, 1, 0, 2); // "ace,be->abc" (b,a,c)
+    add_term(vvvo_term(t2.select(0, i).select(0, j), k), 1.0, 0, 1, 2); // "bce,ae->abc" (a,b,c)
+    add_term(vvvo_term(t2.select(0, i).select(0, k), j), 1.0, 0, 2, 1); // "cbe,ae->abc" (a,c,b)
+    add_term(vvvo_term(t2.select(0, k).select(0, i), j), 1.0, 1, 2, 0); // "abe,ce->abc" (c,a,b)
+
+    add_term(ovoo_term(t2.select(0, i), j, k), -1.0, 0, 1, 2); // "mc,mab->abc" (a,b,c)
+    add_term(ovoo_term(t2.select(0, i), k, j), -1.0, 0, 2, 1); // "mb,mac->abc" (a,c,b)
+    add_term(ovoo_term(t2.select(0, k), i, j), -1.0, 1, 2, 0); // "mb,mca->abc" (c,a,b)
+    add_term(ovoo_term(t2.select(0, k), j, i), -1.0, 2, 1, 0); // "ma,mcb->abc" (c,b,a)
+    add_term(ovoo_term(t2.select(0, j), k, i), -1.0, 2, 0, 1); // "ma,mbc->abc" (b,c,a)
+    add_term(ovoo_term(t2.select(0, j), i, k), -1.0, 1, 0, 2); // "mc,mba->abc" (b,a,c)
+
+    Tensor denom({v, v, v});
+    const double e_ijk = F_occ(i) + F_occ(j) + F_occ(k);
+    for (int a = 0; a < v; ++a) {
+    for (int b = 0; b < v; ++b) {
+    for (int c = 0; c < v; ++c) {
+        denom(a, b, c) = e_ijk - (F_virt(a) + F_virt(b) + F_virt(c));
+    }}}
+    return t3 / denom;
+}
 
 // Loops over occupied (i,j,k), builds one (v,v,v) connected-T3 batch (t3c_ijk_so/t3c_ijk_spat above) at a time, 
 // and contracts it into the x1/x2 accumulators, meaning that the full O(o^3 v^3) T3 is never created, unlike 
@@ -93,6 +232,8 @@ double calc_pert_triples(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor
     for (int i = 0; i < n_occ; ++i) {
     for (int j = 0; j < n_occ; ++j) {
     for (int k = 0; k < n_occ; ++k) {
+        timing::Scoped _t("  Build T3");
+        
         Tensor t3 = t3c_ijk_spin(t2, Wvvvo, Wovoo, F_occ, F_virt, i, j, k);
 
         x1.select(0, i) += 0.25 * einsum("bc,abc->a", {Woovv.select(0, j).select(0, k), t3});
@@ -118,6 +259,8 @@ double calc_pert_triples(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor
     for (int i = 0; i < n_occ; ++i) {
     for (int j = 0; j < n_occ; ++j) {
     for (int k = 0; k < n_occ; ++k) {
+        timing::Scoped _t("  Build T3");
+
         Tensor t3 = t3c_ijk_spat(t2, Wvvvo, Wovoo, F_occ, F_virt, i, j, k);
         Tensor t3_diff  = t3 - t3.swapaxes(0, 2);
         Tensor t3_comb1 = 2.0 * t3 - t3.swapaxes(1, 2) - t3.swapaxes(0, 2);
@@ -144,11 +287,8 @@ double calc_pert_triples(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor
 // https://github.com/CrawfordGroup/ProgrammingProjects/tree/master/Project%2306
 // https://github.com/psi4/psi4numpy/blob/master/Coupled-Cluster/Spin_Orbitals/CCSD/CCSD_T.py
 double calc_pert_triples_noddy(const Tensor& Iprqs, const Tensor& t1, const Tensor&t2,
-                        const Tensor& FN, Sli O, Sli V) {
+                        const Tensor& FN, const int nbf, const int n_occ, Sli O, Sli V) {
     timing::Scoped _t("Perbutative Triples");
-
-    const int n_occ = O.stop - O.start;
-    const int n_virt = V.stop - V.start;
 
     // Disconnected triples
     Tensor tmp = einsum("ia,jkbc->ijkabc", {t1, Iprqs.slice(O, O, V, V)});
@@ -186,6 +326,7 @@ double calc_pert_triples_noddy(const Tensor& Iprqs, const Tensor& t1, const Tens
     }
     Tensor F_occ = F_diag.slice(O); Tensor F_virt = F_diag.slice(V);
 
+    const int n_virt = nbf * 2 - n_occ;
     Tensor Dijkabc({n_occ, n_occ, n_occ, n_virt, n_virt, n_virt});
 
     for (int i=0; i<n_occ; ++i)  for (int j=0; j<n_occ; ++j)  for (int k=0; k<n_occ; ++k)
