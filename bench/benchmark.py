@@ -326,7 +326,7 @@ def main():
     ap.add_argument("--name", default=datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     ap.add_argument("--repeats", type=int, default=3,
                     help="runs per (system, method); fastest wall time is reported")
-    ap.add_argument("--tier", nargs="+", choices=["tiny", "small", "medium", "large", "massive"])
+    ap.add_argument("--tier", nargs="+", choices=["tiny", "small", "medium", "large", "stress"])
     ap.add_argument("--method", nargs="+", choices=list(METHOD_SPECS),
                     help="limit to these methods (default: all listed per system)")
     ap.add_argument("--runall", action="store_true",
@@ -514,7 +514,7 @@ def main():
             if method == "scf":
                 spec["printer"](collected, logger)
             else:
-                spec["printer"](collected, logger, compact_scf=args.compact_scf)
+                spec["printer"](collected, logger, compact_scf=args.compact)
 
     logger.info(f"\ntol = {args.tol:.1e} vs Psi4; wall = best of {args.repeats} runs")
 

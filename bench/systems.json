@@ -148,5 +148,25 @@
     "mult": 2,
     "charge": 0,
     "methods": ["mp3"]
+  },
+  "indole/sto-3g": {
+    "xyz": "input/indole.xyz",
+    "basis": "sto-3g",
+    "tier": "stress",
+    "run_by_default": false,
+    "reference": "rhf",
+    "mult": 1,
+    "charge": 0,
+    "methods": ["ccsd_t"]
+  },
+  "parabenzyne/sto-3g": {
+    "xyz": "input/parabenzyne.xyz",
+    "basis": "sto-3g",
+    "tier": "stress",
+    "run_by_default": false,
+    "reference": "uhf",
+    "mult": 3,
+    "charge": 0,
+    "methods": ["ccsd_t"]
   }
 }
