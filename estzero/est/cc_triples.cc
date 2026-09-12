@@ -3,6 +3,7 @@
 #include "einsum.h"
 #include "timer.h"
 #include "est_gemm.h"
+#include "cc_triples.h"
 
 // Vikings' connected-T3 batch for fixed occupied (i,j,k), spin-orbital/UHF form, called once per
 // (i,j,k) by calc_pert_triples below.
@@ -36,12 +37,13 @@ Tensor t3c_ijk_spin_old(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wov
 
 
 // Directly call GEMM for contractions, bypassing einsum.
-Tensor t3c_ijk_spin(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
+Tensor t3c_ijk_spin(const Tensor& t2, VikingsBufferSpin& vb, const int o, const int v,
                const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k) {
-    const int v = Wvvvo.shape[0];
-    const int o = Wovoo.shape[0];
     const int v2 = v * v;
     const size_t v3 = static_cast<size_t>(v2) * v;
+
+    Tensor& t3 = vb.t3;
+    t3.fill(0);
 
     // t2[idx,idx,:,:] (v,v) is already contiguous because the it's the first index being sliced (largest stride), so no 
     // packing is needed (just pass in the data_ptr that is already offsetted). Wvvvo[:,:,:,idx] is a strided  slice (last 
@@ -50,41 +52,38 @@ Tensor t3c_ijk_spin(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
     // The GEMM notation is t2(a,d) * W(bc,d).T = (abc)
     // The sizes and leading dimension are passed into cblas, so the shape can be recognized (v^2 is bc). The transpose then
     // guarentess the output shape is abc, no permutation needed.
-    std::vector<double> abc(v3, 0.0);
-    auto add_vvvo_term = [&](double sign, const Tensor& t2_slice, int w_occ_idx, bool first) {
-        Tensor Wpack = Wvvvo.select(3, w_occ_idx).copy();
+    auto add_vvvo_term = [&](double sign, const Tensor& t2_slice, const Tensor& W_pack, bool first) {
         const double* A = t2_slice.data_ptr();
-        const double* B = Wpack.data_ptr();
+        const double* B = W_pack.data_ptr();
         const double beta = first ? 0.0 : 1.0;
-        call_gemm(gs, v, v2, v, A, B, abc.data(), sign, beta, /*transA*/ false, /*transB*/ true);
+        call_gemm(gs, v, v2, v, A, B, vb.gemm_out.data(), sign, beta, /*transA*/ false, /*transB*/ true);
     };
-    add_vvvo_term(1.0,  t2.select(0, i).select(0, j), k, true);  // "ad,bcd->abc" (a,b,c)
-    add_vvvo_term(-1.0, t2.select(0, k).select(0, j), i, false); // "ad,bcd->abc" (a,b,c)
-    add_vvvo_term(-1.0, t2.select(0, i).select(0, k), j, false); // "ad,bcd->abc" (a,b,c)
+    add_vvvo_term(1.0,  t2.select(0, i).select(0, j), vb.Wvvvo_k, true);  // "ad,bcd->abc" (a,b,c)
+    add_vvvo_term(-1.0, t2.select(0, k).select(0, j), vb.Wvvvo_i, false); // "ad,bcd->abc" (a,b,c)
+    add_vvvo_term(-1.0, t2.select(0, i).select(0, k), vb.Wvvvo_j, false); // "ad,bcd->abc" (a,b,c)
+
+    Tensor abc({v, v, v}, vb.gemm_out);
+    t3.assign(abc);                   // + abc[a,b,c]
+    t3 -= abc.swapaxes(0, 1).copy(); // - abc[b,a,c]
+    t3 -= abc.swapaxes(0, 2).copy(); // - abc[c,b,a]
 
     // Very much similar idea here, but t2 is sliced once and W is sliced twice instead. The transpose trick is the
     // same to get the desired output shape (abc)
-    std::vector<double> abc2(v3, 0.0);
-    auto add_ovoo_term = [&](double sign, const Tensor& t2_slice, int w_idx1, int w_idx2, bool first) {
-        Tensor Wpack = Wovoo.select(2, w_idx1).select(2, w_idx2).copy();
+    auto add_ovoo_term = [&](double sign, const Tensor& t2_slice, const Tensor& W_pack, bool first) {
         const double* A = t2_slice.data_ptr();
-        const double* B = Wpack.data_ptr();
+        const double* B = W_pack.data_ptr();
         const double beta = first ? 0.0 : 1.0;
-        call_gemm(gs, v2, v, o, A, B, abc2.data(), sign, beta, /*transA*/ true, /*transB*/ false);
+        call_gemm(gs, v2, v, o, A, B, vb.gemm_out.data(), sign, beta, /*transA*/ true, /*transB*/ false);
     };
-    add_ovoo_term(1.0,  t2.select(0, i), j, k, true);  // "lab,lc->abc" (a,b,c)
-    add_ovoo_term(-1.0, t2.select(0, j), i, k, false); // "lab,lc->abc" (a,b,c)
-    add_ovoo_term(-1.0, t2.select(0, k), j, i, false); // "lab,lc->abc" (a,b,c)
+    add_ovoo_term(1.0,  t2.select(0, i), vb.Wovoo_jk, true);  // "lab,lc->abc" (a,b,c)
+    add_ovoo_term(-1.0, t2.select(0, j), vb.Wovoo_ik, false); // "lab,lc->abc" (a,b,c)
+    add_ovoo_term(-1.0, t2.select(0, k), vb.Wovoo_ji, false); // "lab,lc->abc" (a,b,c)
 
-    Tensor abc_t({v, v, v}, abc);
-    Tensor abc2_t({v, v, v}, abc2);
+    Tensor abc2({v, v, v}, vb.gemm_out);
 
-    Tensor t3 = abc_t.copy();                   // + abc[a,b,c]
-    t3 -= abc_t.swapaxes(0, 1).copy(); // - abc[b,a,c]
-    t3 -= abc_t.swapaxes(0, 2).copy(); // - abc[c,b,a]
-    t3 -= abc2_t;                               // - abc2[a,b,c]
-    t3 += abc2_t.swapaxes(0, 2).copy();// + abc2[c,b,a]
-    t3 += abc2_t.swapaxes(1, 2).copy();// + abc2[a,c,b]
+    t3 -= abc2;                               // - abc2[a,b,c]
+    t3 += abc2.swapaxes(0, 2).copy();// + abc2[c,b,a]
+    t3 += abc2.swapaxes(1, 2).copy();// + abc2[a,c,b]
 
     Tensor denom({v, v, v});
     const double e_ijk = F_occ(i) + F_occ(j) + F_occ(k);
@@ -130,35 +129,29 @@ Tensor t3c_ijk_spat_old(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wov
 }
 
 
-Tensor t3c_ijk_spat(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
+Tensor t3c_ijk_spat(const Tensor& t2, VikingsBufferSpat& vb, const int o, const int v,
                const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k) {
-    const int v = Wvvvo.shape[0];
-    const int o = Wovoo.shape[0];
     const int v2 = v * v;
-    const size_t v3 = static_cast<size_t>(v2) * v;
 
-    Tensor t3({v, v, v});
-    t3.fill(0.0);
+    Tensor& t3 = vb.t3;
+    t3.fill(0);
 
     // Similar idea in UHF where t2 is already contiguous and W needs packing. However, we don't accumulate directly into 
     // t3 because the output shape varies in the RHF scheme, unlike uhf. For example, t2(c,e) * W(ba,e).T = (cba), not
-    // abc, and this varies with all contractions. Therefore, a raw term must be permutated.
-    auto vvvo_term = [&](const Tensor& t2_slice, int w_idx1) {
-        std::vector<double> raw(v3);
+    // abc, and this varies with all contractions. Therefore, a raw term must be permutated. They also can't share the same 
+    // vb.gemm_out for accumulation, so it is instead reused sequentially as scratch
+    auto vvvo_term = [&](const Tensor& t2_slice, const Tensor& W_pack) {
         const double* A = t2_slice.data_ptr();
-        Tensor Wpack = Wvvvo.select(3, w_idx1).copy();
-        const double* B = Wpack.data_ptr();
-        call_gemm(gs, v, v2, v, A, B, raw.data(), 1.0, 0.0, /*transA*/ false, /*transB*/ true);
-        return Tensor({v, v, v}, raw);
+        const double* B = W_pack.data_ptr();
+        call_gemm(gs, v, v2, v, A, B, vb.gemm_out.data(), 1.0, 0.0, /*transA*/ false, /*transB*/ true);
+        return Tensor({v, v, v}, vb.gemm_out);
     };
 
-    auto ovoo_term = [&](const Tensor& t2_slice, int w_idx1, int w_idx2) {
-        std::vector<double> raw(v3);
+    auto ovoo_term = [&](const Tensor& t2_slice, const Tensor& W_pack) {
         const double* A = t2_slice.data_ptr();
-        Tensor Wpack = Wovoo.select(2, w_idx1).select(2, w_idx2).copy();
-        const double* B = Wpack.data_ptr();
-        call_gemm(gs, v2, v, o, A, B, raw.data(), 1.0, 0.0, /*transA*/ true, /*transB*/ false);
-        return Tensor({v, v, v}, raw);
+        const double* B = W_pack.data_ptr();
+        call_gemm(gs, v2, v, o, A, B, vb.gemm_out.data(), 1.0, 0.0, /*transA*/ true, /*transB*/ false);
+        return Tensor({v, v, v}, vb.gemm_out);
     };
 
     // Permutation logic to accumulate the raw output GEMM into t3. (bac) to (abc) would be (1, 0, 2)
@@ -167,19 +160,19 @@ Tensor t3c_ijk_spat(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
     };
 
     // Comment shows the old einsum string, then the raw (physical) axis order the GEMM actually produces
-    add_term(vvvo_term(t2.select(0, k).select(0, j), i), 1.0, 2, 1, 0); // "bae,ce->abc" (c,b,a)
-    add_term(vvvo_term(t2.select(0, j).select(0, k), i), 1.0, 2, 0, 1); // "cae,be->abc" (b,c,a)
-    add_term(vvvo_term(t2.select(0, j).select(0, i), k), 1.0, 1, 0, 2); // "ace,be->abc" (b,a,c)
-    add_term(vvvo_term(t2.select(0, i).select(0, j), k), 1.0, 0, 1, 2); // "bce,ae->abc" (a,b,c)
-    add_term(vvvo_term(t2.select(0, i).select(0, k), j), 1.0, 0, 2, 1); // "cbe,ae->abc" (a,c,b)
-    add_term(vvvo_term(t2.select(0, k).select(0, i), j), 1.0, 1, 2, 0); // "abe,ce->abc" (c,a,b)
+    add_term(vvvo_term(t2.select(0, k).select(0, j), vb.Wvvvo_i), 1.0, 2, 1, 0); // "bae,ce->abc" (c,b,a)
+    add_term(vvvo_term(t2.select(0, j).select(0, k), vb.Wvvvo_i), 1.0, 2, 0, 1); // "cae,be->abc" (b,c,a)
+    add_term(vvvo_term(t2.select(0, j).select(0, i), vb.Wvvvo_k), 1.0, 1, 0, 2); // "ace,be->abc" (b,a,c)
+    add_term(vvvo_term(t2.select(0, i).select(0, j), vb.Wvvvo_k), 1.0, 0, 1, 2); // "bce,ae->abc" (a,b,c)
+    add_term(vvvo_term(t2.select(0, i).select(0, k), vb.Wvvvo_j), 1.0, 0, 2, 1); // "cbe,ae->abc" (a,c,b)
+    add_term(vvvo_term(t2.select(0, k).select(0, i), vb.Wvvvo_j), 1.0, 1, 2, 0); // "abe,ce->abc" (c,a,b)
 
-    add_term(ovoo_term(t2.select(0, i), j, k), -1.0, 0, 1, 2); // "mc,mab->abc" (a,b,c)
-    add_term(ovoo_term(t2.select(0, i), k, j), -1.0, 0, 2, 1); // "mb,mac->abc" (a,c,b)
-    add_term(ovoo_term(t2.select(0, k), i, j), -1.0, 1, 2, 0); // "mb,mca->abc" (c,a,b)
-    add_term(ovoo_term(t2.select(0, k), j, i), -1.0, 2, 1, 0); // "ma,mcb->abc" (c,b,a)
-    add_term(ovoo_term(t2.select(0, j), k, i), -1.0, 2, 0, 1); // "ma,mbc->abc" (b,c,a)
-    add_term(ovoo_term(t2.select(0, j), i, k), -1.0, 1, 0, 2); // "mc,mba->abc" (b,a,c)
+    add_term(ovoo_term(t2.select(0, i), vb.Wovoo_jk), -1.0, 0, 1, 2); // "mc,mab->abc" (a,b,c)
+    add_term(ovoo_term(t2.select(0, i), vb.Wovoo_kj), -1.0, 0, 2, 1); // "mb,mac->abc" (a,c,b)
+    add_term(ovoo_term(t2.select(0, k), vb.Wovoo_ij), -1.0, 1, 2, 0); // "mb,mca->abc" (c,a,b)
+    add_term(ovoo_term(t2.select(0, k), vb.Wovoo_ji), -1.0, 2, 1, 0); // "ma,mcb->abc" (c,b,a)
+    add_term(ovoo_term(t2.select(0, j), vb.Wovoo_ki), -1.0, 2, 0, 1); // "ma,mbc->abc" (b,c,a)
+    add_term(ovoo_term(t2.select(0, j), vb.Wovoo_ik), -1.0, 1, 0, 2); // "mc,mba->abc" (b,a,c)
 
     Tensor denom({v, v, v});
     const double e_ijk = F_occ(i) + F_occ(j) + F_occ(k);
@@ -201,16 +194,19 @@ double calc_pert_triples(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor
     timing::Scoped _t("Perbutative Triples");
 
     const int n_occ = O.stop - O.start;
+    const int n_virt = V.stop - V.start;
+
     Tensor F_diag({FN.shape[0]});
     for (int i = 0; i != FN.shape[0]; ++i) { F_diag(i) = FN(i, i); }
     Tensor F_occ  = F_diag.slice(O);
     Tensor F_virt = F_diag.slice(V);
     Tensor Fov    = FN.slice(O, V);
 
-    Tensor x1(t1.shape);
-    Tensor x2(t2.shape);
-
     if (spin) {
+    auto vb  = VikingsBufferSpin(t1, t2, n_occ, n_virt);
+    Tensor& x1 = vb.x1; Tensor& x2 = vb.x2; Tensor& t3 = vb.t3;
+
+    // Non-copying views
     Tensor Wvvvo = DEprqs.slice(V, V, V, O);
     Tensor Wovoo = DEprqs.slice(O, V, O, O);
     
@@ -218,12 +214,19 @@ double calc_pert_triples(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor
     Tensor Wvovv = DEprqs.slice(V, O, V, V);
     Tensor Wooov = DEprqs.slice(O, O, O, V);
 
+    // .assign() writes values into the buffer's already allocated storage in place
     for (int i = 0; i < n_occ; ++i) {
+        vb.Wvvvo_i.assign(Wvvvo.select(3, i));
     for (int j = 0; j < n_occ; ++j) {
+        vb.Wvvvo_j.assign(Wvvvo.select(3, j));
+        vb.Wovoo_ji.assign(Wovoo.select(2, j).select(2, i));
     for (int k = 0; k < n_occ; ++k) {
+        vb.Wvvvo_k.assign(Wvvvo.select(3, k));
+        vb.Wovoo_jk.assign(Wovoo.select(2, j).select(2, k));
+        vb.Wovoo_ik.assign(Wovoo.select(2, i).select(2, k));
         timing::Scoped _t("  Build T3");
-        
-        Tensor t3 = t3c_ijk_spin(t2, Wvvvo, Wovoo, F_occ, F_virt, i, j, k);
+
+        t3 = t3c_ijk_spin(t2, vb, n_occ, n_virt, F_occ, F_virt, i, j, k);
 
         x1.select(0, i) += 0.25 * einsum("bc,abc->a", {Woovv.select(0, j).select(0, k), t3});
         x2.select(0, i).select(0, j) += 0.25 * einsum("c,abc->ab", {Fov.select(0, k), t3});
@@ -237,7 +240,11 @@ double calc_pert_triples(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor
     et += 0.25 * einsum("ijab,ijab->", {t2, x2})();
     return et;
     } else {
-
+    auto vb  = VikingsBufferSpat(t1, t2, n_occ, n_virt);
+    Tensor& x1 = vb.x1; Tensor& x2 = vb.x2; Tensor& t3 = vb.t3;
+    Tensor& t3_diff = vb.t3_diff; Tensor& t3_comb1 = vb.t3_comb1;
+    
+    // Non-copying views
     Tensor Wvvvo = Iprqs.slice(V, V, V, O);
     Tensor Wovoo = Iprqs.slice(O, V, O, O);
 
@@ -246,13 +253,22 @@ double calc_pert_triples(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor
     Tensor DEoovv = DEprqs.slice(O, O, V, V);
 
     for (int i = 0; i < n_occ; ++i) {
+        vb.Wvvvo_i.assign(Wvvvo.select(3, i));
     for (int j = 0; j < n_occ; ++j) {
+        vb.Wvvvo_j.assign(Wvvvo.select(3, j));
+        vb.Wovoo_ij.assign(Wovoo.select(2, i).select(2, j));
+        vb.Wovoo_ji.assign(Wovoo.select(2, j).select(2, i));
     for (int k = 0; k < n_occ; ++k) {
+        vb.Wvvvo_k.assign(Wvvvo.select(3, k));
+        vb.Wovoo_jk.assign(Wovoo.select(2, j).select(2, k));
+        vb.Wovoo_kj.assign(Wovoo.select(2, k).select(2, j));
+        vb.Wovoo_ik.assign(Wovoo.select(2, i).select(2, k));
+        vb.Wovoo_ki.assign(Wovoo.select(2, k).select(2, i));
         timing::Scoped _t("  Build T3");
 
-        Tensor t3 = t3c_ijk_spat(t2, Wvvvo, Wovoo, F_occ, F_virt, i, j, k);
-        Tensor t3_diff  = t3 - t3.swapaxes(0, 2);
-        Tensor t3_comb1 = 2.0 * t3 - t3.swapaxes(1, 2) - t3.swapaxes(0, 2);
+        t3 = t3c_ijk_spat(t2, vb, n_occ, n_virt, F_occ, F_virt, i, j, k);
+        t3_diff  = t3 - t3.swapaxes(0, 2);
+        t3_comb1 = 2.0 * t3 - t3.swapaxes(1, 2) - t3.swapaxes(0, 2);
 
         x1.select(0, i) += einsum("abc,bc->a", {t3_diff, DEoovv.select(0, j).select(0, k)});
         x2.select(0, i).select(0, j) += einsum("abc,dbc->ad", {t3_comb1, Wvovv.select(1, k)});
