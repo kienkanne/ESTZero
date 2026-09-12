@@ -2,10 +2,18 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.7.3] Added `VikingsBuffer{Spin/Spat}` to allocate buffers all `Tensor`s once before the main loop
+
+- A big problem with the loops in the vikings algorithm is that it creates many large tensors each iteration that is ran thousands of times, so the memory allocation itself is a cost that can be avoided. `VikingsBuffer{Spin/Spat}` initiate the `Tensor` storage for terms like `t3`, `Wovoo_ji`, or `Wvvvo_i` once before the loop, as well as a `std::vector<double> gemm_out` as a scratch workspace for GEMM outputs.
+- Some tensors don't have to rebuilt every iteration as the innermost loop changes `k` only, so terms like `Wovoo_ji`, or `Wvvvo_i` can be built outside that loop, further saving allocation cost.
+- The CPU backend OpenBLAS saw some noticeable performance boost compared to v3.7.2 for PertT(s): `indole/sto-3g` 73.572s -> 62.850s (1.17x), `parabenzyne/sto-3g` 183.393s -> 167.056s (1.10x).
+- The GPU backend cuBLAS saw some improvement too, but smaller (~5%) since it still has to copy from host to device, proving that this is it's dominant cost. 
+
 ## [v3.7.2] Generalized GEMM backend via , added direct `cublas_dgemm` benchmarking for CCSD(T)
 
 - `raw_gemm` (renamed to `call_gemm`) previously lived in `einsum.h`, but now is moved to `est_gemm.h` so `cc_triples.cc` can use it too. This gives the vikings access to all GEMM backend, and the numbers for `cublas_dgemm` is reported in this patch.
-- As expected, without the heavy `einsum` string parsing overhead, `cublas_dgemm` gained significant performance compared to itself in v3.7.0: `indole/sto-3g` 144.965s -> 79.594s (1.82x), `parabenzyne/sto-3g` 301.772s -> 195.325s (1.54x). It has also finally outperformed OpenBLAS in v3.7.1, where the framework is identical and only the backend changed. OpenBLAS was 102.316s on `indole/sto-3g` and 261.854s on `parabenzyne/sto-3g`. However, this is still limited due cuBLAS having to move data to device every iteration, which is a problem that can be solved with persistent buffers. This will be explored next patches.
+- As expected, without the heavy `einsum` string parsing overhead, `cublas_dgemm` gained significant performance compared to itself in v3.7.0. For PertT(s): `indole/sto-3g` 144.965s -> 79.594s (1.82x), `parabenzyne/sto-3g` 301.772s -> 195.325s (1.54x). 
+- However, it's performance is still relatively the same to OpenBLAS in v3.7.1, where the framework is identical and only the backend changed. OpenBLAS was 102.316s on `indole/sto-3g` and 261.854s on `parabenzyne/sto-3g`. cuBLAS still has to device every iteration, which is a problem that can be solved with persistent buffers. This will be explored next patches.
 
 ## [v3.7.1] Wired GEMM directly into `cc_triples`, bypassing `einsum` for the (T) triples loop. Added new benchmarking systems.
 

@@ -70,9 +70,10 @@ void cublas_dgemm(const int M, const int N, const int K, const double alpha, con
         cudaMemcpy(d_C, C, sizeC * sizeof(double), cudaMemcpyHostToDevice);
     }
 
-    // The leading dimensions of A & B must change according to the transpose (row->column if trans)
-    auto TA = (transB) ? CUBLAS_OP_T : CUBLAS_OP_N;
-    auto TB = (transA) ? CUBLAS_OP_T : CUBLAS_OP_N;
+    // The leading dimensions of A & B must change according to the transpose. The transpose flag must flip as
+    // cublas is in column-major: C^T = op(B)^T * op(A)^T instead (arguments swapped)
+    auto TA = (transB) ? CUBLAS_OP_T : CUBLAS_OP_N; // flag for d_B (first arg after the swap)
+    auto TB = (transA) ? CUBLAS_OP_T : CUBLAS_OP_N; // flag for d_A (second arg after the swap)
     const int ldb_call = transB ? K : N;
     const int lda_call = transA ? M : K;
 
@@ -137,6 +138,7 @@ void cublas_sgemm(const int M, const int N, const int K, const double alpha, con
         cudaMemcpy(d_C, hC, sizeC * sizeof(float), cudaMemcpyHostToDevice);
     }
 
+    // Same row-major-via-column-major swap trick as cublas_dgemm.
     auto TA = (transB) ? CUBLAS_OP_T : CUBLAS_OP_N;
     auto TB = (transA) ? CUBLAS_OP_T : CUBLAS_OP_N;
     const int ldb_call = transB ? K : N;
