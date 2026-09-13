@@ -214,6 +214,8 @@ double calc_pert_triples(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor
     Tensor Wvovv = DEprqs.slice(V, O, V, V);
     Tensor Wooov = DEprqs.slice(O, O, O, V);
 
+    const int v2 = n_virt * n_virt;
+
     // .assign() writes values into the buffer's already allocated storage in place
     for (int i = 0; i < n_occ; ++i) {
         vb.Wvvvo_i.assign(Wvvvo.select(3, i));
@@ -228,22 +230,42 @@ double calc_pert_triples(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor
 
         t3 = t3c_ijk_spin(t2, vb, n_occ, n_virt, F_occ, F_virt, i, j, k);
 
-        x1.select(0, i) += 0.25 * einsum("bc,abc->a", {Woovv.select(0, j).select(0, k), t3});
-        x2.select(0, i).select(0, j) += 0.25 * einsum("c,abc->ab", {Fov.select(0, k), t3});
-        x2.select(0, i).select(0, j) += 0.25 * einsum("dbc,abc->ad", {Wvovv.select(1, k), t3});
-        x2.select(0, i) -= 0.25 * einsum("md,abd->mab", {Wooov.select(0, j).select(0, k), t3});
+        // t3 (a,b,c) is contiguous (freshly built), and the other operands are also contiguous (slicing only the
+        // first indices from the left). The output is fed directly into x2 with the correct slicing, which is
+        // also contiguous, so it's safe to call data_ptr().
+
+        // x1(i,:) += 0.25 * t3 as (a,(bc)) times Woovv_jk (bc,).
+        Tensor Woovv_jk = Woovv.select(0, j).select(0, k).contiguous();
+        call_gemm(gs, n_virt, 1, v2, t3.data_ptr(), Woovv_jk.data_ptr(),
+                  x1.select(0, i).data_ptr(), 0.25, 1.0, false, false);
+
+        // x2(i,j,:,:) += 0.25 * t3 as ((ab),c) times Fov_k (c,).
+        Tensor Fov_k = Fov.select(0, k);
+        call_gemm(gs, v2, 1, n_virt, t3.data_ptr(), Fov_k.data_ptr(),
+                  x2.select(0, i).select(0, j).data_ptr(), 0.25, 1.0, false, false);
+
+        // x2(i,j,a,d) += 0.25 * t3 (a,(bc)) @ Wvovv_k (d,(bc))^T.
+        Tensor Wvovv_k = Wvovv.select(1, k).contiguous();
+        call_gemm(gs, n_virt, n_virt, v2, t3.data_ptr(), Wvovv_k.data_ptr(),
+                  x2.select(0, i).select(0, j).data_ptr(), 0.25, 1.0, false, true);
+
+        // x2(i,m,a,b) -= 0.25 * Wooov_jk (m,d) @ t3 ((ab),d)^T.
+        Tensor Wooov_jk = Wooov.select(0, j).select(0, k).contiguous();
+        call_gemm(gs, n_occ, v2, n_virt, Wooov_jk.data_ptr(), t3.data_ptr(),
+                  x2.select(0, i).data_ptr(), -0.25, 1.0, false, true);
     }}}
 
     x2 = x2 - x2.swapaxes(0, 1) - x2.swapaxes(2, 3) + x2.swapaxes(0, 1).swapaxes(2, 3);
 
-    double et = einsum("ia,ia->", {t1, x1})();
-    et += 0.25 * einsum("ijab,ijab->", {t2, x2})();
+    double et = (t1 * x1).sum();
+    et += 0.25 * (t2 * x2).sum();
     return et;
     } else {
     auto vb  = VikingsBufferSpat(t1, t2, n_occ, n_virt);
     Tensor& x1 = vb.x1; Tensor& x2 = vb.x2; Tensor& t3 = vb.t3;
     Tensor& t3_diff = vb.t3_diff; Tensor& t3_comb1 = vb.t3_comb1;
-    
+    const int v2 = n_virt * n_virt;
+
     // Non-copying views
     Tensor Wvvvo = Iprqs.slice(V, V, V, O);
     Tensor Wovoo = Iprqs.slice(O, V, O, O);
@@ -270,15 +292,27 @@ double calc_pert_triples(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor
         t3_diff  = t3 - t3.swapaxes(0, 2);
         t3_comb1 = 2.0 * t3 - t3.swapaxes(1, 2) - t3.swapaxes(0, 2);
 
-        x1.select(0, i) += einsum("abc,bc->a", {t3_diff, DEoovv.select(0, j).select(0, k)});
-        x2.select(0, i).select(0, j) += einsum("abc,dbc->ad", {t3_comb1, Wvovv.select(1, k)});
-        x2.select(0, i) -= einsum("abc,lc->lab", {t3_comb1, Wooov.select(0, j).select(0, k)});
-        x2.select(0, i).select(0, j) += einsum("abc,c->ab", {t3_diff, Fov.select(0, k)});
+        // Same GEMM-shape reasoning as the UHF branch above, just no 0.25 factor here.
+        Tensor DEoovv_jk = DEoovv.select(0, j).select(0, k).contiguous();
+        call_gemm(gs, n_virt, 1, v2, t3_diff.data_ptr(), DEoovv_jk.data_ptr(),
+                  x1.select(0, i).data_ptr(), 1.0, 1.0, false, false);
+
+        Tensor Wvovv_k = Wvovv.select(1, k).contiguous();
+        call_gemm(gs, n_virt, n_virt, v2, t3_comb1.data_ptr(), Wvovv_k.data_ptr(),
+                  x2.select(0, i).select(0, j).data_ptr(), 1.0, 1.0, false, true);
+
+        Tensor Wooov_jk = Wooov.select(0, j).select(0, k).contiguous();
+        call_gemm(gs, n_occ, v2, n_virt, Wooov_jk.data_ptr(), t3_comb1.data_ptr(),
+                  x2.select(0, i).data_ptr(), -1.0, 1.0, false, true);
+
+        Tensor Fov_k = Fov.select(0, k);
+        call_gemm(gs, v2, 1, n_virt, t3_diff.data_ptr(), Fov_k.data_ptr(),
+                  x2.select(0, i).select(0, j).data_ptr(), 1.0, 1.0, false, false);
     }}}
 
-    double et = 2.0 * einsum("ia,ia->", {t1, x1})();
+    double et = 2.0 * (t1 * x1).sum();
     Tensor t2_comb = 4.0 * t2 - 2.0 * t2.swapaxes(2, 3);
-    et += einsum("ijab,ijab->", {t2_comb, x2})();
+    et += (t2_comb * x2).sum();
     return et;
     }
 }
