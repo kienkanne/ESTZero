@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.7.4] Replaced the last `einsum` calls in `calc_pert_triples` (x1/x2 accumulation) with direct GEMM
+
+- `x1`/`x2`'s accumulation and the final `et` reduction were the only `einsum` calls left in the live (T) path. Every destination (i.e. `x2.select(0,i).select(0,j)`) only fixes outer axes so it's always contiguous, so each became a direct GEMM written straight into that memory with `beta=1`, no intermediate `Tensor`. `et` is just `(t1*x1).sum()`/`(t2*x2).sum()`.
+- Further improvement on top of v3.7.3: `indole/sto-3g` PertT 62.850s -> 56.703s (1.11x, openblas), 70.085s -> 62.920s (1.11x, cublas_dgemm); `parabenzyne/sto-3g` PertT 167.056s -> 110.013s (1.52x, openblas), 183.062s -> 118.019s (1.55x, cublas_dgemm).
+- `einsum` no longer appears anywhere in the live (T) triples path, only in the `_old` reference functions and `calc_pert_triples_noddy` kept for A-B comparison.
+
 ## [v3.7.3] Added `VikingsBuffer{Spin/Spat}` to allocate buffers all `Tensor`s once before the main loop
 
 - A big problem with the loops in the vikings algorithm is that it creates many large tensors each iteration that is ran thousands of times, so the memory allocation itself is a cost that can be avoided. `VikingsBuffer{Spin/Spat}` initiate the `Tensor` storage for terms like `t3`, `Wovoo_ji`, or `Wvvvo_i` once before the loop, as well as a `std::vector<double> gemm_out` as a scratch workspace for GEMM outputs.

@@ -134,8 +134,10 @@ The systems tracked in the sections below are now too small to show signal (see 
 | v3.7.0, cutensor (einsum) | 173.215 | 161.063 | 15.125 |
 | v3.7.1, openblas (direct GEMM) | 94.046 | 73.572 | 6.909 |
 | v3.7.2, cublas_dgemm (direct GEMM) | 100.963 | 79.594 | 7.474 |
-| v3.7.3, openblas (direct, pinned buffer) | 83.945 | 62.850 | 5.274 |
-| v3.7.3, cublas_dgemm (direct, pinned buffer) | 92.084 | 70.085 | 5.946 |
+| v3.7.3, openblas (pinned buffer) | 83.945 | 62.850 | 5.274 |
+| v3.7.3, cublas_dgemm (pinned buffer) | 92.084 | 70.085 | 5.946 |
+| v3.7.4, openblas (einsum-free x1/x2) | 78.099 | 56.703 | 4.704 |
+| v3.7.4, cublas_dgemm (einsum-free x1/x2) | 84.900 | 62.920 | 5.289 |
 
 **parabenzyne/sto-3g**
 
@@ -147,8 +149,10 @@ The systems tracked in the sections below are now too small to show signal (see 
 | v3.7.0, cutensor (einsum) | 286.221 | 267.973 | 12.202 |
 | v3.7.1, openblas (direct GEMM) | 213.376 | 183.393 | 8.350 |
 | v3.7.2, cublas_dgemm (direct GEMM) | 223.068 | 195.325 | 8.893 |
-| v3.7.3, openblas (direct, pinned buffer) | 197.558 | 167.056 | 6.329 |
-| v3.7.3, cublas_dgemm (direct, pinned buffer) | 211.964 | 183.062 | 7.000 |
+| v3.7.3, openblas (pinned buffer) | 197.558 | 167.056 | 6.329 |
+| v3.7.3, cublas_dgemm (pinned buffer) | 211.964 | 183.062 | 7.000 |
+| v3.7.4, openblas (einsum-free x1/x2) | 141.045 | 110.013 | 3.730 |
+| v3.7.4, cublas_dgemm (einsum-free x1/x2) | 147.095 | 118.019 | 4.144 |
 
 
 This log tracks the update in features and their performance in the most computationally costly steps of different electronic structure theory methods. Versions without algorithm update for each section is not documented. See `bench/outputs` for full version peformance logs.
