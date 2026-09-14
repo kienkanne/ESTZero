@@ -107,7 +107,29 @@ void cublas_dgemm(const int M, const int N, const int K, const double alpha, con
     cudaFree(d_C);
 }
 
-// Single-precision path to explore the performance vs accuracy tradeoff. The double to float 
+// No malloc/H2D/D2H as A/B/C are resident device pointers, so this is just the bare cublasDgemm call 
+// with the same arguments swapping check
+void cublas_direct_dgemm(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* d_A, const double* d_B, double* d_C,
+                bool transA, bool transB) {
+
+    auto TA = (transB) ? CUBLAS_OP_T : CUBLAS_OP_N; // flag for d_B (first arg after the swap)
+    auto TB = (transA) ? CUBLAS_OP_T : CUBLAS_OP_N; // flag for d_A (second arg after the swap)
+    const int ldb_call = transB ? K : N;
+    const int lda_call = transA ? M : K;
+
+    cublasHandle_t handle = get_handle();
+    cublasDgemm(handle,
+                TA, TB,
+                N, M, K,
+                &alpha,
+                d_B, ldb_call, // BT
+                d_A, lda_call, // AT
+                &beta,
+                d_C, N); // CT
+}
+
+// Single-precision path to explore the performance vs accuracy tradeoff. The double to float
 // casting happens here.
 void cublas_sgemm(const int M, const int N, const int K, const double alpha, const double beta,
                 const double* A, const double* B, double* C, double* kernel_ms,
@@ -195,6 +217,14 @@ void cublas_sgemm(const int, const int, const int, const double, const double,
         "gemm_cublas: this build was compiled without EST_HAVE_CUBLAS -- the cuBLAS block in "
         "CMakeLists.txt is commented out (clean CPU-only build). Un-comment it to use "
         "--gemm-scheme cublas_sgemm.");
+}
+
+void cublas_direct_dgemm(const int, const int, const int, const double, const double,
+                  const double*, const double*, double*, bool, bool) {
+    throw std::runtime_error(
+        "gemm_cublas: this build was compiled without EST_HAVE_CUBLAS -- the cuBLAS block in "
+        "CMakeLists.txt is commented out (clean CPU-only build). Un-comment it to use "
+        "the device-resident vikings GPU path.");
 }
 
 #endif

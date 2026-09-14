@@ -74,6 +74,10 @@ void cublas_sgemm(const int M, const int N, const int K, const double alpha, con
                 const double* A, const double* B, double* C, double* kernel_ms = nullptr,
                 bool transA = false, bool transB = false);
 
+void cublas_direct_dgemm(const int M, const int N, const int K, const double alpha, const double beta,
+                const double* d_A, const double* d_B, double* d_C,
+                bool transA = false, bool transB = false);
+
 // Hand-written cuda kernels GEMM, single and double precision versions
 void cu_s_ladder(const int M, const int N, const int K, const double alpha, const double beta,
                  const double* A, const double* B, double* C, int ladder, double* kernel_ms = nullptr);
