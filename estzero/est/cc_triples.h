@@ -3,6 +3,7 @@
 
 #include "cuda_runtime_api.h"
 #include "tensor.h"
+#include "est_gemm.h"
 #include <vector>
 
 inline void to_device(void* dst, const void* src, int size) {
@@ -37,7 +38,14 @@ struct VikingsBufferSpin {
     VikingsBufferSpin(const Tensor& t1, const Tensor&t2, const int o, const int v)
         : gemm_out(v*v*v), x1(t1.shape), x2(t2.shape), t3({v,v,v}),
         Wvvvo_i({v,v,v}), Wvvvo_j({v,v,v}), Wvvvo_k({v,v,v}),
-        Wovoo_jk({o,v}), Wovoo_ik({o,v}), Wovoo_ji({o,v}) {
+        Wovoo_jk({o,v}), Wovoo_ik({o,v}), Wovoo_ji({o,v}),
+        d_gemm_out(nullptr), d_t2(nullptr),
+        d_Wvvvo_i(nullptr), d_Wvvvo_j(nullptr), d_Wvvvo_k(nullptr),
+        d_Wovoo_jk(nullptr), d_Wovoo_ik(nullptr), d_Wovoo_ji(nullptr),
+        d_x1(nullptr), d_x2(nullptr), d_t3(nullptr),
+        d_Woovv_jk(nullptr), d_Fov_k(nullptr), d_Wvovv_k(nullptr), d_Wooov_jk(nullptr) {
+
+        if (gs != GEMMScheme::CUBLAS_DGEMM) return;
 
         cudaMalloc((void**)&d_t2, t2.size() * sizeof(double));
         cudaMalloc((void**)&d_gemm_out, (v*v*v) * sizeof(double));
