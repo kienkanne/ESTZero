@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.7.5] Device-resident `cublas_dgemm` for `calc_pert_triples` (both UHF and RHF)
+
+- `cublas_dgemm` mallocs+H2D+D2H fresh device buffers on*every single call, which was the actual dominant cost for the (T) loop's many small GEMMs. Added `cublas_direct_dgemm`, a bare `cublasDgemm` call with no malloc/copy that expects pointers already on device. `VikingsBuffer{Spin/Spat}` now hold persistent `d_*` device buffers (i.e. `t2` uploaded once; `Wvvvo_*`/`Wovoo_*` refreshed at the same `i`/`(i,j)`/`(i,j,k)` ...)
+- UHF (`t3c_ijk_spin`) accumulates 3 terms directly into one device buffer before each of the 2 `to_host()` calls per `(i,j,k)`. RHF (`t3c_ijk_spat`) can't do the same as each of its 12 raw terms needs its own host-side `.permute()` before folding into `t3`, so `to_host()` is immediately called after finishing GEMM.
+- The improvement is rather disappointing with only slight improvements, though now `cublas_dgemm` is basically identical to `openblas`. `parabenzyne/sto-3g` PertT 110.013s (openblas) vs 107.547s (cublas_dgemm, 1.02x faster). For RHF, `indole/sto-3g` PertT 56.703s (openblas) vs 57.865s (cublas_dgemm, 1.02x slower). Comparing to itself in v3.7.4, `cublas_dgemm`: `indole/sto-3g` PertT 62.920s -> 57.865s (1.09x), T3/it 5.289ms -> 4.829ms; `parabenzyne/sto-3g` PertT 118.019s -> 107.547s (1.10x), T3/it 4.144ms -> 3.623ms.
+
 ## [v3.7.4] Replaced the last `einsum` calls in `calc_pert_triples` (x1/x2 accumulation) with direct GEMM
 
 - `x1`/`x2`'s accumulation and the final `et` reduction were the only `einsum` calls left in the live (T) path. Every destination (i.e. `x2.select(0,i).select(0,j)`) only fixes outer axes so it's always contiguous, so each became a direct GEMM written straight into that memory with `beta=1`, no intermediate `Tensor`. `et` is just `(t1*x1).sum()`/`(t2*x2).sum()`.
