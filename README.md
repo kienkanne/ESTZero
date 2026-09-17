@@ -1,6 +1,8 @@
-# ESTZero: an electronic structure engine, built from the tensor contraction up
+# ESTZero: Electronic Structure Engine built from First Principles
 
 A repository building electronic structure theory methods from the ground up RHF/UHF -> MP2/MP3 -> CCSD/CCSD(T) written in C++. Every layer underneath them are built and explored too: a homemade `Tensor` class with zero-copy views and contiguous logic, an `einsum` contraction engine with its own O(1) odometer index walker, and a GEMM library climbing a ladder from naive triple loops through AVX-512 intrinsics to hand-written CUDA kernels and cuBLAS. Every version was benchmarked and checked against Psi4 for correctness along the way.
+
+> For from-scratch NumPy implementations of the molecular integrals themselves (Obara-Saika recursion for overlap, kinetic, nuclear attraction, and ERI), see [Scratch-Code-Fock](https://github.com/kienkanne/SCF-Scratch_Code_Fock), the Python precursor to this project. Its integral module is under reviewed for contribution for Psi4Numpy. This repository uses [Libint2](https://github.com/evaleev/libint) as its integral backend and focuses on the methods and performance engineering built around it.
 
 ## Layout
 
@@ -72,7 +74,11 @@ scf_type pk # no density-fitting
 guess core
 
 mp2_type conv
-freeze_core false
+mp_type conv
+cc_maxiter 200
+r_convergence 1e-8,
+
+freeze_core true/false # depending on the --frozen-core option
 ```
 
 ## Highlights
