@@ -5,8 +5,9 @@
 #include "uhf.h"
 #include "transmo.h"
 #include "mp2.h"
-#include "cc_spin.h"
-#include "cc_build.h"
+#include "pre_iter.h"
+#include "intmds.h"
+#include "amps.h"
 
 // Standalone verification: build the spin-orbital DEprqs/Dia/Dijab pipeline for an open-shell
 // UHF system and check that test_mp2_energy() reproduces the correlation energy as the already

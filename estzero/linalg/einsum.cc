@@ -230,10 +230,6 @@ Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>&
     }
     Tensor result(result_shape); // constructor already computes correct natural strides
 
-    // GEMM Route. `raw_gemm` has no CUTENSOR case (it would throw), so gs==CUTENSOR must never
-    // reach `try_gemm` -- route it through `try_cutensor` instead, which declines (returns false)
-    // straight to the odometer walk below for the one shape it can't handle (an intra-operand
-    // repeated-index trace).
     bool gemm = (gs == GEMMScheme::CUTENSOR)
         ? try_cutensor(terms_strings, operands, result)
         : try_gemm(terms_strings, operands, result); // modify `Tensor result` directly

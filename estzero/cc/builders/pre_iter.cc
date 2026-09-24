@@ -1,8 +1,68 @@
+#include "pre_iter.h"
 #include "tensor.h"
 #include "einsum.h"
-#include "cc_spin.h"
+
+
+// Now uses directly the provided Sli to get the occ and virt info
+Dia_Dijab build_Dia_Dijab(const Tensor& FN, Sli O, Sli V) {
+    const int dim = FN.shape[0];
+    const int n_occ = O.stop - O.start;
+    const int n_virt = V.stop - V.start;
+
+    Tensor FN_diag({dim});
+    for (int i=0; i != dim; ++i) { FN_diag(i) = FN(i, i); }
+
+    Tensor Dia({n_occ, n_virt});
+    Tensor Dijab({n_occ, n_occ, n_virt, n_virt});
+
+    for (int i = 0; i < n_occ; ++i) {
+    for (int a = 0; a < n_virt; ++a) {
+        Dia(i, a) = FN_diag(O.start + i) - FN_diag(V.start + a);
+
+        for (int j = 0; j < n_occ; ++j) {
+        for (int b = 0; b < n_virt; ++b) {
+            Dijab(i, j, a, b) = FN_diag(O.start + i) + FN_diag(O.start + j)
+                              - FN_diag(V.start + a) - FN_diag(V.start + b);
+    }}}}
+
+    return {Dia, Dijab};
+}
+
+
+Tensor build_diag_spat_FN(const Vector& eps_diag) {
+    const int dim = static_cast<int>(eps_diag.size());
+    Tensor FN({dim, dim});
+    FN.fill(0.0);
+    for (int i = 0; i != dim; ++i) { FN(i, i) = eps_diag(i); }
+    return FN;
+}
 
 namespace {
+
+struct Slices_AB_OV {
+    // Initial, final
+    Sli OA_des; Sli OB_des; Sli VA_des; Sli VB_des;
+    Sli OA_src; Sli OB_src; Sli VA_src; Sli VB_src;
+};
+
+// Provide slicing for AB-OV combinations in occupancy-major form
+Slices_AB_OV get_slices_ab_ov(const int n_alpha, const int n_beta, const int nbf) {
+    const int n_occ = n_alpha + n_beta;
+
+    const Sli OA_des = Sli {0, n_alpha};
+    const Sli OB_des = Sli {n_alpha, n_occ};
+    const Sli VA_des = Sli {n_occ, n_occ+(nbf-n_alpha)};
+    const Sli VB_des = Sli {n_occ+(nbf-n_alpha), nbf*2};
+
+    const Sli OA_src{0, n_alpha}; 
+    const Sli OB_src{0, n_beta};
+    const Sli VA_src{n_alpha, nbf};
+    const Sli VB_src{n_beta, nbf};
+
+    return {OA_des, OB_des, VA_des, VB_des,
+            OA_src, OB_src, VA_src, VB_src};
+}
+
 
 // Scatters one SAME-spin chemist-notation (pq|rs) block into its four occupancy-major
 // destination blocks in the MIXED-spin Iprqs (physicist notation). Converts chemist -> 
@@ -132,85 +192,4 @@ Tensor build_diag_spin_FN(const Vector& epsA_active, const int n_alpha,
     for (int a = 0; a != nbf - n_beta; ++a) { FN(VB_des.start + a, VB_des.start + a) = epsB_active(VB_src.start + a); }
 
     return FN;
-}
-
-
-// Stanton Eqn 1
-Tensor build_spin_T1(const Tensor& DEprqs, const Tensor& FN,
-                const Tensor& Fae, const Tensor& Fmi, const Tensor& Fme,
-                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin) {
-    Tensor t1_new = FN.slice(O, V).copy();
-
-    t1_new += einsum("ie,ae->ia", {t1, Fae});
-    t1_new -= einsum("ma,mi->ia", {t1, Fmi});
-    t1_new += einsum("imae,me->ia", {t2, Fme});
-    t1_new -= einsum("nf,naif->ia", {t1, DEprqs.slice(O, V, O, V)});
-    t1_new -= 0.5 * einsum("imef,maef->ia", {t2, DEprqs.slice(O, V, V, V)});
-    t1_new -= 0.5 * einsum("mnae,nmei->ia", {t2, DEprqs.slice(O, O, V, O)});
-
-    return t1_new;
-}
-
-// Stanton Eqn 2
-Tensor build_spin_T2(const Tensor& DEprqs, const Tensor& tau, // (takes tau, not FN)
-                const Tensor& Fae, const Tensor& Fmi, const Tensor& Fme,
-                const Tensor& Wmnij, const Tensor& Wabef, const Tensor& Wmbej,
-                const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin) {
-    Tensor t2_new = DEprqs.slice(O, O, V, V).copy();
-    
-    // P(ij) = (Pij - Pji)
-    Tensor tmp = Fae - 0.5 * einsum("mb,me->be", {t1, Fme});
-    Tensor Pab = einsum("ijae,be->ijab", {t2, tmp});
-    t2_new += Pab;
-    t2_new -= Pab.swapaxes(2, 3);
-
-    // Most costly step here
-    tmp = Fmi + 0.5 * einsum("je,me->mj", {t1, Fme});
-    Tensor Pij = einsum("imab,mj->ijab", {t2, tmp});
-    t2_new -= Pij;
-    t2_new += Pij.swapaxes(0, 1);
-    t2_new += 0.5 * einsum("mnab,mnij->ijab", {tau, Wmnij});
-    t2_new += 0.5 * einsum("ijef,abef->ijab", {tau, Wabef});
-
-    // And here
-    Tensor Pijab = einsum("imae,mbej->ijab", {t2, Wmbej});
-
-    tmp = einsum("ie,mbej,ma->ijab", {t1, DEprqs.slice(O, V, V, O), t1,});
-    Pijab -= tmp;
-
-    // P(ij) * P(ab): (ij - ji) * (ab - ba) = ijab - ijba - jiab + jiba
-    t2_new += Pijab;
-    t2_new -= Pijab.swapaxes(2, 3);
-    t2_new -= Pijab.swapaxes(0, 1);
-    t2_new += Pijab.swapaxes(0, 1).swapaxes(2, 3);
-    
-    Pij = einsum("ie,abej->ijab", {t1, DEprqs.slice(V, V, V, O)});
-    t2_new += Pij;
-    t2_new -= Pij.swapaxes(0, 1);
-    
-    Pab = einsum("ma,mbij->ijab", {t1, DEprqs.slice(O, V, O, O)});
-    t2_new -= Pab;
-    t2_new += Pab.swapaxes(2, 3);
-    
-    return t2_new;
-}
-
-double test_mp2_energy(const Tensor& DEprqs, const Tensor& Dia, const Tensor& Dijab, const int n_occ) {
-    const Sli O{0, n_occ};
-    const Sli V{n_occ, DEprqs.shape[0]};
-    const Tensor Ioovv = DEprqs.slice(O, O, V, V);
-    const Tensor t2 = Ioovv / Dijab;
-
-    return 0.25 * (t2 * Ioovv).sum();
-}
-
-double calc_spin_cc_E(const Tensor& DEprqs, const Tensor& FN, const Tensor& tau,
-                const Tensor& t1, const Tensor& t2, Sli O, Sli V) {
-    const Tensor I_oovv = DEprqs.slice(O, O, V, V);
-    double E_cc = 0.25 * einsum("ijab,ijab->", {I_oovv, t2})();
-    
-    E_cc += einsum("ia,ia->", {FN.slice(O, V), t1})();
-    E_cc += 0.5 * einsum("ijab,ia,jb->", {I_oovv, t1, t1})();
-
-    return E_cc;
 }

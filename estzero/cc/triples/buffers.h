@@ -1,5 +1,5 @@
-#ifndef TRIPLES
-#define TRIPLES
+#ifndef TRIPLES_BUFFERS
+#define TRIPLES_BUFFERS
 
 #include "cuda_runtime_api.h"
 #include "tensor.h"
@@ -17,7 +17,7 @@ inline void to_host(void* dst, const void* src, int size) {
 // Allocate all the Tensor buffers that is reused frequently throughout the entire loop at the beginning,
 // so no new allocation needed per loop. The allocation of tensors that depend on i,j,k can be saved further
 // more by only creating them when the index change, so for outer indices (i,j) they won't needed to be resigned
-// every innermost loop (see `cc_triples.cc`)
+// every innermost loop (see `triples_spin.cc`)
 struct VikingsBufferSpin {
     std::vector<double> gemm_out;
 
@@ -30,7 +30,7 @@ struct VikingsBufferSpin {
         *d_Wvvvo_i, *d_Wvvvo_j, *d_Wvvvo_k,
         *d_Wovoo_jk, *d_Wovoo_ik, *d_Wovoo_ji,
 
-        // Not needed for t3 builder, but is the final accumulation steps which needs GEMM also, so 
+        // Not needed for t3 builder, but is the final accumulation steps which needs GEMM also, so
         // move them to device also.
         *d_x1, *d_x2, *d_t3,
         *d_Woovv_jk, *d_Fov_k, *d_Wvovv_k, *d_Wooov_jk;
@@ -128,7 +128,6 @@ struct VikingsBufferSpat {
         d_x1(nullptr), d_x2(nullptr), d_t3_diff(nullptr), d_t3_comb1(nullptr),
         d_DEoovv_jk(nullptr), d_Fov_k(nullptr), d_Wvovv_k(nullptr), d_Wooov_jk(nullptr) {
 
-        // Same CPU-path skip as VikingsBufferSpin's constructor -- see the comment there.
         if (gs != GEMMScheme::CUBLAS_DGEMM) return;
 
         cudaMalloc((void**)&d_t2, t2.size() * sizeof(double));
@@ -183,11 +182,5 @@ struct VikingsBufferSpat {
         cudaFree(d_Wooov_jk);
     }
 };
-
-double calc_pert_triples(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor& t1, const Tensor& t2,
-                        const Tensor& FN, Sli O, Sli V, bool spin);
-
-double calc_pert_triples_noddy(const Tensor& Iprqs, const Tensor& t1, const Tensor&t2,
-                        const Tensor& FN, Sli O, Sli V);
 
 #endif

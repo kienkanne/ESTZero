@@ -1,11 +1,7 @@
-#ifndef CC_BUILD
-#define CC_BUILD
+#ifndef INTMDS
+#define INTMDS
 
 #include "tensor.h"
-
-struct Dia_Dijab { Tensor Dia; Tensor Dijab; };
-
-Dia_Dijab build_Dia_Dijab(const Tensor& FN, Sli O, Sli V);
 
 struct Taus { Tensor tau; Tensor tilde_tau;};
 Taus build_taus(const Tensor& t1, const Tensor& t2, bool spin);

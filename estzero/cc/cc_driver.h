@@ -1,11 +1,9 @@
 #ifndef CC_DRIVER
 #define CC_DRIVER
 
+#include "pre_iter.h"
+#include "dispatch.h"
 #include "cc_iter.h"
-#include "cc_spin.h"
-#include "cc_spat.h"
-#include "cc_build.h"
-#include "cc_triples.h"
 #include "transmo.h"
 #include "wfn.h"
 #include <algorithm>
@@ -47,7 +45,7 @@ inline CCInputs build_cc_inputs(WaveFunction& wfn, const SCFResult& sr, const st
         ccin.Iprqs = transmo_spat_pqrs(wfn.get_eri_tensor(), C_active).swapaxes(1, 2);
         ccin.DEprqs = ccin.Iprqs * 2 - ccin.Iprqs.swapaxes(2, 3);
 
-        ccin.FN = build_diag_FN(Vector(sr.epsA.tail(nbf_active)));
+        ccin.FN = build_diag_spat_FN(Vector(sr.epsA.tail(nbf_active)));
 
         auto dd = build_Dia_Dijab(ccin.FN, ccin.O, ccin.V);
         ccin.Dia = dd.Dia; ccin.Dijab = dd.Dijab;

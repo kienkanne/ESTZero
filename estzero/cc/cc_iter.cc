@@ -1,9 +1,8 @@
 #include <cmath>
 #include <print>
 #include "tensor.h"
-#include "cc_build.h"
-#include "cc_spin.h"
-#include "cc_spat.h"
+#include "amps.h"
+#include "intmds.h"
 #include "cc_iter.h"
 #include "timer.h"
 #include "diis.h"

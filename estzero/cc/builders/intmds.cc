@@ -5,32 +5,8 @@
 
 #include "tensor.h"
 #include "einsum.h"
-#include "cc_build.h"
+#include "intmds.h"
 
-// Now uses directly the provided Sli to get the occ and virt info
-Dia_Dijab build_Dia_Dijab(const Tensor& FN, Sli O, Sli V) {
-    const int dim = FN.shape[0];
-    const int n_occ = O.stop - O.start;
-    const int n_virt = V.stop - V.start;
-
-    Tensor FN_diag({dim});
-    for (int i=0; i != dim; ++i) { FN_diag(i) = FN(i, i); }
-
-    Tensor Dia({n_occ, n_virt});
-    Tensor Dijab({n_occ, n_occ, n_virt, n_virt});
-
-    for (int i = 0; i < n_occ; ++i) {
-    for (int a = 0; a < n_virt; ++a) {
-        Dia(i, a) = FN_diag(O.start + i) - FN_diag(V.start + a);
-
-        for (int j = 0; j < n_occ; ++j) {
-        for (int b = 0; b < n_virt; ++b) {
-            Dijab(i, j, a, b) = FN_diag(O.start + i) + FN_diag(O.start + j)
-                              - FN_diag(V.start + a) - FN_diag(V.start + b);
-    }}}}
-
-    return {Dia, Dijab};
-}
 
 // Stanton Eqn. 9 & 10 (UHF, spin-orbital: t1 outer product is antisymmetrized).
 // RHF's spin-adapted tau/tilde_tau use the plain (non-antisymmetrized) outer product instead

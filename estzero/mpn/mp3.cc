@@ -1,8 +1,7 @@
 #include "tensor.h"
 #include "einsum.h"
 #include "timer.h"
-#include "cc_spin.h"
-#include "cc_spat.h"
+#include "amps.h"
 #include "mp3.h"
 
 double calc_mp3_E(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor& FN,

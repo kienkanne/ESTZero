@@ -30,19 +30,21 @@ find_library(OPENBLAS_LIBRARY NAMES openblas
 option(EST_BUILD_TESTS "Build unit tests" ON)
 
 add_library(est_core STATIC
-    estzero/est/jk_build.cc
-    estzero/est/integrals.cc
-    estzero/est/wfn.cc
-    estzero/est/rhf.cc
-    estzero/est/uhf.cc
-    estzero/est/mp2.cc
-    estzero/est/mp3.cc
-    estzero/est/transmo.cc
-    estzero/est/cc_spin.cc
-    estzero/est/cc_spat.cc
-    estzero/est/cc_build.cc
-    estzero/est/cc_iter.cc
-    estzero/est/cc_triples.cc
+    estzero/wfn.cc
+    estzero/core/jk_build.cc
+    estzero/core/integrals.cc
+    estzero/core/rhf.cc
+    estzero/core/uhf.cc
+    estzero/core/transmo.cc
+    estzero/mpn/mp2.cc
+    estzero/mpn/mp3.cc
+    estzero/cc/cc_iter.cc
+    estzero/cc/builders/amps.cc
+    estzero/cc/builders/intmds.cc
+    estzero/cc/builders/pre_iter.cc
+    estzero/cc/triples/triples_spin.cc
+    estzero/cc/triples/triples_spat.cc
+    estzero/cc/triples/triples_legacy.cc
     estzero/linalg/einsum.cc
 
     estzero/gemm/cutensor_gemm.cc
@@ -59,7 +61,12 @@ target_include_directories(est_core PUBLIC
     ${LIBINT_ROOT}/include
     ${CUTENSOR_ROOT}/include
     ${OPENBLAS_INCLUDE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/estzero/est
+    ${CMAKE_CURRENT_SOURCE_DIR}/estzero
+    ${CMAKE_CURRENT_SOURCE_DIR}/estzero/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/estzero/mpn
+    ${CMAKE_CURRENT_SOURCE_DIR}/estzero/cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/estzero/cc/builders
+    ${CMAKE_CURRENT_SOURCE_DIR}/estzero/cc/triples
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/linalg
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/gemm
@@ -101,10 +108,10 @@ target_compile_definitions(est_core PUBLIC EST_HAVE_CUTENSOR)
 target_link_libraries(est_core PRIVATE cutensor)
 # ================================================
 
-add_executable(ESTZero estzero/est/main.cc)
+add_executable(ESTZero estzero/main.cc)
 target_link_libraries(ESTZero PRIVATE est_core)
 
-add_executable(verify_ccsd estzero/est/verify_ccsd.cc)
+add_executable(verify_ccsd estzero/cc/verify_ccsd.cc)
 target_link_libraries(verify_ccsd PRIVATE est_core)
 
 add_executable(gemm_bench estzero/gemm/gemm_bench.cc)
