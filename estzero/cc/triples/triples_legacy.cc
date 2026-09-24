@@ -1,6 +1,7 @@
 #include "tensor.h"
 #include "einsum.h"
 #include "timer.h"
+#include "buffers.h"
 
 // Vikings' connected-T3 batch for fixed occupied (i,j,k), spin-orbital/UHF form, called once per
 // (i,j,k) by t_vikings_so in PyCC (see triples_spin.cc's calc_pert_triples_spin for the modern
@@ -11,24 +12,24 @@
 // Legacy version wired through einsum. The route routed into live code is triples_spin.cc's
 // t3c_ijk_spin, where GEMM is called directly. The repeated einsum calls in PertT makes the
 // overhead cost the dominate.
-Tensor t3c_ijk_spin_old(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
+Tensor t3c_ijk_spin_old(const Tensor& t2, VikingsBufferSpin& vb, const int o, const int v,
                const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k) {
-    Tensor abc = einsum("ad,bcd->abc", {t2.select(0, i).select(0, j), Wvvvo.select(3, k)});
-    abc -= einsum("ad,bcd->abc", {t2.select(0, k).select(0, j), Wvvvo.select(3, i)});
-    abc -= einsum("ad,bcd->abc", {t2.select(0, i).select(0, k), Wvvvo.select(3, j)});
+
+    Tensor abc = einsum("ad,bcd->abc", {t2.select(0, i).select(0, j), vb.Wvvvo_k});
+    abc -= einsum("ad,bcd->abc", {t2.select(0, k).select(0, j), vb.Wvvvo_i});
+    abc -= einsum("ad,bcd->abc", {t2.select(0, i).select(0, k), vb.Wvvvo_j});
     Tensor t3 = abc - abc.swapaxes(0, 1) - abc.swapaxes(0, 2);
 
-    abc = einsum("lab,lc->abc", {t2.select(0, i), Wovoo.select(2, j).select(2, k)});
-    abc -= einsum("lab,lc->abc", {t2.select(0, j), Wovoo.select(2, i).select(2, k)});
-    abc -= einsum("lab,lc->abc", {t2.select(0, k), Wovoo.select(2, j).select(2, i)});
+    abc = einsum("lab,lc->abc", {t2.select(0, i), vb.Wovoo_jk});
+    abc -= einsum("lab,lc->abc", {t2.select(0, j), vb.Wovoo_ik});
+    abc -= einsum("lab,lc->abc", {t2.select(0, k), vb.Wovoo_ji});
     t3 -= (abc - abc.swapaxes(0, 2) - abc.swapaxes(1, 2));
 
-    const int n_virt = t3.shape[0];
-    Tensor denom({n_virt, n_virt, n_virt});
+    Tensor denom({v, v, v});
     const double e_ijk = F_occ(i) + F_occ(j) + F_occ(k);
-    for (int a = 0; a < n_virt; ++a) {
-    for (int b = 0; b < n_virt; ++b) {
-    for (int c = 0; c < n_virt; ++c) {
+    for (int a = 0; a < v; ++a) {
+    for (int b = 0; b < v; ++b) {
+    for (int c = 0; c < v; ++c) {
         denom(a, b, c) = e_ijk - (F_virt(a) + F_virt(b) + F_virt(c));
     }}}
     return t3 / denom;
@@ -38,28 +39,27 @@ Tensor t3c_ijk_spin_old(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wov
 // are written out explicitly. Wvvvo/Wovoo are raw Iprqs slices, unlike the UHF version which uses DEprqs
 // This is a direct line-by-line port of `t3c_ijk` in `cctriples.py` in PyCC.
 // Source: https://github.com/CrawfordGroup/pycc/blob/main/pycc/cctriples.py
-Tensor t3c_ijk_spat_old(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
+Tensor t3c_ijk_spat_old(const Tensor& t2, VikingsBufferSpat& vb, const int o, const int v,
                const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k) {
-    Tensor t3 = einsum("bae,ce->abc", {Wvvvo.select(3, i), t2.select(0, k).select(0, j)});
-    t3 += einsum("cae,be->abc", {Wvvvo.select(3, i), t2.select(0, j).select(0, k)});
-    t3 += einsum("ace,be->abc", {Wvvvo.select(3, k), t2.select(0, j).select(0, i)});
-    t3 += einsum("bce,ae->abc", {Wvvvo.select(3, k), t2.select(0, i).select(0, j)});
-    t3 += einsum("cbe,ae->abc", {Wvvvo.select(3, j), t2.select(0, i).select(0, k)});
-    t3 += einsum("abe,ce->abc", {Wvvvo.select(3, j), t2.select(0, k).select(0, i)});
+    Tensor t3 = einsum("bae,ce->abc", {vb.Wvvvo_i, t2.select(0, k).select(0, j)});
+    t3 += einsum("cae,be->abc", {vb.Wvvvo_i, t2.select(0, j).select(0, k)});
+    t3 += einsum("ace,be->abc", {vb.Wvvvo_k, t2.select(0, j).select(0, i)});
+    t3 += einsum("bce,ae->abc", {vb.Wvvvo_k, t2.select(0, i).select(0, j)});
+    t3 += einsum("cbe,ae->abc", {vb.Wvvvo_j, t2.select(0, i).select(0, k)});
+    t3 += einsum("abe,ce->abc", {vb.Wvvvo_j, t2.select(0, k).select(0, i)});
 
-    t3 -= einsum("mc,mab->abc", {Wovoo.select(2, j).select(2, k), t2.select(0, i)});
-    t3 -= einsum("mb,mac->abc", {Wovoo.select(2, k).select(2, j), t2.select(0, i)});
-    t3 -= einsum("mb,mca->abc", {Wovoo.select(2, i).select(2, j), t2.select(0, k)});
-    t3 -= einsum("ma,mcb->abc", {Wovoo.select(2, j).select(2, i), t2.select(0, k)});
-    t3 -= einsum("ma,mbc->abc", {Wovoo.select(2, k).select(2, i), t2.select(0, j)});
-    t3 -= einsum("mc,mba->abc", {Wovoo.select(2, i).select(2, k), t2.select(0, j)});
+    t3 -= einsum("mc,mab->abc", {vb.Wovoo_jk, t2.select(0, i)});
+    t3 -= einsum("mb,mac->abc", {vb.Wovoo_kj, t2.select(0, i)});
+    t3 -= einsum("mb,mca->abc", {vb.Wovoo_ij, t2.select(0, k)});
+    t3 -= einsum("ma,mcb->abc", {vb.Wovoo_ji, t2.select(0, k)});
+    t3 -= einsum("ma,mbc->abc", {vb.Wovoo_ki, t2.select(0, j)});
+    t3 -= einsum("mc,mba->abc", {vb.Wovoo_ik, t2.select(0, j)});
 
-    const int n_virt = t3.shape[0];
-    Tensor denom({n_virt, n_virt, n_virt});
+    Tensor denom({v, v, v});
     const double e_ijk = F_occ(i) + F_occ(j) + F_occ(k);
-    for (int a = 0; a < n_virt; ++a) {
-    for (int b = 0; b < n_virt; ++b) {
-    for (int c = 0; c < n_virt; ++c) {
+    for (int a = 0; a < v; ++a) {
+    for (int b = 0; b < v; ++b) {
+    for (int c = 0; c < v; ++c) {
         denom(a, b, c) = e_ijk - (F_virt(a) + F_virt(b) + F_virt(c));
     }}}
     return t3 / denom;

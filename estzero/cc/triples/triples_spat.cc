@@ -4,6 +4,7 @@
 #include "est_gemm.h"
 #include "buffers.h"
 #include "dispatch.h"
+#include "triples_legacy.h"
 
 // Vikings' connected-T3 batch for fixed occupied (i,j,k), spin-adapted/RHF form, where the six
 // permutations are written out explicitly. Wvvvo/Wovoo are raw Iprqs slices, unlike the UHF
@@ -159,7 +160,7 @@ double calc_pert_triples_spat(const Tensor& Iprqs, const Tensor& DEprqs, const T
 
         timing::Scoped _t("  Build T3");
 
-        t3 = t3c_ijk_spat(t2, vb, o, v, F_occ, F_virt, i, j, k);
+        t3 = t3c_ijk_spat_old(t2, vb, o, v, F_occ, F_virt, i, j, k);
         t3_diff  = t3 - t3.swapaxes(0, 2);
         t3_comb1 = 2.0 * t3 - t3.swapaxes(1, 2) - t3.swapaxes(0, 2);
 

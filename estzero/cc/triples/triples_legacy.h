@@ -2,11 +2,12 @@
 #define TRIPLES_LEGACY
 
 #include "tensor.h"
+#include "buffers.h"
 
-Tensor t3c_ijk_spin_old(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
+Tensor t3c_ijk_spin_old(const Tensor& t2, VikingsBufferSpin& vb, const int o, const int v,
                const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k);
 
-Tensor t3c_ijk_spat_old(const Tensor& t2, const Tensor& Wvvvo, const Tensor& Wovoo,
+Tensor t3c_ijk_spat_old(const Tensor& t2, VikingsBufferSpat& vb, const int o, const int v,
                const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k);
 
 // "Noddy" implementation of the perturbative triples correction: creates the full O(o^3 v^3) T3
