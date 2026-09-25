@@ -27,6 +27,16 @@ find_library(OPENBLAS_LIBRARY NAMES openblas
     REQUIRED
 )
 
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_supported OUTPUT error_message)
+
+if(ipo_supported)
+    # Enable LTO globally for all targets added after this line
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+else()
+    message(WARNING "LTO/IPO is not supported by this compiler: ${error_message}")
+endif()
+
 option(EST_BUILD_TESTS "Build unit tests" ON)
 
 add_library(est_core STATIC
@@ -38,6 +48,7 @@ add_library(est_core STATIC
     estzero/core/transmo.cc
     estzero/mpn/mp2.cc
     estzero/mpn/mp3.cc
+    estzero/cc/cc_driver.cc
     estzero/cc/cc_iter.cc
     estzero/cc/builders/amps.cc
     estzero/cc/builders/intmds.cc
@@ -45,6 +56,7 @@ add_library(est_core STATIC
     estzero/cc/triples/triples_spin.cc
     estzero/cc/triples/triples_spat.cc
     estzero/cc/triples/triples_legacy.cc
+    estzero/linalg/tensor.cc
     estzero/linalg/einsum.cc
 
     estzero/gemm/cutensor_gemm.cc
