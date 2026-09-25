@@ -2,7 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
-## [3.8.1] Splitted `tensor.h`/`cc_driver.h`, added `tensor.cc`/`cc_driver.cc`
+## [v3.8.2] Fixed `terms_strides` instantion bug inside the hot loop of the non-contiguous slow path for `Tensor` operators
+
+- In the non-contiguous slow path for `Tensor` operators, the `std::vector<std::vector<int>> terms_strides` is being instantiated inside the hot loop (iterating over elements) via curly brackets, which is a few heap allocations per element, creating massive overhead cost for any non-contiguous operations with `Tensor`, which is very common especially in CCSD(T), or `einsum` if GEMM is rejected.
+- Fixing this bug is just a few lines by moving the `terms_strides` instantiation outside of the loop.
+- The performance gain is massive for the stress systems: CCSD(T) `indole/sto-3g` 104.869s (v3.8.0) -> 10.271s (10.2x); `parabenzyne/sto-3g` 256.716s -> 27.690 (9.27x). In the old benchmarking systems (`bench/outputs`), where the largest ones are CCSD(T) `pyrimidine/sto-3g` and `propargyl/sto-3g`, wall time is essentially just over a second.
+
+## [v3.8.1] Splitted `tensor.h`/`cc_driver.h`, added `tensor.cc`/`cc_driver.cc`
 
 - `tensor.h`/`cc_driver.h` were heavyweight headers, especially in the case of `Tensor` where it is included in many files, making any edits to it very costly to re-compile everything.
 - Both were splitted into implementation files `.cc`. For `tensor.h` specifically, its per-element access methods were kept inlined for compiler visibility. They cost nothing, so they were inlined to ensure compiler visbility to avoid any per-call overhead cost in hot loops.

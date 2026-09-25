@@ -40,12 +40,13 @@ Tensor Tensor::_binary_op(const Tensor& other, Operation operation) const {
     } else {
         std::vector<int> result_indices(this->shape.size(), 0);
         std::vector<int> term_flats {0,0}; //this_flat, term_flat
+        std::vector<std::vector<int>> terms_strides {this->strides, other.strides};
 
         for (int flat = 0; flat != this->size(); ++flat) {
             values[flat] = operation(
                 this->flat_index(term_flats[0]), other.flat_index(term_flats[1]));
 
-            odometer(result_indices, term_flats, shape, {this->strides, other.strides});
+            odometer(result_indices, term_flats, shape, terms_strides);
         }
     }
     return Tensor(shape, values);
@@ -64,11 +65,12 @@ Tensor& Tensor::_binary_assign_op(const Tensor& other, Operation operation) {
     } else {
         std::vector<int> result_indices(this->shape.size(), 0);
         std::vector<int> term_flats {0, 0}; // this_flat, other_flat
+        std::vector<std::vector<int>> terms_strides {this->strides, other.strides};
 
         for (int flat = 0; flat != this->size(); ++flat) {
             this->flat_index(term_flats[0]) = operation(
                 this->flat_index(term_flats[0]), other.flat_index(term_flats[1]));
-            odometer(result_indices, term_flats, shape, {this->strides, other.strides});
+            odometer(result_indices, term_flats, shape, terms_strides);
         }
     }
     return *this;
@@ -86,10 +88,11 @@ Tensor Tensor::_unary_op(Operation operation) const {
     } else {
         std::vector<int> indices(this->shape.size(), 0);
         std::vector<int> this_flat = {0};
+        std::vector<std::vector<int>> terms_strides {this->strides};
 
         for (int flat = 0; flat != this->size(); ++flat) {
             values[flat] = operation(this->flat_index(this_flat[0]));
-            odometer(indices, this_flat, shape, {this->strides});
+            odometer(indices, this_flat, shape, terms_strides);
         }
     }
     return Tensor(shape, values);
@@ -104,10 +107,11 @@ Tensor& Tensor::_unary_assign_op(Operation operation) {
     } else {
         std::vector<int> indices(this->shape.size(), 0);
         std::vector<int> this_flat = {0};
+        std::vector<std::vector<int>> terms_strides {this->strides};
 
         for (int flat = 0; flat != this->size(); ++flat) {
             this->flat_index(this_flat[0]) = operation(this->flat_index(this_flat[0]));
-            odometer(indices, this_flat, shape, {this->strides});
+            odometer(indices, this_flat, shape, terms_strides);
         }
     }
     return *this;
@@ -310,9 +314,11 @@ double Tensor::sum() const {
 
     std::vector<int> indices(shape.size(), 0);
     std::vector<int> tensor_flat {0};
+    std::vector<std::vector<int>> terms_strides {strides};
+
     for (int i = 0; i != size(); ++i) {
         total += flat_index(tensor_flat[0]);
-        odometer(indices, tensor_flat, shape, {strides});
+        odometer(indices, tensor_flat, shape, terms_strides);
     }
     return total;
 }
