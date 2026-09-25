@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT   = Path(__file__).resolve().parents[1]
 BINARY = ROOT / "build" / "ESTZero"
-OUT_DIR = ROOT / "bench" / "outputs_ccsd_t"
+OUT_DIR = ROOT / "bench" / "outputs"
 OUT_DIR.mkdir(exist_ok=True)
 
 
@@ -347,6 +347,8 @@ def main():
                     help="post-HF tables (mp2/mp3/ccsd/ccsd_t) only: replace the ERI(s)/"
                          "JK/it(ms)/scf_it columns with a single summed SCF(s) column. "
                          "The scf table itself is unaffected (that IS the SCF breakdown).")
+    ap.add_argument("--outdir", default=None,
+                    help="output directory for the log and json file")  
 
     args = ap.parse_args()
 
@@ -360,9 +362,10 @@ def main():
     if not BINARY.exists():
         raise RuntimeError(f"Binary not found: {BINARY}")
 
-    logger = logging.Logger("mySCF")
+    out_dir = Path(args.outdir) if args.outdir is not None else OUT_DIR
 
-    log_path = OUT_DIR / f"{args.name}.log"
+    logger = logging.Logger("mySCF")
+    log_path = out_dir / f"{args.name}.log"
 
     logger.addHandler(logging.FileHandler(log_path, mode='w'))
     logger.addHandler(logging.StreamHandler(sys.stdout))
@@ -523,7 +526,7 @@ def main():
 
     report_markdown(collected, args.version, logger)
 
-    (OUT_DIR / f"{args.name}.json").write_text(json.dumps(nan_to_null(outputs), indent=2))
+    (out_dir / f"{args.name}.json").write_text(json.dumps(nan_to_null(outputs), indent=2))
 
 
 if __name__ == "__main__":

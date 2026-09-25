@@ -2,6 +2,15 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [3.8.1] Splitted `tensor.h`/`cc_driver.h`, added `tensor.cc`/`cc_driver.cc`
+
+- `tensor.h`/`cc_driver.h` were heavyweight headers, especially in the case of `Tensor` where it is included in many files, making any edits to it very costly to re-compile everything.
+- Both were splitted into implementation files `.cc`. For `tensor.h` specifically, its per-element access methods were kept inlined for compiler visibility. They cost nothing, so they were inlined to ensure compiler visbility to avoid any per-call overhead cost in hot loops.
+- LTO (link-time optimization) was added to `CMakeLists.txt` to optimize this problem to ensure that the code itself remains clear while performance is optimized.
+- Small gains in performance is visible, especially in larger systems: CCSD(T) `indole/sto-3g` 114.192s (v3.8.0) -> 104.869s; `parabenzyne/sto-3g` 285.338s -> 256.716s. Notably, the gain in `parabenzyne/sto-3g` (UHF) is a tradeoff: despite faster per-CCSD-iteration time (1544.2s -> 1397.5s), the number of iteration increased from 20 to 23, so the CCSD wall time is essentially the same; the gain camed from PertT wall time. Accuracy also changed slightly from `2.14e-08` to `1.38e-09`. The LTO probably somehow messed with the floating point of diis as a side effect.
+- Renamed `bench/outputs_ccsd_t` into `bench/outputs_stress` to clearly indicate testing for stress systems (CCSD(T) `indole/sto-3g` & `parabenzyne/sto-3g`).
+- Added `--outdir` flag to benchmark to easily switch between output directories.
+
 ## [v3.8.0] Reorganization of `estzero/est` module, separate into many folders
 
 - `estzero/est` used to be a giant folder containing all modules directly related to the electronic structure engine, but it has grown large enough that it divides additional division for better organization.
