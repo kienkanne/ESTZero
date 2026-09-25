@@ -2,6 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.8.0] Reorganization of `estzero/est` module, separate into many folders
+
+- `estzero/est` used to be a giant folder containing all modules directly related to the electronic structure engine, but it has grown large enough that it divides additional division for better organization.
+- Three top level orchestrators (`main.cc`, `wfn.cc`, `wfn.h`) and three new folders replacing `estzero/est` are introduced: `estzero/core`, `estzero/mpn`, and `estzero/cc`, with additional sub-folders within the `cc` module, which is even larger than the `core` module.
+- The `einsum` route is rewired into the perbutative triples (`triples_{spat,spin}.cc` calls the `_old` version directly). The direct optimization of the perbutative triples was a bit too messy, especially for the GPU routes requiring heavy classes for buffers. For this reason, the work is delayed, and the priority now goes back to the `Tensor` class to give it GPU-support instead. The infrastructure gets an update as a whole, not a single module.
+- Performance basically didn't changed much compared to v3.7.0, only slightly faster. This is expected as the old `einsum` route now also gets to use the pre-allocated `W` intermediate buffers, which improves performance slightly
+
 ## [v3.7.5] Device-resident `cublas_dgemm` for `calc_pert_triples` (both UHF and RHF)
 
 - `cublas_dgemm` mallocs+H2D+D2H fresh device buffers on*every single call, which was the actual dominant cost for the (T) loop's many small GEMMs. Added `cublas_direct_dgemm`, a bare `cublasDgemm` call with no malloc/copy that expects pointers already on device. `VikingsBuffer{Spin/Spat}` now hold persistent `d_*` device buffers (i.e. `t2` uploaded once; `Wvvvo_*`/`Wovoo_*` refreshed at the same `i`/`(i,j)`/`(i,j,k)` ...)
