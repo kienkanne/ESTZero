@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include <iterator>
 #include <ranges>
 #include <unordered_set>
 #include <unordered_map>
@@ -31,8 +32,8 @@ std::string remove_spaces(const std::string& str) {
 
 struct ParsedSubscripts {
     std::vector<std::string> terms_strings;
-    std::unordered_map<char, int> char_to_dim;
-    std::unordered_map<char, int> char_to_col;
+    std::unordered_map<char, Index> char_to_dim;
+    std::unordered_map<char, Index> char_to_col;
 };
 
 ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::vector<Tensor>& operands) {
@@ -90,7 +91,7 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
 
     // Gate 5: Operand dimensionality match check
     for (size_t i = 0; i < terms_strings.size()-1; ++i) {
-        if (operands[i].ndim() != static_cast<int>(terms_strings[i].length())) {
+        if (operands[i].ndim() != std::ssize(terms_strings[i])) {
             throw std::invalid_argument("Operand " + std::to_string(i) + " has " + 
                                         std::to_string(operands[i].ndim()) + " dimensions, but subscript '" + 
                                         terms_strings[i] + "' expects " + std::to_string(terms_strings[i].length()) + ".");
@@ -99,15 +100,15 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
 
     // Gate 6: Dimension size consistency across shared letters
     // Map from character to its corresponding dimension size
-    std::unordered_map<char, int> char_to_dim;
-    std::unordered_map<char, int> char_to_col;
-    size_t next_col = 0;
+    std::unordered_map<char, Index> char_to_dim;
+    std::unordered_map<char, Index> char_to_col;
+    Index next_col = 0;
     for (size_t i = 0; i < terms_strings.size()-1; ++i) {
         const auto& term = terms_strings[i];
-        const auto& shape = operands[i].shape;
+        const auto& shape = operands[i].shape();
         for (size_t a = 0; a < term.length(); ++a) {
             char c = term[a];
-            int size = shape[a];
+            Index size = shape[a];
             if (char_to_dim.count(c)) {
                 if (char_to_dim[c] != size) {
                     throw std::invalid_argument(std::string("Dimension mismatch for index '") + c + 
@@ -157,36 +158,36 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
 
     // Walk A once: kept-left axes (C have it) summed axes (C doesn't have it).
     // summed_labels must is the same for both A and B, so create one here and B reuses it
-    std::vector<int> left_axes, summed_axes_A;
+    std::vector<Index> left_axes, summed_axes_A;
     std::string summed_labels;
-    for (int i = 0; i < static_cast<int>(A.size()); ++i) {
+    for (Index i = 0; i < std::ssize(A); ++i) {
         if (c_set.count(A[i])) left_axes.push_back(i);
         else { summed_axes_A.push_back(i); summed_labels += A[i]; }
     }
 
-    std::vector<int> right_axes;
-    for (int i = 0; i < static_cast<int>(B.size()); ++i) {
+    std::vector<Index> right_axes;
+    for (Index i = 0; i < std::ssize(B); ++i) {
         if (c_set.count(B[i])) right_axes.push_back(i);
     }
-    std::vector<int> summed_axes_B(summed_labels.size());
+    std::vector<Index> summed_axes_B(summed_labels.size());
     for (size_t k = 0; k < summed_labels.size(); ++k) {
-        summed_axes_B[k] = static_cast<int>(B.find(summed_labels[k])); // reuse
+        summed_axes_B[k] = B.find(summed_labels[k]); // reuse
     }
 
-    std::vector<int> permA = left_axes;
+    std::vector<Index> permA = left_axes;
     permA.insert(permA.end(), summed_axes_A.begin(), summed_axes_A.end());
-    std::vector<int> permB = summed_axes_B;
+    std::vector<Index> permB = summed_axes_B;
     permB.insert(permB.end(), right_axes.begin(), right_axes.end());
 
-    int left_size = 1; for (int i : left_axes) left_size *= operands[0].shape[i];
-    int summed_size = 1; for (int i : summed_axes_A) summed_size *= operands[0].shape[i]; // only takes A to compute, same if takes B
-    int right_size = 1; for (int i : right_axes) right_size *= operands[1].shape[i];
+    Index left_size = 1; for (Index i : left_axes) left_size *= operands[0].shape()[i];
+    Index summed_size = 1; for (Index i : summed_axes_A) summed_size *= operands[0].shape()[i]; // only takes A to compute, same if takes B
+    Index right_size = 1; for (Index i : right_axes) right_size *= operands[1].shape()[i];
 
     // Guard on the contraction's total work (FLOPs ~ left*summed*right) instead of raw element count. 
     // v3.0.1-v3.0.2a declined GEMM whenever any operand alone was small, and this caused problems for UHF
     // MP2, where the full AO ERI tensor is contracted with a small matrix (C_occ), so the contraction work
     // is still large, and should be routed through GEMM. Its performance dropped substantially. See CHANGELOG v3.0.3.
-    size_t total_work = static_cast<size_t>(left_size) * static_cast<size_t>(summed_size) * static_cast<size_t>(right_size);
+    Index total_work = left_size * summed_size * right_size;
     if (total_work < gemm_threshold) { return false; }
 
     // Freshly built Tensor, guaranteed to be contiguous
@@ -195,9 +196,9 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
 
     // combined_labels: left_axes + right_axes (what GEMM produced)
     std::string combined_labels;
-    std::vector<int> combined_shape;
-    for (int i : left_axes)  { combined_labels += A[i]; combined_shape.push_back(operands[0].shape[i]); }
-    for (int i : right_axes) { combined_labels += B[i]; combined_shape.push_back(operands[1].shape[i]); }
+    std::vector<Index> combined_shape;
+    for (Index i : left_axes)  { combined_labels += A[i]; combined_shape.push_back(operands[0].shape()[i]); }
+    for (Index i : right_axes) { combined_labels += B[i]; combined_shape.push_back(operands[1].shape()[i]); }
 
     Tensor combined;
     
@@ -205,17 +206,19 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
         Matrix result_mat = M.as_matrix(left_size, summed_size) * N.as_matrix(summed_size, right_size);
         combined = mat_to_tensor(result_mat).reshape(combined_shape);
     } else {
-        // Non-Eigen route: works directly on a vector
+        // Non-Eigen route: works directly on a vector. BLAS/cuBLAS take 32-bit int dimensions, so this call is
+        // the one place Index narrows back to int.
         std::vector<double> result_data(left_size * right_size);
-        call_gemm(gs, left_size, right_size, summed_size, M.data_ptr(), N.data_ptr(), result_data.data());
+        call_gemm(gs, static_cast<int>(left_size), static_cast<int>(right_size), static_cast<int>(summed_size),
+                  M.data_ptr(), N.data_ptr(), result_data.data());
 
         combined = Tensor(combined_shape, result_data);
     }
     
     // Reorder combined's axes into the caller's actual requested order
-    std::vector<int> perm_out(C.size());
+    std::vector<Index> perm_out(C.size());
     for (size_t i = 0; i < C.size(); ++i) {
-        perm_out[i] = static_cast<int>(combined_labels.find(C[i]));
+        perm_out[i] = combined_labels.find(C[i]);
     }
     result.assign(combined.permute(perm_out));
     return true;
@@ -226,39 +229,39 @@ namespace {
 // Generic odometer route when GEMM is declined. NT = N(operands) + 1.
 template <int NT>
 void odometer_contract(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands,
-                       const std::unordered_map<char, int>& char_to_dim,
-                       const std::unordered_map<char, int>& char_to_col, Tensor& result) {
+                       const std::unordered_map<char, Index>& char_to_dim,
+                       const std::unordered_map<char, Index>& char_to_col, Tensor& result) {
     // One odometer axis ("column") per distinct label
-    Odometer<NT> odo(char_to_dim.size());
+    Odometer<NT> odo(std::ssize(char_to_dim));
 
-    size_t total_combinations = 1;
+    Index total_combinations = 1;
     for (const auto& [label, col] : char_to_col) {
         odo.dims[col] = char_to_dim.at(label);
-        total_combinations *= static_cast<size_t>(odo.dims[col]);
+        total_combinations *= odo.dims[col];
     }
 
     // stride_table[col][term] = how much term's flat offset moves per +1 of the global label assigned to
     // column `col`.
     //
-    // Each term's entries are basically a relabeled copy of that tensor's own `.strides`. The loops below
+    // Each term's entries are basically a relabeled copy of that tensor's own `.strides()`. The loops below
     // just map them onto this canonical table that contains all indices/labels. The table starts at 0, so any
     // label not owned by a term stays 0, meaning that when that label moves, the term's flat offset just stays.
     for (int term = 0; term < NT - 1; ++term) {
         const auto& term_string = terms_strings[term];
 
-        for (int axis = 0; axis < static_cast<int>(term_string.size()); ++axis) {
-            int col = char_to_col.at(term_string[axis]);
-            odo.stride_table[col][term] += operands[term].strides[axis];
+        for (Index axis = 0; axis < std::ssize(term_string); ++axis) {
+            Index col = char_to_col.at(term_string[axis]);
+            odo.stride_table[col][term] += operands[term].strides()[axis];
     }}
 
     // Technically, parse_subscripts' Gate 4 rejects a duplicate output index, so applying it here is consistency only.
     const auto& result_string = terms_strings.back();
-    for (int axis = 0; axis < static_cast<int>(result_string.size()); ++axis) {
-        int col = char_to_col.at(result_string[axis]);
-        odo.stride_table[col][NT - 1] += result.strides[axis];
+    for (Index axis = 0; axis < std::ssize(result_string); ++axis) {
+        Index col = char_to_col.at(result_string[axis]);
+        odo.stride_table[col][NT - 1] += result.strides()[axis];
     }
 
-    for (size_t c = 0; c < total_combinations; ++c) {
+    for (Index c = 0; c < total_combinations; ++c) {
         double product = 1.0;
         for (int term = 0; term < NT - 1; ++term) {
             product *= operands[term].flat_index(odo.flat[term]);
@@ -273,7 +276,7 @@ void odometer_contract(const std::vector<std::string>& terms_strings, const std:
 Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
     auto [terms_strings, char_to_dim, char_to_col] = parse_subscripts(subscripts, operands);
 
-    std::vector<int> result_shape;
+    std::vector<Index> result_shape;
     for (const char& c : terms_strings.back()) {
         result_shape.push_back(char_to_dim[c]);
     }
@@ -320,7 +323,7 @@ std::string str_intersect(std::string term1, std::string term2) {
     return result;
 }
 
-std::string get_output_string(int output_idx, std::vector<std::string> terms_strings, 
+std::string get_output_string(size_t output_idx, std::vector<std::string> terms_strings, 
                             std::string term1_str, std::string term2_str){
     std::string term12_union = multi_union({term1_str, term2_str});
 
@@ -352,7 +355,6 @@ Tensor einsum(const std::string& subscripts, const std::vector<Tensor>& operands
             next_output_str = get_output_string(output_idx, terms_strings, output_str, terms_strings[next_operand]);
         }
 
-        const size_t output_idx = next_operand + 1;
         output = pairwise_einsum(
             output_str + "," + terms_strings[next_operand] + "->" + next_output_str,
             {output, operands[next_operand]});

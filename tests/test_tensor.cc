@@ -5,9 +5,9 @@
 namespace {
 
 // doctest has no Tensor comparison; compare element-wise over the flat storage.
-void check_tensor(const Tensor& actual, const std::vector<int>& shape,
+void check_tensor(const Tensor& actual, const std::vector<Index>& shape,
                    const std::vector<double>& expected) {
-    REQUIRE(actual.shape == shape);
+    REQUIRE(actual.shape() == shape);
     for (size_t i = 0; i < expected.size(); ++i)
         CHECK(actual.flat_index(i) == doctest::Approx(expected[i]));
 }
@@ -23,14 +23,14 @@ TEST_CASE("Tensor: default construction has rank zero") {
 
 TEST_CASE("Tensor: shape constructor computes row-major strides") {
     Tensor v({5});
-    CHECK(v.strides == std::vector<int>{1});
+    CHECK(v.strides() == std::vector<Index>{1});
 
     Tensor m({2, 3});
-    CHECK(m.shape == std::vector<int>{2, 3});
-    CHECK(m.strides == std::vector<int>{3, 1});
+    CHECK(m.shape() == std::vector<Index>{2, 3});
+    CHECK(m.strides() == std::vector<Index>{3, 1});
 
     Tensor t3({2, 3, 4});
-    CHECK(t3.strides == std::vector<int>{12, 4, 1});
+    CHECK(t3.strides() == std::vector<Index>{12, 4, 1});
 }
 
 TEST_CASE("Tensor: shape constructor zero-initializes storage") {
@@ -61,13 +61,23 @@ TEST_CASE("Tensor: fill overwrites every element") {
     check_tensor(m, {2, 2}, {7, 7, 7, 7});
 }
 
-TEST_CASE("Tensor: clear can be called without throwing") {
-    // Tensor indexing is unchecked (v1.5.3, for performance), so accessing an
-    // element after clear() is UB, not a throw -- there's no safe way to
-    // observe the emptied storage through the public API, so this only
-    // exercises that clear() itself doesn't throw.
+TEST_CASE("Tensor: fill on a view leaves the rest of the shared buffer untouched") {
+    // Column 1 of a 2x3: a non-contiguous view (strides (3,1), shape (2,1)), so this also covers the
+    // odometer path. Filling the whole buffer instead would zero columns 0 and 2 too.
+    Tensor m({2, 3}, {1, 2, 3, 4, 5, 6});
+    m.slice(Sli{0, 2}, Sli{1, 2}).fill(0.0);
+    check_tensor(m, {2, 3}, {1, 0, 3, 4, 0, 6});
+}
+
+TEST_CASE("Tensor: clear empties the tensor without invalidating views that share its buffer") {
+    // Accessing an element of the cleared tensor itself is still UB (indexing is unchecked, v1.5.3), but
+    // its size/ndim are observable, and a view taken before clear() must keep reading valid data.
     Tensor v({3}, {1, 2, 3});
-    CHECK_NOTHROW(v.clear());
+    Tensor tail = v.slice(Sli{1, 3});
+    v.clear();
+    CHECK(v.size() == 0);
+    CHECK(v.ndim() == 0);
+    check_tensor(tail, {2}, {2, 3});
 }
 
 // ── operator() / flat_index agreement (owning tensor, offset == 0) ──────────
@@ -97,8 +107,8 @@ TEST_CASE("Tensor: operator() rejects an index-count mismatch") {
 TEST_CASE("Tensor: swapaxes swaps shape and strides") {
     Tensor m({2, 3}, {1, 2, 3, 4, 5, 6});
     Tensor t = m.swapaxes(0, 1);
-    CHECK(t.shape == std::vector<int>{3, 2});
-    CHECK(t.strides == std::vector<int>{1, 3});
+    CHECK(t.shape() == std::vector<Index>{3, 2});
+    CHECK(t.strides() == std::vector<Index>{1, 3});
 }
 
 TEST_CASE("Tensor: swapaxes(0,1) on a matrix matches its transpose") {
@@ -141,7 +151,7 @@ TEST_CASE("Tensor: slice with a stride selects every step-th element") {
     // (stride-aware) rather than flat_index (raw buffer walk).
     Tensor v({6}, {0, 1, 2, 3, 4, 5});
     Tensor s = v.slice(Sli{0, 6, 2});
-    REQUIRE(s.shape == std::vector<int>{3});
+    REQUIRE(s.shape() == std::vector<Index>{3});
     CHECK(s(0) == doctest::Approx(0));
     CHECK(s(1) == doctest::Approx(2));
     CHECK(s(2) == doctest::Approx(4));
@@ -152,7 +162,7 @@ TEST_CASE("Tensor: slice with a negative step reverses a sub-range") {
     // Not contiguous, so again compare via operator(), not flat_index.
     Tensor v({5}, {10, 20, 30, 40, 50});
     Tensor s = v.slice(Sli{4, 1, -1});
-    REQUIRE(s.shape == std::vector<int>{3});
+    REQUIRE(s.shape() == std::vector<Index>{3});
     CHECK(s(0) == doctest::Approx(50));
     CHECK(s(1) == doctest::Approx(40));
     CHECK(s(2) == doctest::Approx(30));
@@ -164,7 +174,7 @@ TEST_CASE("Tensor: slice on a matrix selects independent row and column ranges")
                        9, 10, 11, 12});
     // Rows {1,2}, columns {0,2}.
     Tensor s = m.slice(Sli{1, 3, 1}, Sli{0, 4, 2});
-    CHECK(s.shape == std::vector<int>{2, 2});
+    CHECK(s.shape() == std::vector<Index>{2, 2});
     CHECK(s(0, 0) == doctest::Approx(5));
     CHECK(s(0, 1) == doctest::Approx(7));
     CHECK(s(1, 0) == doctest::Approx(9));
@@ -221,7 +231,7 @@ TEST_CASE("Tensor: flat_index agrees with operator() on a sliced view") {
     Tensor t({2, 3}, {1, 2, 3, 4, 5, 6});
     Tensor row1 = t.slice(Sli{1, 2, 1}, Sli{0, 3, 1}); // just row 1: {4, 5, 6}
 
-    REQUIRE(row1.shape == std::vector<int>{1, 3});
+    REQUIRE(row1.shape() == std::vector<Index>{1, 3});
     for (int j = 0; j < 3; ++j)
         CHECK(row1.flat_index(static_cast<size_t>(j)) == doctest::Approx(row1(0, j)));
     check_tensor(row1, {1, 3}, {4, 5, 6});
@@ -248,7 +258,7 @@ TEST_CASE("Tensor: addition works for owning tensors") {
 
     Tensor sum = a + b;
     check_tensor(sum, {2, 3}, {7, 7, 7, 7, 7, 7});
-    CHECK(sum.strides == std::vector<int>{3, 1});
+    CHECK(sum.strides() == std::vector<Index>{3, 1});
 }
 
 TEST_CASE("Tensor: addition follows slice strides and offsets") {
@@ -426,7 +436,7 @@ TEST_CASE("Tensor: copy materializes a swapaxes view into a contiguous tensor") 
     Tensor c = view.copy();
 
     check_tensor(c, {3, 2}, {1, 4, 2, 5, 3, 6});
-    CHECK(c.strides == std::vector<int>{2, 1}); // now naturally contiguous
+    CHECK(c.strides() == std::vector<Index>{2, 1}); // now naturally contiguous
 }
 
 TEST_CASE("Tensor: copy of a strided slice is contiguous and independent") {
@@ -435,7 +445,7 @@ TEST_CASE("Tensor: copy of a strided slice is contiguous and independent") {
     Tensor c = s.copy();
 
     check_tensor(c, {3}, {0, 2, 4});
-    CHECK(c.strides == std::vector<int>{1});
+    CHECK(c.strides() == std::vector<Index>{1});
 
     c(0) = -1.0;
     CHECK(v(0) == doctest::Approx(0.0)); // source untouched

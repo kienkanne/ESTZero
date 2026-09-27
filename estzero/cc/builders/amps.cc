@@ -142,7 +142,7 @@ Tensor build_spin_T2(const Tensor& DEprqs, const Tensor& tau, // (takes tau, not
 
 double test_mp2_energy(const Tensor& DEprqs, const Tensor& Dia, const Tensor& Dijab, const int n_occ) {
     const Sli O{0, n_occ};
-    const Sli V{n_occ, DEprqs.shape[0]};
+    const Sli V{n_occ, DEprqs.shape()[0]};
     const Tensor Ioovv = DEprqs.slice(O, O, V, V);
     const Tensor t2 = Ioovv / Dijab;
 

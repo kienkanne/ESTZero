@@ -6,11 +6,11 @@
 #include "est_gemm.h"
 #include <vector>
 
-inline void to_device(void* dst, const void* src, int size) {
+inline void to_device(void* dst, const void* src, Index size) {
     cudaMemcpy(dst, src, size * sizeof(double), cudaMemcpyHostToDevice);
 }
 
-inline void to_host(void* dst, const void* src, int size) {
+inline void to_host(void* dst, const void* src, Index size) {
     cudaMemcpy(dst, src, size * sizeof(double), cudaMemcpyDeviceToHost);
 }
 
@@ -36,7 +36,7 @@ struct VikingsBufferSpin {
         *d_Woovv_jk, *d_Fov_k, *d_Wvovv_k, *d_Wooov_jk;
 
     VikingsBufferSpin(const Tensor& t1, const Tensor&t2, const int o, const int v)
-        : gemm_out(v*v*v), x1(t1.shape), x2(t2.shape), t3({v,v,v}),
+        : gemm_out(v*v*v), x1(t1.shape()), x2(t2.shape()), t3({v,v,v}),
         Wvvvo_i({v,v,v}), Wvvvo_j({v,v,v}), Wvvvo_k({v,v,v}),
         Wovoo_jk({o,v}), Wovoo_ik({o,v}), Wovoo_ji({o,v}),
         d_gemm_out(nullptr), d_t2(nullptr),
@@ -56,8 +56,8 @@ struct VikingsBufferSpin {
         cudaMalloc((void**)&d_Wovoo_ik, (o*v) * sizeof(double));
         cudaMalloc((void**)&d_Wovoo_ji, (o*v) * sizeof(double));
 
-        cudaMalloc((void**)&d_x1, static_cast<size_t>(x1.size()) * sizeof(double));
-        cudaMalloc((void**)&d_x2, static_cast<size_t>(x2.size()) * sizeof(double));
+        cudaMalloc((void**)&d_x1, x1.size() * sizeof(double));
+        cudaMalloc((void**)&d_x2, x2.size() * sizeof(double));
         cudaMalloc((void**)&d_t3, (v*v*v) * sizeof(double));
         cudaMalloc((void**)&d_Woovv_jk, (v*v) * sizeof(double));
         cudaMalloc((void**)&d_Fov_k, v * sizeof(double));
@@ -116,7 +116,7 @@ struct VikingsBufferSpat {
         *d_DEoovv_jk, *d_Fov_k, *d_Wvovv_k, *d_Wooov_jk;
 
     VikingsBufferSpat(const Tensor& t1, const Tensor&t2, const int o, const int v)
-        : gemm_out(v*v*v), x1(t1.shape), x2(t2.shape),
+        : gemm_out(v*v*v), x1(t1.shape()), x2(t2.shape()),
         t3({v,v,v}), t3_diff({v,v,v}), t3_comb1({v,v,v}),
         Wvvvo_i({v,v,v}), Wvvvo_j({v,v,v}), Wvvvo_k({v,v,v}),
         Wovoo_jk({o,v}), Wovoo_ik({o,v}), Wovoo_ji({o,v}),
@@ -142,8 +142,8 @@ struct VikingsBufferSpat {
         cudaMalloc((void**)&d_Wovoo_ki, (o*v) * sizeof(double));
         cudaMalloc((void**)&d_Wovoo_ij, (o*v) * sizeof(double));
 
-        cudaMalloc((void**)&d_x1, static_cast<size_t>(x1.size()) * sizeof(double));
-        cudaMalloc((void**)&d_x2, static_cast<size_t>(x2.size()) * sizeof(double));
+        cudaMalloc((void**)&d_x1, x1.size() * sizeof(double));
+        cudaMalloc((void**)&d_x2, x2.size() * sizeof(double));
         cudaMalloc((void**)&d_t3_diff, (v*v*v) * sizeof(double));
         cudaMalloc((void**)&d_t3_comb1, (v*v*v) * sizeof(double));
         cudaMalloc((void**)&d_DEoovv_jk, (v*v) * sizeof(double));

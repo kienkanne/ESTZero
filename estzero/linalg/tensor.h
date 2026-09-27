@@ -13,11 +13,15 @@
 using Matrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 using Vector = Eigen::VectorXd;
 
+// One signed 64-bit type for everything that measures or addresses Tensor data: extents, strides, offsets,
+// flat indices, element counts, and axis numbers.
+using Index = std::ptrdiff_t;
+
 // For slicing
 struct Sli {
-    int start = 0;
-    int stop = -1;
-    int step = 1;
+    Index start = 0;
+    Index stop = -1;
+    Index step = 1;
 };
 
 // A plain row-major dense array (the last axis has stride one, sweeps fastest.). Previously Eigen's Tensor 
@@ -27,12 +31,39 @@ struct Sli {
 // The per-element accessors are kept inline instead of moving to `.cc`. Those are called in hot loops and are very 
 // cheap, so they are inlined here for compiler visbility to avoid any per-call overhead. 
 class Tensor {
-    std::shared_ptr<std::vector<double>> data;
-    size_t offset = 0; // For slicing
+    // All state is private and read through the const getters below, so `_size` can never go stale: `_shape`
+    // only changes by building a new Tensor (every constructor sets `_size`).
+    std::vector<Index> _shape;
+    std::vector<Index> _strides;
+    Index _size = 0;   // Cached product of `_shape`. 0 only for an empty (default-constructed or cleared) Tensor
+    std::shared_ptr<std::vector<double>> _data;
+    Index _offset = 0; // For slicing
 
-    // Private constructor for creating zero-copy views
-    Tensor(std::shared_ptr<std::vector<double>> d, std::vector<int> sh, std::vector<int> st, size_t off)
-        : data(d), shape(sh), strides(st), offset(off) {}
+    // Private constructor for creating zero-copy views. 
+    // View ops (permute/swapaxes/select/reshape/slice) comes through here
+    Tensor(std::shared_ptr<std::vector<double>> d, std::vector<Index> sh, std::vector<Index> st, Index off)
+        : _shape(std::move(sh)), _strides(std::move(st)), _size(_numel(_shape)), _data(std::move(d)), _offset(off) {}
+
+    // Compute size (num element) from new shape for view ops
+    static Index _numel(const std::vector<Index>& sh) {
+        Index n = 1;
+        for (Index dim : sh) n *= dim;
+        return n;
+    }
+
+    // Flat buffer position of element (idx...), shared by both operator() overloads.
+    template <typename... Idx>
+    Index _offset_of(Idx... idx) const {
+        if (sizeof...(idx) != _shape.size()) {
+            throw std::invalid_argument("Number of indices must be equal to ndim");
+        }
+        const Index ind[] = { static_cast<Index>(idx)... };
+        Index flat = _offset;
+        for (Index i = 0; i < ndim(); ++i) {
+            flat += ind[i] * _strides[i];
+        }
+        return flat;
+    }
 
     // == ARITHMETIC HELPERS (defined in tensor.cc) =========================================
 
@@ -40,12 +71,12 @@ class Tensor {
 
     // A view is contiguous only when its strides match row-major strides.
     bool _is_contiguous() const {
-        size_t expected_stride = 1;
-        for (int axis = static_cast<int>(shape.size()) - 1; axis >= 0; --axis) {
-            if (strides[axis] != expected_stride) {
+        Index expected_stride = 1;
+        for (Index axis = ndim() - 1; axis >= 0; --axis) {
+            if (_strides[axis] != expected_stride) {
                 return false;
             }
-            expected_stride *= static_cast<size_t>(shape[axis]);
+            expected_stride *= _shape[axis];
         }
         return true;
     }
@@ -56,76 +87,55 @@ class Tensor {
     template <typename Operation> Tensor& _unary_assign_op(Operation operation);
 
 public:
-    std::vector<int> shape;
-    std::vector<int> strides;
+    const std::vector<Index>& shape() const { return _shape; }
+    const std::vector<Index>& strides() const { return _strides; }
+    // static_cast rather than std::ssize: this header is also compiled by nvcc, which defaults to C++17
+    Index ndim() const { return static_cast<Index>(_shape.size()); }
+    Index size() const { return _size; }
 
-    void fill(double value) { std::fill(data->begin(), data->end(), value); };
-    void clear() { data->clear(); data->shrink_to_fit(); };
-    int ndim() const { return static_cast<int>(shape.size()); }
-    int size() const {
-        int size = 1;
-        for (const int& dim : shape) size *= dim;
-        return size;
-    }
+    // Sets only the elements this view covers (a slice shares its parent's buffer)
+    void fill(double value);
+    // Drops this Tensor's reference to the buffer, leaving it empty (size 0, ndim 0).
+    void clear() { *this = Tensor(); }
 
     // == CONSTRUCTORS =======================================================================
 
     Tensor() = default;
-    explicit Tensor(const std::vector<int>& shape_);
-    explicit Tensor(const std::vector<int>& shape_, std::vector<double> values); // no const on values to support std::move
+    explicit Tensor(const std::vector<Index>& shape_);
+    explicit Tensor(const std::vector<Index>& shape_, std::vector<double> values); // no const on values to support std::move
 
     // == ELEMENT ACCESS ==================================================================
 
     // WARNING: Be careful when using on a strided slice or an axis-permuting swapaxes
     // views walk the buffer in a different order than operator() would, because the
     // flat index of underlying contiguous data is still the original
-    double flat_index(size_t index) const { return (*data)[offset + index]; }
-    double& flat_index(size_t index) { return (*data)[offset + index]; }
+    double flat_index(Index index) const { return (*_data)[_offset + index]; }
+    double& flat_index(Index index) { return (*_data)[_offset + index]; }
 
     // The number of indices must match ndim()
     template <typename... Idx>
-    double& operator()(Idx... idx) {
-        if (sizeof...(idx) != ndim()) {
-            throw std::invalid_argument("Number of indices must be equal to ndim");
-        }
-        const size_t ind[] = { static_cast<size_t>(idx)... };
-        size_t flat = offset;
-        for (size_t i = 0; i < ndim(); ++i) {
-            flat += ind[i] * strides[i];
-        }
-        return (*data)[flat];
-    }
+    double& operator()(Idx... idx) { return (*_data)[_offset_of(idx...)]; }
 
     template <typename... Idx>
-    double operator()(Idx... idx) const {
-        if (sizeof...(idx) != ndim()) {
-            throw std::invalid_argument("Number of indices must be equal to ndim");
-        }
-        const size_t ind[] = { static_cast<size_t>(idx)... };
-        size_t flat = offset;
-        for (size_t i = 0; i < ndim(); ++i) {
-            flat += ind[i] * strides[i];
-        }
-        return (*data)[flat];
-    }
+    double operator()(Idx... idx) const { return (*_data)[_offset_of(idx...)]; }
 
     // == VIEW & COPY METHODS =============================================================
 
     Tensor contiguous() const;
 
     template <typename... Idx>
-    Tensor permute(Idx... idx) const { return permute(std::vector<int>{ static_cast<int>(idx)... }); }
-    Tensor permute(const std::vector<int>& perm) const;
+    Tensor permute(Idx... idx) const { return permute(std::vector<Index>{ static_cast<Index>(idx)... }); }
+    Tensor permute(const std::vector<Index>& perm) const;
 
-    Tensor swapaxes(size_t ax1, size_t ax2) const;
+    Tensor swapaxes(Index ax1, Index ax2) const;
 
     // Fix one axis to a single index, dropping that axis entirely, which is similar to numpy's fancy
     // indexing (t[..., idx, ...]), returning a smaller zero-copy view `Tensor`.
-    Tensor select(size_t axis, int index) const;
+    Tensor select(Index axis, Index index) const;
 
     template <typename... Idx>
-    Tensor reshape(Idx... idx) const { return reshape(std::vector<int>{ static_cast<int>(idx)... }); }
-    Tensor reshape(const std::vector<int>& new_shape) const;
+    Tensor reshape(Idx... idx) const { return reshape(std::vector<Index>{ static_cast<Index>(idx)... }); }
+    Tensor reshape(const std::vector<Index>& new_shape) const;
 
     template <typename... Slices>
     Tensor slice(Slices... slices) const { return slice(std::vector<Sli>{ slices... }); };
@@ -136,14 +146,14 @@ public:
 
     // Zero-copy view of a contiguous Tensor's buffer as an row-major Eigen matrix, for GEMM.
     // WARNING: Only safe to use when this this is already packed row-major (straight out of reshape())
-    Eigen::Map<const Matrix> as_matrix(int rows, int cols) const;
+    Eigen::Map<const Matrix> as_matrix(Index rows, Index cols) const;
 
     // Get raw data pointer (+ offset). Contiguous is still checked for safety
     double* data_ptr() const {
         if (!_is_contiguous()) {
             throw std::runtime_error("Current Tensor view is not contiguous! Data might mismatch!");
         }
-        return data->data() + offset; }
+        return _data->data() + _offset; }
 
     // == ARITHMETIC OPERATIONS (defined in tensor.cc) ======================================
 
@@ -173,38 +183,5 @@ public:
 // Copy a row-major Eigen Matrix into an owning row-major Tensor.
 Tensor mat_to_tensor(const Matrix& M);
 Tensor vec_to_tensor(const Vector& V);
-
-
-// LEGACY: TensorView was introduced as a reference wrapper in v1.3.1 to fix
-// `einsum` memory bug. In v1.6.0, `Tensor` now uses a std::shared_ptr pointing
-// to the data vector, so constructing the std::vector<Tensor> in `einsum` would
-// just copy the pointer instead of the entire data vector.
-
-// Intermediate `TensorView` class that points directly to `Tensor` data,
-// and this lets std::vector owns this lightweight object.
-// Another alternative to TensorView is std::vector<std::reference_wrapper<const Tensor>>
-class TensorView {
-    const double* data_ptr;
-public:
-    std::vector<int> shape; // Lightweight so just let it copies
-    std::vector<int> strides;
-    // Constructor: Takes in the `Tensor` class
-    TensorView(const Tensor& t) : data_ptr(t.data_ptr()), shape(t.shape), strides(t.strides) {}
-
-    int ndim() const { return static_cast<int>(shape.size()); }
-
-    // Tensor VIEW, so no non-const overload (reference to data) methods
-    double flat_index(size_t index) const { return data_ptr[index]; }
-
-    template <typename... Idx>
-    double operator()(Idx... idx) const {
-        size_t ind[] = { static_cast<size_t>(idx)... };
-        size_t flat = 0;
-        for (size_t i = 0; i < shape.size(); ++i) {
-            flat += ind[i] * static_cast<size_t>(strides[i]);
-        }
-        return data_ptr[flat];
-    }
-};
 
 #endif

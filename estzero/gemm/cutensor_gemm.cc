@@ -55,22 +55,22 @@ bool try_cutensor(const std::vector<std::string>& terms_strings, const std::vect
     std::vector<int32_t> modeC(C_str.begin(), C_str.end());
 
     // Extent is similar to shape
-    std::vector<int64_t> extentA(A.shape.begin(), A.shape.end());
-    std::vector<int64_t> extentB(B.shape.begin(), B.shape.end());
+    std::vector<int64_t> extentA(A.shape().begin(), A.shape().end());
+    std::vector<int64_t> extentB(B.shape().begin(), B.shape().end());
 
     // The extent can be built and requested directly from cuTensor without an extra step of permuting
     // with our own Tensor, which `try_gemm` had to do.
     std::vector<int64_t> extentC(numModesC);
-    std::vector<int> result_shape(numModesC);
+    std::vector<Index> result_shape(numModesC);
     for (uint32_t i = 0; i < numModesC; ++i) {
         size_t posA = A_str.find(C_str[i]);
-        int dim = (posA != std::string::npos) ? A.shape[posA] : B.shape[B_str.find(C_str[i])];
+        Index dim = (posA != std::string::npos) ? A.shape()[posA] : B.shape()[B_str.find(C_str[i])];
         extentC[i] = dim;
         result_shape[i] = dim;
     }
 
-    std::vector<int64_t> strideA(A.strides.begin(), A.strides.end());
-    std::vector<int64_t> strideB(B.strides.begin(), B.strides.end());
+    std::vector<int64_t> strideA(A.strides().begin(), A.strides().end());
+    std::vector<int64_t> strideB(B.strides().begin(), B.strides().end());
     std::vector<int64_t> strideC(numModesC);
 
     { // Strides of C have to be computed manually, as the default by cuTensor is column major
@@ -109,8 +109,8 @@ bool try_cutensor(const std::vector<std::string>& terms_strings, const std::vect
     cutensorPlan_t plan;
     cutensorCreatePlan(handle, &plan, opDesc, planPref, worksize);
 
-    const size_t sizeA = static_cast<size_t>(A.size());
-    const size_t sizeB = static_cast<size_t>(B.size());
+    const size_t sizeA = A.size();
+    const size_t sizeB = B.size();
     size_t sizeC = 1;
     for (int64_t e : extentC) sizeC *= static_cast<size_t>(e);
 

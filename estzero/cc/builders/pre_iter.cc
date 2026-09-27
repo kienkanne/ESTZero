@@ -5,7 +5,7 @@
 
 // Now uses directly the provided Sli to get the occ and virt info
 Dia_Dijab build_Dia_Dijab(const Tensor& FN, Sli O, Sli V) {
-    const int dim = FN.shape[0];
+    const int dim = FN.shape()[0];
     const int n_occ = O.stop - O.start;
     const int n_virt = V.stop - V.start;
 
@@ -126,7 +126,7 @@ void scatter_mixed_spin(Tensor& IS, const Tensor& I_chem_AB,
 Tensor build_spin_Iprqs(const Tensor& Ipqrs_AA, const Tensor& Ipqrs_BB, const Tensor& Ipqrs_AB,
                     const int n_alpha, const int n_beta) {
 
-    const int nbf = Ipqrs_AA.shape[0];
+    const int nbf = Ipqrs_AA.shape()[0];
     const auto [OA_des, OB_des, VA_des, VB_des,
                 OA_src, OB_src, VA_src, VB_src] = get_slices_ab_ov(n_alpha, n_beta, nbf);
     
@@ -147,7 +147,7 @@ Tensor build_spin_Iprqs(const Tensor& Ipqrs_AA, const Tensor& Ipqrs_BB, const Te
 // Kept for legacy only, see `build_diag_spin_FN`
 Tensor build_spin_FN(const Tensor& HA, const Tensor& HB, const Tensor& DEprqs, 
                     const int n_alpha, const int n_beta) {
-    const int nbf = HA.shape[0];
+    const int nbf = HA.shape()[0];
     Tensor HN({2 * nbf, 2 * nbf});
 
     const auto [OA_des, OB_des, VA_des, VB_des,

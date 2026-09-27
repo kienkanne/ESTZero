@@ -24,7 +24,7 @@ Taus build_taus(const Tensor& t1, const Tensor& t2, bool spin) {
 Tensor build_Fae(const Tensor& DEprqs, const Tensor& FN, const Tensor& tilde_tau,
                 const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin) {
     Tensor Fae = FN.slice(V, V).copy();
-    for (int i = 0; i != Fae.shape[0]; ++i) { Fae(i, i) = 0; }
+    for (int i = 0; i != Fae.shape()[0]; ++i) { Fae(i, i) = 0; }
     
     Fae -= 0.5 * einsum("me,ma->ae", {FN.slice(O, V), t1});
     Fae += einsum("mf,mafe->ae", {t1, DEprqs.slice(O, V, V, V)});
@@ -38,7 +38,7 @@ Tensor build_Fae(const Tensor& DEprqs, const Tensor& FN, const Tensor& tilde_tau
 Tensor build_Fmi(const Tensor& DEprqs, const Tensor& FN, const Tensor& tilde_tau,
                 const Tensor& t1, const Tensor& t2, Sli O, Sli V, bool spin) {
     Tensor Fmi = FN.slice(O, O).copy();
-    for (int i = 0; i != Fmi.shape[0]; ++i) { Fmi(i, i) = 0; }
+    for (int i = 0; i != Fmi.shape()[0]; ++i) { Fmi(i, i) = 0; }
 
     Fmi += 0.5 * einsum("ie,me->mi", {t1, FN.slice(O, V)});
     Fmi += einsum("ne,mnie->mi", {t1, DEprqs.slice(O, O, O, V)});

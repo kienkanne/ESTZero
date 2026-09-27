@@ -11,7 +11,7 @@ namespace {
 // ADDED the new contiguous() method. flat_index already got a warning for its uses cases,
 // so contiguous is required here for using flat_index() to validate
 void check_tensor_approx(const Tensor& a, const Tensor& b, double eps) {
-    REQUIRE(a.shape == b.shape);
+    REQUIRE(a.shape() == b.shape());
     Tensor ac = a.contiguous();
     Tensor bc = b.contiguous();
 
@@ -54,13 +54,13 @@ TEST_CASE("transmo_spat_iajb: frozen core is exactly a sub-slice of the unfrozen
     Tensor I_full = transmo_spat_iajb(eri_tensor, C, n_occ);
     Tensor I_frozen = transmo_spat_iajb(eri_tensor, C, n_occ, n_frozen);
 
-    REQUIRE(I_frozen.shape[0] == I_full.shape[0] - n_frozen);
-    REQUIRE(I_frozen.shape[2] == I_full.shape[2] - n_frozen);
+    REQUIRE(I_frozen.shape()[0] == I_full.shape()[0] - n_frozen);
+    REQUIRE(I_frozen.shape()[2] == I_full.shape()[2] - n_frozen);
 
-    for (int i = 0; i < I_frozen.shape[0]; ++i)
-    for (int a = 0; a < I_frozen.shape[1]; ++a)
-    for (int j = 0; j < I_frozen.shape[2]; ++j)
-    for (int b = 0; b < I_frozen.shape[3]; ++b)
+    for (int i = 0; i < I_frozen.shape()[0]; ++i)
+    for (int a = 0; a < I_frozen.shape()[1]; ++a)
+    for (int j = 0; j < I_frozen.shape()[2]; ++j)
+    for (int b = 0; b < I_frozen.shape()[3]; ++b)
         CHECK(I_frozen(i, a, j, b) == doctest::Approx(I_full(i + n_frozen, a, j + n_frozen, b)));
 }
 

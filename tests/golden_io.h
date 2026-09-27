@@ -103,12 +103,10 @@ inline void write_list(std::ostream& os, const std::string& name, const std::vec
 
 inline void write_tensor4(std::ostream& os, const std::string& name, const Tensor& t) {
     os << "tensor4 " << name;
-    for (int d : t.shape) os << " " << d;
+    for (Index d : t.shape()) os << " " << d;
     os << "\n";
-    int count = 1;
-    for (int d : t.shape) count *= d;
     // Tensor is row-major, so flat order is already i,j,k,l (last axis fastest).
-    for (int i = 0; i < count; ++i) {
+    for (Index i = 0; i < t.size(); ++i) {
         if (i) os << " ";
         write_num(os, t.flat_index(i));
     }
@@ -159,7 +157,7 @@ public:
 
 private:
     // For each structured data, dimensions is stored also
-    struct Entry { std::vector<int> dims; std::vector<double> data; };
+    struct Entry { std::vector<Index> dims; std::vector<double> data; };
 
     // A map for each data type
     std::map<std::string, double> scalars_;
@@ -211,16 +209,16 @@ inline Golden load_golden(const std::string& name) {
 
             // Calculate the total element count
             int ndim = (tag == "matrix") ? 2 : (tag == "tensor4") ? 4 : 1;
-            for (int d = 0; d < ndim; ++d) { int x; ls >> x; e.dims.push_back(x); }
-            size_t count = 1;
-            for (int d : e.dims) count *= static_cast<size_t>(d);
+            for (int d = 0; d < ndim; ++d) { Index x; ls >> x; e.dims.push_back(x); }
+            Index count = 1;
+            for (Index d : e.dims) count *= d;
             e.data.reserve(count);
 
             // Most confusing part here:
             // Reads from `in` (file stream), not `ls` (line stream)
             // Current line is the header only, while the data lives on the next lines
             // Use `in` to skip any whitespace to read in per token
-            for (size_t i = 0; i < count; ++i) { double v; in >> v; e.data.push_back(v); }
+            for (Index i = 0; i < count; ++i) { double v; in >> v; e.data.push_back(v); }
             // After this, the file pointer is at the end of the data section
             // consume the rest of the data line's newline
             std::getline(in, line);

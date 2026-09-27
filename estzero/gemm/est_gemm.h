@@ -1,6 +1,7 @@
 #ifndef EST_GEMM
 #define EST_GEMM
 
+#include <cstddef>
 #include <stdexcept>
 #include <string>
 #include <cblas.h>
@@ -15,7 +16,7 @@ inline GEMMScheme gs;
 
 // Minimum estimated FLOPs (left_size * summed_size * right_size) for try_gemm to route through GEMM at all. 
 // Below this, the odometer scheme is used instead. use --gemm-min in main.cc to adjust this default.
-inline size_t gemm_threshold = 1024;
+inline std::ptrdiff_t gemm_threshold = 1024;
 
 inline void set_gemm_scheme(std::string g) {
     if      (g == "odometer")   gs = GEMMScheme::ODO;

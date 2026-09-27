@@ -106,8 +106,8 @@ double calc_pert_triples_noddy(const Tensor& Iprqs, const Tensor& t1, const Tens
     t3c += tmp.swapaxes(0, 2).swapaxes(3, 5); // kjicba
 
     tmp = t3d + t3c;
-    Tensor F_diag({FN.shape[0]});
-    for (int i=0; i != FN.shape[0]; ++i) {
+    Tensor F_diag({FN.shape()[0]});
+    for (int i=0; i != FN.shape()[0]; ++i) {
         F_diag(i) = FN(i, i);
     }
     Tensor F_occ = F_diag.slice(O); Tensor F_virt = F_diag.slice(V);

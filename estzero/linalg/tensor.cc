@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <iterator> // for std::size to return signed type, replace static_cast
 #include "tensor.h"
 #include "odometer.h"
 
@@ -13,13 +14,24 @@ inline auto power = [](double base, int exp) {
         return result;
     };
 
+// Natural row-major strides for `shape` (last axis contiguous)
+std::vector<Index> row_major_strides(const std::vector<Index>& shape) {
+    std::vector<Index> strides(shape.size());
+    Index running = 1;
+    for (Index axis = std::ssize(shape) - 1; axis >= 0; --axis) {
+        strides[axis] = running;
+        running *= shape[axis];
+    }
+    return strides;
+}
+
 } // namespace
 
 // == ARITHMETIC HELPERS ================================================================
 
 // Private shape and stride checking method for arithmetic operators.
 bool Tensor::_match_check(const Tensor& other) const {
-    if (shape != other.shape) {
+    if (_shape != other._shape) {
         throw std::invalid_argument(
             "Two tensors must have matching shape for arithmetic operators.");
     }
@@ -31,39 +43,39 @@ bool Tensor::_match_check(const Tensor& other) const {
 template <typename Operation>
 Tensor Tensor::_binary_op(const Tensor& other, Operation operation) const {
     bool fast = _match_check(other);
-    const int n = this->size();
+    const Index n = this->size();
     std::vector<double> values(n);
 
     if (fast) {
-        for (int i = 0; i != n; ++i) {
+        for (Index i = 0; i != n; ++i) {
             values[i] = operation(this->flat_index(i), other.flat_index(i));
         }
     } else {
-        Odometer<2> odo(shape, {this->strides, other.strides}); // terms: this, other
+        Odometer<2> odo(_shape, {_strides, other._strides}); // terms: this, other
 
-        for (int i = 0; i != n; ++i) {
+        for (Index i = 0; i != n; ++i) {
             values[i] = operation(this->flat_index(odo.flat[0]), other.flat_index(odo.flat[1]));
             odo.next();
         }
     }
-    return Tensor(shape, std::move(values));
+    return Tensor(_shape, std::move(values));
 }
 
 // Same fast/general split as _binary_op, but for binary assignments
 template <typename Operation>
 Tensor& Tensor::_binary_assign_op(const Tensor& other, Operation operation) {
     bool fast = _match_check(other);
-    const int n = this->size();
+    const Index n = this->size();
 
     if (fast) {
-        for (int i = 0; i != n; ++i) {
+        for (Index i = 0; i != n; ++i) {
             this->flat_index(i) = operation(
                 this->flat_index(i), other.flat_index(i));
         }
     } else {
-        Odometer<2> odo(shape, {this->strides, other.strides}); // terms: this, other
+        Odometer<2> odo(_shape, {_strides, other._strides}); // terms: this, other
 
-        for (int i = 0; i != n; ++i) {
+        for (Index i = 0; i != n; ++i) {
             this->flat_index(odo.flat[0]) = operation(
                 this->flat_index(odo.flat[0]), other.flat_index(odo.flat[1]));
             odo.next();
@@ -75,36 +87,36 @@ Tensor& Tensor::_binary_assign_op(const Tensor& other, Operation operation) {
 // Same fast/general split as _binary_op, but for a single tensor
 template <typename Operation>
 Tensor Tensor::_unary_op(Operation operation) const {
-    const int n = this->size();
+    const Index n = this->size();
     std::vector<double> values(n);
 
     if (_is_contiguous()) {
-        for (int i = 0; i != n; ++i) {
+        for (Index i = 0; i != n; ++i) {
             values[i] = operation(this->flat_index(i));
         }
     } else {
-        Odometer<1> odo(shape, {this->strides});
+        Odometer<1> odo(_shape, {_strides});
 
-        for (int i = 0; i != n; ++i) {
+        for (Index i = 0; i != n; ++i) {
             values[i] = operation(this->flat_index(odo.flat[0]));
             odo.next();
         }
     }
-    return Tensor(shape, std::move(values));
+    return Tensor(_shape, std::move(values));
 }
 
 template <typename Operation>
 Tensor& Tensor::_unary_assign_op(Operation operation) {
-    const int n = this->size();
+    const Index n = this->size();
 
     if (_is_contiguous()) {
-        for (int i = 0; i != n; ++i) {
+        for (Index i = 0; i != n; ++i) {
             this->flat_index(i) = operation(this->flat_index(i));
         }
     } else {
-        Odometer<1> odo(shape, {this->strides});
+        Odometer<1> odo(_shape, {_strides});
 
-        for (int i = 0; i != n; ++i) {
+        for (Index i = 0; i != n; ++i) {
             this->flat_index(odo.flat[0]) = operation(this->flat_index(odo.flat[0]));
             odo.next();
         }
@@ -114,95 +126,73 @@ Tensor& Tensor::_unary_assign_op(Operation operation) {
 
 // == CONSTRUCTORS =======================================================================
 
-Tensor::Tensor(const std::vector<int>& shape_) : shape(shape_), strides(shape_.size()) {
-    size_t total_size = 1;
-    for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
-        strides[i] = static_cast<int>(total_size);
-        total_size *= static_cast<size_t>(shape[i]);
-    }
-    data = std::make_shared<std::vector<double>>(total_size);
-}
+Tensor::Tensor(const std::vector<Index>& shape_)
+    : _shape(shape_), _strides(row_major_strides(_shape)), _size(_numel(_shape)),
+      _data(std::make_shared<std::vector<double>>(_size)) {}
 
-Tensor::Tensor(const std::vector<int>& shape_, std::vector<double> values)
-    : shape(shape_), strides(shape_.size()) {
-    size_t total_size = 1;
-    for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
-        strides[i] = static_cast<int>(total_size);
-        total_size *= static_cast<size_t>(shape[i]);
-    }
-    if (values.size() != total_size) {
+Tensor::Tensor(const std::vector<Index>& shape_, std::vector<double> values)
+    : _shape(shape_), _strides(row_major_strides(_shape)), _size(_numel(_shape)) {
+    if (std::ssize(values) != _size) {
         throw std::invalid_argument("Tensor data size does not match shape.");
     }
-    data = std::make_shared<std::vector<double>>(std::move(values));
+    _data = std::make_shared<std::vector<double>>(std::move(values));
 }
 
 // == VIEW & COPY METHODS =============================================================
 
 Tensor Tensor::contiguous() const { return _is_contiguous() ? *this : copy(); }
 
-Tensor Tensor::permute(const std::vector<int>& perm) const {
-    if (perm.size() != static_cast<size_t>(ndim())) {
+Tensor Tensor::permute(const std::vector<Index>& perm) const {
+    if (std::ssize(perm) != ndim()) {
         throw std::invalid_argument("Number of indices must be equal to ndim");
     }
-    std::vector<int> new_shape(ndim()), new_strides(ndim());
-    for (int i = 0; i < ndim(); ++i) {
-        new_shape[i] = shape[perm[i]];
-        new_strides[i] = strides[perm[i]];
+    std::vector<Index> new_shape(ndim());
+    std::vector<Index> new_strides(ndim());
+    for (Index i = 0; i < ndim(); ++i) {
+        new_shape[i] = _shape[perm[i]];
+        new_strides[i] = _strides[perm[i]];
     }
-    return Tensor(data, new_shape, new_strides, offset);
+    return Tensor(_data, new_shape, new_strides, _offset);
 }
 
-Tensor Tensor::swapaxes(size_t ax1, size_t ax2) const {
-    auto new_shape = shape;
-    auto new_strides = strides;
+Tensor Tensor::swapaxes(Index ax1, Index ax2) const {
+    auto new_shape = _shape;
+    auto new_strides = _strides;
     std::swap(new_shape[ax1], new_shape[ax2]);
     std::swap(new_strides[ax1], new_strides[ax2]);
-    return Tensor(data, new_shape, new_strides, offset);
+    return Tensor(_data, new_shape, new_strides, _offset);
 }
 
-Tensor Tensor::select(size_t axis, int index) const {
-    auto new_shape = shape;
-    auto new_strides = strides;
-    size_t new_offset = offset + static_cast<size_t>(index) * static_cast<size_t>(strides[axis]);
+Tensor Tensor::select(Index axis, Index index) const {
+    auto new_shape = _shape;
+    auto new_strides = _strides;
+    Index new_offset = _offset + index * _strides[axis];
     new_shape.erase(new_shape.begin() + axis);
     new_strides.erase(new_strides.begin() + axis);
-    return Tensor(data, new_shape, new_strides, new_offset);
+    return Tensor(_data, new_shape, new_strides, new_offset);
 }
 
-Tensor Tensor::reshape(const std::vector<int>& new_shape) const {
-    int new_size = 1;
-    for (int i=0; i < new_shape.size(); ++i) {
-        new_size *= new_shape[i];
-    }
-    if (new_size != this->size()) {
+Tensor Tensor::reshape(const std::vector<Index>& new_shape) const {
+    if (_numel(new_shape) != this->size()) {
         throw std::invalid_argument("New shape is not compatible with current tensor!");
     }
     Tensor t = contiguous();
-
-    std::vector<int> new_strides(new_shape.size());
-    size_t total_size = 1;
-    for (int i = static_cast<int>(new_shape.size()) - 1; i >= 0; --i) {
-        new_strides[i] = static_cast<int>(total_size);
-        total_size *= static_cast<size_t>(new_shape[i]);
-    }
-    return Tensor(t.data, new_shape, new_strides, t.offset);
+    return Tensor(t._data, new_shape, row_major_strides(new_shape), t._offset);
 }
 
 Tensor Tensor::slice(const std::vector<Sli>& slices) const {
-    if (slices.size() != ndim()) {
+    if (std::ssize(slices) != ndim()) {
         throw std::invalid_argument("Number of slices must be equal to ndim");
     }
-    auto new_offset = offset;
-    auto new_shape = shape;
-    auto new_strides = strides;
+    auto new_offset = _offset;
+    auto new_shape = _shape;
+    auto new_strides = _strides;
 
-    for (size_t i = 0; i < ndim(); ++i) {
-        int start = slices[i].start;
-        int stop = slices[i].stop;
-        int step = slices[i].step;
+    for (Index i = 0; i < ndim(); ++i) {
+        auto [start, stop, step] = slices[i];
 
         if (step == 0) { throw std::invalid_argument("Slice step cannot be zero."); }
-        if (stop < 0) { stop = shape[i] + stop + 1; }
+        if (stop < 0) { stop = _shape[i] + stop + 1; }
 
         if (step > 0) {
             if (stop < start) stop = start;
@@ -212,10 +202,10 @@ Tensor Tensor::slice(const std::vector<Sli>& slices) const {
             new_shape[i] = (start - stop - step - 1) / (-step);
         }
 
-        new_offset += start * strides[i];
-        new_strides[i] = strides[i] * step;
+        new_offset += start * _strides[i];
+        new_strides[i] = _strides[i] * step;
     }
-    return Tensor(data, new_shape, new_strides, new_offset);
+    return Tensor(_data, new_shape, new_strides, new_offset);
 }
 
 Tensor Tensor::copy() const {
@@ -226,14 +216,18 @@ Tensor& Tensor::assign(const Tensor& other) {
     return _binary_assign_op(other, [](double, double new_val) { return new_val; });
 }
 
-Eigen::Map<const Matrix> Tensor::as_matrix(int rows, int cols) const {
+void Tensor::fill(double value) {
+    _unary_assign_op([value](double) { return value; });
+}
+
+Eigen::Map<const Matrix> Tensor::as_matrix(Index rows, Index cols) const {
     if (!_is_contiguous()) {
         throw std::runtime_error("Current Tensor view is not contiguous! Data might mismatch!");
     }
     if (rows * cols != size()) {
         throw std::runtime_error("Requested rows and cols do not match Tensor size!");
     }
-    return Eigen::Map<const Matrix>(data->data() + offset, rows, cols);
+    return Eigen::Map<const Matrix>(_data->data() + _offset, rows, cols);
 }
 
 // == ARITHMETIC OPERATIONS =============================================================
@@ -300,16 +294,16 @@ Tensor Tensor::operator^(int exp) const {
 
 double Tensor::sum() const {
     double total = 0.0;
-    const int n = size();
+    const Index n = size();
     if (_is_contiguous()) {
-        for (int i = 0; i != n; ++i) {
+        for (Index i = 0; i != n; ++i) {
             total += flat_index(i);
         }
         return total;
     }
 
-    Odometer<1> odo(shape, {strides});
-    for (int i = 0; i != n; ++i) {
+    Odometer<1> odo(_shape, {_strides});
+    for (Index i = 0; i != n; ++i) {
         total += flat_index(odo.flat[0]);
         odo.next();
     }
@@ -319,14 +313,9 @@ double Tensor::sum() const {
 // == EIGEN CONVERSIONS ====================================================================
 
 Tensor mat_to_tensor(const Matrix& M) {
-    const int rows = static_cast<int>(M.rows());
-    const int cols = static_cast<int>(M.cols());
-
-    return Tensor({rows, cols},
-        std::vector<double>(M.data(), M.data() + rows * cols));
+    return Tensor({M.rows(), M.cols()}, std::vector<double>(M.data(), M.data() + M.size()));
 }
 
 Tensor vec_to_tensor(const Vector& V) {
-    return Tensor({static_cast<int>(V.size())},
-        std::vector<double>(V.data(), V.data() + V.size()));
+    return Tensor({V.size()}, std::vector<double>(V.data(), V.data() + V.size()));
 }

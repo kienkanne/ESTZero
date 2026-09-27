@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
         else if ((arg == "--method") && i + 1 < argc) { method = argv[++i]; }
         else if ((arg == "--eri-scheme") && i + 1 < argc) { eri_scheme_str = argv[++i]; }
         else if ((arg == "--gemm-scheme") && i + 1 < argc) { gemm_scheme_str = argv[++i]; }
-        else if ((arg == "--gemm-min") && i + 1 < argc) { gemm_threshold = std::stoul(argv[++i]); }
+        else if ((arg == "--gemm-min") && i + 1 < argc) { gemm_threshold = std::stol(argv[++i]); }
         else if ((arg == "--guess") && i + 1 < argc) { guess_str = argv[++i]; }
         else if ((arg == "--frozen-core") && i + 1 < argc) { frozen_core = (std::string_view(argv[++i]) == "true"); }
         else if ((arg == "--mult") && i + 1 < argc) { mult = std::stoi(argv[++i]); }

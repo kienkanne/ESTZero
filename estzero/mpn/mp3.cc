@@ -8,7 +8,7 @@ double calc_mp3_E(const Tensor& Iprqs, const Tensor& DEprqs, const Tensor& FN,
                       const Tensor& Dia, const Tensor& Dijab, Sli O, Sli V, bool spin) {
     timing::Scoped _t("MP3 Energy Calculation");
 
-    Tensor t1(Dia.shape);
+    Tensor t1(Dia.shape());
     Tensor t2 = spin ? DEprqs.slice(O, O, V, V) / Dijab
                      : Iprqs.slice(O, O, V, V) / Dijab;
 

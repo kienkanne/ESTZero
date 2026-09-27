@@ -106,8 +106,8 @@ double calc_pert_triples_spat(const Tensor& Iprqs, const Tensor& DEprqs, const T
     const int o = O.stop - O.start;
     const int v = V.stop - V.start;
 
-    Tensor F_diag({FN.shape[0]});
-    for (int i = 0; i != FN.shape[0]; ++i) { F_diag(i) = FN(i, i); }
+    Tensor F_diag({FN.shape()[0]});
+    for (int i = 0; i != FN.shape()[0]; ++i) { F_diag(i) = FN(i, i); }
     Tensor F_occ  = F_diag.slice(O);
     Tensor F_virt = F_diag.slice(V);
     Tensor Fov    = FN.slice(O, V);

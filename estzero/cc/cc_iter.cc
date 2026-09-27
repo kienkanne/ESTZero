@@ -10,7 +10,7 @@
 // Flatten and concatenate the t1/t2 residuals into one column so the existing (Matrix-based)
 // diis() can be reused.
 Matrix concat_errors(const Tensor& err_t1, const Tensor& err_t2) {
-    int n1 = err_t1.size(), n2 = err_t2.size();
+    Index n1 = err_t1.size(), n2 = err_t2.size();
     Matrix err_vec(n1 + n2, 1);
     std::copy(err_t1.data_ptr(), err_t1.data_ptr() + n1, err_vec.data());
     std::copy(err_t2.data_ptr(), err_t2.data_ptr() + n2, err_vec.data() + n1);
@@ -24,7 +24,7 @@ Matrix concat_errors(const Tensor& err_t1, const Tensor& err_t2) {
 CCResult cc_iterate(double econv, int max_iter, int verbose, const Tensor& Iprqs,
                     const Tensor& DEprqs, const Tensor& FN, const Tensor& Dia, const Tensor& Dijab,
                     Sli O, Sli V, bool spin, bool is_CCD) {
-    Tensor t1(Dia.shape); // zero initial guess
+    Tensor t1(Dia.shape()); // zero initial guess
     Tensor t2 = spin ? DEprqs.slice(O, O, V, V) / Dijab   // <ij||ab>/D
                      : Iprqs.slice(O, O, V, V) / Dijab;   // <ij|ab>/D
 
@@ -35,7 +35,7 @@ CCResult cc_iterate(double econv, int max_iter, int verbose, const Tensor& Iprqs
     // happen tiny test systems with only 1-2 total amplitudes like H2, making the DIIS B-matrix rank-deficient; 
     // The solver returns a degenerate combination that reuses the same couple of history entries every iteration, 
     // so the amplitudes stay at a wrong fixed point. Cap the DIIS subspace so it never exceeds the true DOF count.
-    const int max_diis_dim = t1.size() + t2.size();
+    const Index max_diis_dim = t1.size() + t2.size();
 
     double E_cc = 0.0;
     double E_ccsd_last = 0.0;
@@ -70,7 +70,7 @@ CCResult cc_iterate(double econv, int max_iter, int verbose, const Tensor& Iprqs
         }
 
         // T1 doesn't exist for CCD, so its error is left at zero.
-        Tensor err_t1 = is_CCD ? Tensor(t1.shape) : Tensor(t1_update - t1);
+        Tensor err_t1 = is_CCD ? Tensor(t1.shape()) : Tensor(t1_update - t1);
         Tensor err_t2 = t2_update - t2;
 
         t1 = t1_update;
@@ -103,12 +103,12 @@ CCResult cc_iterate(double econv, int max_iter, int verbose, const Tensor& Iprqs
         }
         E_ccsd_last = E_cc;
 
-        if (err_list.size() >= 3 && static_cast<int>(err_list.size()) <= max_diis_dim) {
+        if (err_list.size() >= 3 && std::ssize(err_list) <= max_diis_dim) {
             Vector coeffs = diis(err_list);
             // Build into fresh tensors rather than mutating t1/t2 in place: t1/t2 still alias the buffers 
             // just got pushed into t1_list/t2_list accumulating into them directly would corrupt history.
-            Tensor t1_diis(t1.shape);
-            Tensor t2_diis(t2.shape);
+            Tensor t1_diis(t1.shape());
+            Tensor t2_diis(t2.shape());
             for (std::size_t k = 0; k < err_list.size(); ++k) {
                 t1_diis += coeffs[k] * t1_list[k];
                 t2_diis += coeffs[k] * t2_list[k];

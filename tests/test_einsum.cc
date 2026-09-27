@@ -5,9 +5,9 @@
 namespace {
 
 // doctest has no Tensor comparison; compare element-wise over the flat storage.
-void check_tensor(const Tensor& actual, const std::vector<int>& shape,
+void check_tensor(const Tensor& actual, const std::vector<Index>& shape,
                    const std::vector<double>& expected) {
-    REQUIRE(actual.shape == shape);
+    REQUIRE(actual.shape() == shape);
     for (size_t i = 0; i < expected.size(); ++i)
         CHECK(actual.flat_index(i) == doctest::Approx(expected[i]));
 }
