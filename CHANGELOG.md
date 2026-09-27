@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.9.1] Changed buffer allocation in `einsum` and PertT to `assign()` instead of `=`
+
+- `einsum` pre-allocated `Tensor result` and PertT pre-allocated the buffers for `t3` and its variants, but `=` was used to assign them data, which copies instead. `assign()` was used here to correctly follow the pre-allocation intention.
+- Additional improvement was observed, especially for RHF (having three `t3` variants instead of one in UHF): CCSD(T) `indole/sto-3g` 7.202s -> 6.880s, `parabenzyne/sto-3g` 18.417s -> 18.736s.
+- Fixed `v3.9.0` regular run numbers to use frozen core.
+
 ## [v3.9.0] Rewrote the odometer as a fixed-size `Odometer<NT>` counter class
 
 - `odometer.h` now resides a generic counter `Odometer<NT>` class that initiates the counter instead of having it done outside as in the previous function version `odometer()`.
