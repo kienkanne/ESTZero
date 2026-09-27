@@ -46,7 +46,7 @@ Tensor Tensor::_binary_op(const Tensor& other, Operation operation) const {
             odo.next();
         }
     }
-    return Tensor(shape, values);
+    return Tensor(shape, std::move(values));
 }
 
 // Same fast/general split as _binary_op, but for binary assignments
@@ -90,7 +90,7 @@ Tensor Tensor::_unary_op(Operation operation) const {
             odo.next();
         }
     }
-    return Tensor(shape, values);
+    return Tensor(shape, std::move(values));
 }
 
 template <typename Operation>
@@ -123,7 +123,7 @@ Tensor::Tensor(const std::vector<int>& shape_) : shape(shape_), strides(shape_.s
     data = std::make_shared<std::vector<double>>(total_size);
 }
 
-Tensor::Tensor(const std::vector<int>& shape_, const std::vector<double>& values)
+Tensor::Tensor(const std::vector<int>& shape_, std::vector<double> values)
     : shape(shape_), strides(shape_.size()) {
     size_t total_size = 1;
     for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {

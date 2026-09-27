@@ -72,7 +72,7 @@ public:
 
     Tensor() = default;
     explicit Tensor(const std::vector<int>& shape_);
-    explicit Tensor(const std::vector<int>& shape_, const std::vector<double>& values);
+    explicit Tensor(const std::vector<int>& shape_, std::vector<double> values); // no const on values to support std::move
 
     // == ELEMENT ACCESS ==================================================================
 

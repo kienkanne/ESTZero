@@ -206,5 +206,5 @@ Tensor eri_vector_to_tensor(const std::vector<double>& eri_vector, int nbf) {
     for (int s = 0; s < nbf; ++s) {
         data[idx++] = eri_vector[eri_index(p, q, r, s)];
     }}}}
-    return Tensor({nbf, nbf, nbf, nbf}, data);
+    return Tensor({nbf, nbf, nbf, nbf}, std::move(data)); // hand over nbf^4 buffer, no copy
 }
