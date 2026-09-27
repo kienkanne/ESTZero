@@ -31,22 +31,19 @@ bool Tensor::_match_check(const Tensor& other) const {
 template <typename Operation>
 Tensor Tensor::_binary_op(const Tensor& other, Operation operation) const {
     bool fast = _match_check(other);
-    std::vector<double> values(this->size());
+    const int n = this->size();
+    std::vector<double> values(n);
 
     if (fast) {
-        for (int i = 0; i != this->size(); ++i) {
+        for (int i = 0; i != n; ++i) {
             values[i] = operation(this->flat_index(i), other.flat_index(i));
         }
     } else {
-        std::vector<int> result_indices(this->shape.size(), 0);
-        std::vector<int> term_flats {0,0}; //this_flat, term_flat
-        std::vector<std::vector<int>> terms_strides {this->strides, other.strides};
+        Odometer<2> odo(shape, {this->strides, other.strides}); // terms: this, other
 
-        for (int flat = 0; flat != this->size(); ++flat) {
-            values[flat] = operation(
-                this->flat_index(term_flats[0]), other.flat_index(term_flats[1]));
-
-            odometer(result_indices, term_flats, shape, terms_strides);
+        for (int i = 0; i != n; ++i) {
+            values[i] = operation(this->flat_index(odo.flat[0]), other.flat_index(odo.flat[1]));
+            odo.next();
         }
     }
     return Tensor(shape, values);
@@ -56,21 +53,20 @@ Tensor Tensor::_binary_op(const Tensor& other, Operation operation) const {
 template <typename Operation>
 Tensor& Tensor::_binary_assign_op(const Tensor& other, Operation operation) {
     bool fast = _match_check(other);
+    const int n = this->size();
 
     if (fast) {
-        for (int i = 0; i != this->size(); ++i) {
+        for (int i = 0; i != n; ++i) {
             this->flat_index(i) = operation(
                 this->flat_index(i), other.flat_index(i));
         }
     } else {
-        std::vector<int> result_indices(this->shape.size(), 0);
-        std::vector<int> term_flats {0, 0}; // this_flat, other_flat
-        std::vector<std::vector<int>> terms_strides {this->strides, other.strides};
+        Odometer<2> odo(shape, {this->strides, other.strides}); // terms: this, other
 
-        for (int flat = 0; flat != this->size(); ++flat) {
-            this->flat_index(term_flats[0]) = operation(
-                this->flat_index(term_flats[0]), other.flat_index(term_flats[1]));
-            odometer(result_indices, term_flats, shape, terms_strides);
+        for (int i = 0; i != n; ++i) {
+            this->flat_index(odo.flat[0]) = operation(
+                this->flat_index(odo.flat[0]), other.flat_index(odo.flat[1]));
+            odo.next();
         }
     }
     return *this;
@@ -79,20 +75,19 @@ Tensor& Tensor::_binary_assign_op(const Tensor& other, Operation operation) {
 // Same fast/general split as _binary_op, but for a single tensor
 template <typename Operation>
 Tensor Tensor::_unary_op(Operation operation) const {
-    std::vector<double> values(this->size());
+    const int n = this->size();
+    std::vector<double> values(n);
 
     if (_is_contiguous()) {
-        for (int i = 0; i != this->size(); ++i) {
+        for (int i = 0; i != n; ++i) {
             values[i] = operation(this->flat_index(i));
         }
     } else {
-        std::vector<int> indices(this->shape.size(), 0);
-        std::vector<int> this_flat = {0};
-        std::vector<std::vector<int>> terms_strides {this->strides};
+        Odometer<1> odo(shape, {this->strides});
 
-        for (int flat = 0; flat != this->size(); ++flat) {
-            values[flat] = operation(this->flat_index(this_flat[0]));
-            odometer(indices, this_flat, shape, terms_strides);
+        for (int i = 0; i != n; ++i) {
+            values[i] = operation(this->flat_index(odo.flat[0]));
+            odo.next();
         }
     }
     return Tensor(shape, values);
@@ -100,18 +95,18 @@ Tensor Tensor::_unary_op(Operation operation) const {
 
 template <typename Operation>
 Tensor& Tensor::_unary_assign_op(Operation operation) {
+    const int n = this->size();
+
     if (_is_contiguous()) {
-        for (int i = 0; i != this->size(); ++i) {
+        for (int i = 0; i != n; ++i) {
             this->flat_index(i) = operation(this->flat_index(i));
         }
     } else {
-        std::vector<int> indices(this->shape.size(), 0);
-        std::vector<int> this_flat = {0};
-        std::vector<std::vector<int>> terms_strides {this->strides};
+        Odometer<1> odo(shape, {this->strides});
 
-        for (int flat = 0; flat != this->size(); ++flat) {
-            this->flat_index(this_flat[0]) = operation(this->flat_index(this_flat[0]));
-            odometer(indices, this_flat, shape, terms_strides);
+        for (int i = 0; i != n; ++i) {
+            this->flat_index(odo.flat[0]) = operation(this->flat_index(odo.flat[0]));
+            odo.next();
         }
     }
     return *this;
@@ -305,20 +300,18 @@ Tensor Tensor::operator^(int exp) const {
 
 double Tensor::sum() const {
     double total = 0.0;
+    const int n = size();
     if (_is_contiguous()) {
-        for (int i = 0; i != size(); ++i) {
+        for (int i = 0; i != n; ++i) {
             total += flat_index(i);
         }
         return total;
     }
 
-    std::vector<int> indices(shape.size(), 0);
-    std::vector<int> tensor_flat {0};
-    std::vector<std::vector<int>> terms_strides {strides};
-
-    for (int i = 0; i != size(); ++i) {
-        total += flat_index(tensor_flat[0]);
-        odometer(indices, tensor_flat, shape, terms_strides);
+    Odometer<1> odo(shape, {strides});
+    for (int i = 0; i != n; ++i) {
+        total += flat_index(odo.flat[0]);
+        odo.next();
     }
     return total;
 }

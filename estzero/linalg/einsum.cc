@@ -221,6 +221,55 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
     return true;
 }
 
+namespace {
+
+// Generic odometer route when GEMM is declined. NT = N(operands) + 1.
+template <int NT>
+void odometer_contract(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands,
+                       const std::unordered_map<char, int>& char_to_dim,
+                       const std::unordered_map<char, int>& char_to_col, Tensor& result) {
+    // One odometer axis ("column") per distinct label
+    Odometer<NT> odo(char_to_dim.size());
+
+    size_t total_combinations = 1;
+    for (const auto& [label, col] : char_to_col) {
+        odo.dims[col] = char_to_dim.at(label);
+        total_combinations *= static_cast<size_t>(odo.dims[col]);
+    }
+
+    // stride_table[col][term] = how much term's flat offset moves per +1 of the global label assigned to
+    // column `col`.
+    //
+    // Each term's entries are basically a relabeled copy of that tensor's own `.strides`. The loops below
+    // just map them onto this canonical table that contains all indices/labels. The table starts at 0, so any
+    // label not owned by a term stays 0, meaning that when that label moves, the term's flat offset just stays.
+    for (int term = 0; term < NT - 1; ++term) {
+        const auto& term_string = terms_strings[term];
+
+        for (int axis = 0; axis < static_cast<int>(term_string.size()); ++axis) {
+            int col = char_to_col.at(term_string[axis]);
+            odo.stride_table[col][term] += operands[term].strides[axis];
+    }}
+
+    // Technically, parse_subscripts' Gate 4 rejects a duplicate output index, so applying it here is consistency only.
+    const auto& result_string = terms_strings.back();
+    for (int axis = 0; axis < static_cast<int>(result_string.size()); ++axis) {
+        int col = char_to_col.at(result_string[axis]);
+        odo.stride_table[col][NT - 1] += result.strides[axis];
+    }
+
+    for (size_t c = 0; c < total_combinations; ++c) {
+        double product = 1.0;
+        for (int term = 0; term < NT - 1; ++term) {
+            product *= operands[term].flat_index(odo.flat[term]);
+        }
+        result.flat_index(odo.flat[NT - 1]) += product;
+        odo.next();
+    }
+}
+
+} // namespace
+
 Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
     auto [terms_strings, char_to_dim, char_to_col] = parse_subscripts(subscripts, operands);
 
@@ -235,64 +284,11 @@ Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>&
         : try_gemm(terms_strings, operands, result); // modify `Tensor result` directly
     if (gemm) { return result; }
 
-    const int n_labels = static_cast<int>(char_to_dim.size());
-    std::vector<int> dim_sizes(n_labels);
-    for (const auto& [label, col] : char_to_col) {
-        dim_sizes[col] = char_to_dim.at(label);
+    switch (operands.size()) {
+        case 1: odometer_contract<2>(terms_strings, operands, char_to_dim, char_to_col, result); break;
+        case 2: odometer_contract<3>(terms_strings, operands, char_to_dim, char_to_col, result); break;
+        default: throw std::invalid_argument("pairwise_einsum takes 1 or 2 operands");
     }
-
-    size_t total_combinations = 1;
-    for (int d : dim_sizes) {
-        total_combinations *= static_cast<size_t>(d);
-    }
-
-    // terms_strides[term_idx][col] = how much term `term_idx`'s flat offset moves per +1 of 
-    // the global label assigned to column `col`. "term" here means every operand AND the result
-    //
-    // Each row is a basically a relabeled copy of each tensor's (operands) own `.strides`.
-    // The loop below just maps them onto this canonical table that contain all indices/labels.
-    // The table is filled with 0 by default, so any index not owned by an operand is just 0,
-    // meaning that when that index moves the flat index of that operand just stays
-    std::vector<std::vector<int>> terms_strides(
-        terms_strings.size(), std::vector<int>(char_to_dim.size(), 0));
-
-    // BUG FIX: Accumulate (not overwrite). a label can appear more than once in the same term. When that 
-    // happens, every axis tied to the label must move together, so the flat-offset delta per +1 label is 
-    // the sum of those axes strides.
-    for (int operand_idx = 0; operand_idx < operands.size(); ++operand_idx) {
-        const auto& term_string = terms_strings[operand_idx];
-
-        for (int axis = 0; axis < term_string.size(); ++axis) {
-            int col = char_to_col.at(term_string[axis]);
-            terms_strides[operand_idx][col] += operands[operand_idx].strides[axis];
-    }}
-
-    // Same fix for result row. Technically, parse_subscripts' Gate 4 rejects a duplicate output index, 
-    // so applying it here is for consistency only.
-    for (int axis = 0; axis < terms_strings.back().size(); ++axis) {
-        int col = char_to_col.at(terms_strings.back()[axis]);
-        terms_strides.back()[col] += result.strides[axis];
-    }
-
-    // global_indices[col]: current value of the label at that column, over all label 
-    // combinations (odometer() walks every one exactly once)
-    std::vector<int> global_indices(n_labels, 0);
-    std::vector<int> terms_flats(terms_strings.size(), 0);
-    for (size_t c = 0; c < total_combinations; ++c) {
-        double product = 1.0;
-
-        for (size_t operand_idx = 0;
-            operand_idx < operands.size();
-            ++operand_idx) {
-            product *= operands[operand_idx].flat_index(
-                terms_flats[operand_idx]);
-        }
-
-        result.flat_index(terms_flats.back()) += product;
-
-        odometer(global_indices, terms_flats, dim_sizes, terms_strides);
-    }
-
     return result;
 }
 

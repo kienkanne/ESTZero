@@ -1,40 +1,69 @@
 #ifndef ODOMETER
 #define ODOMETER
 
-#include <vector>
+#include <array>
+#include <cstddef>
+#include <span>
+#include <stdexcept>
+#include <string>
 
-// Advances `global_indices` to the next combination of a shared set of axes. The last axis 
-// is the fastest-moving, matching Tensor's row-major layout where the last axis sweeps fastest.
-// The sweeped axes can be einsum's distinct index letters, or the common logical shape two
-// Tensors walk together in an elementwise op. 
+// Maximum number of axes one odometer can sweep (set to use std::array)
+constexpr int MAX_AXES = 12;
+
+// Walks every combination of a shared set of axes (last axis fastest, matching Tensor's row-major layout),
+// and alongside the counter keeps the flat offset of NT "terms" up to date. The swept axes can be einsum's
+// distinct index letters, or the common logical shape two Tensors walk together in an elementwise op.
 //
-// Alongside the counter, it incrementally updates the flat offset of every "term" via 
-// `terms_strides`, which is term_idx's own real per-axis stride for that axis, or 0 if 
-// that term doesn't depend on the axis at all (important for einsum) Because each step only 
-// adds/subtracts one axis's stride delta instead of recomputing every term's flat offset 
-// from scratch every iteration, this is O(1) per combination
-inline void odometer(
-    std::vector<int>& global_indices,
-    std::vector<int>& terms_flats,
-    const std::vector<int>& dim_sizes,
-    const std::vector<std::vector<int>>& terms_strides) {
+// NT (the number of terms) is a template parameter, so it is known at compile time (1-2 for
+// Tensor ops, 2-3 for pairwise einsum) to avoid using std::vector
+template <int NT>
+struct Odometer {
+    int naxes = 0;
+    std::array<int, MAX_AXES> idx{};  // current value of each axis
+    std::array<int, MAX_AXES> dims{}; // extent of each axis
 
-    for (int axis = global_indices.size() - 1; axis >= 0; --axis) {
-        if (global_indices[axis] < dim_sizes[axis] - 1) {
-            ++global_indices[axis];
+    // stride_table[axis][term]: stride (how much to move when that axis +1) per axis per term. It is 0 if that
+    // term doesn't depend on the axis (important for einsum). Stored axis-major, so next() reads every term's 
+    // stride for one fixed axis at a time contiguously.
+    std::array<std::array<std::ptrdiff_t, NT>, MAX_AXES> stride_table{};
 
-            for (size_t term_idx = 0;
-                 term_idx < terms_flats.size();
-                 ++term_idx) {
-                terms_flats[term_idx] += terms_strides[term_idx][axis];
-            }
-            return;
+    std::array<std::ptrdiff_t, NT> flat{}; // current flat offset of each term
+
+    // einsum: the caller fills `dims` and `stride_table` directly (it relabels each operand's strides onto
+    // the global index letters, some of which are zer, so the table isn't a copy of the tensor's strides.
+    explicit Odometer(int naxes_) : naxes(naxes_) {
+        if (naxes > MAX_AXES) {
+            throw std::invalid_argument(
+                "Odometer: " + std::to_string(naxes) + " axes exceeds MAX_AXES ("+ std::to_string(MAX_AXES) + ")");
         }
+    }
 
-        global_indices[axis] = 0;
+    // Tensor elementwise ops: use the strides directly. std::span reads both std::vector and std::array
+    Odometer(std::span<const int> shape, const std::array<std::span<const int>, NT>& term_strides)
+        : Odometer(static_cast<int>(shape.size())) {
+        for (int axis = 0; axis < naxes; ++axis) {
+            dims[axis] = shape[axis];
+            for (int term = 0; term < NT; ++term) {
+                stride_table[axis][term] = term_strides[term][axis];
+            }
+        }
+    }
 
-        for (size_t term_idx = 0; term_idx < terms_flats.size(); ++term_idx) {
-            terms_flats[term_idx] -= terms_strides[term_idx][axis] * (dim_sizes[axis] - 1);
+    // Advance to the next combination
+    void next() {
+        for (int axis = naxes - 1; axis >= 0; --axis) {
+            if (++idx[axis] < dims[axis]) {
+                for (int term = 0; term < NT; ++term) {
+                    flat[term] += stride_table[axis][term];
+                }
+                return;
+            }
+
+            // Reset and move to the next if the bound (axis dimension) is hit
+            idx[axis] = 0;
+            for (int term = 0; term < NT; ++term) {
+                flat[term] -= stride_table[axis][term] * (dims[axis] - 1);
+            }
         }
     }
 };
