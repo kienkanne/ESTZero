@@ -2,6 +2,16 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.9.0] Rewrote the odometer as a fixed-size `Odometer<NT>` counter class
+
+- `odometer.h` now resides a generic counter `Odometer<NT>` class that initiates the counter instead of having it done outside as in the previous function version `odometer()`.
+- The number of terms `NT` is a template parameter, as it is known at compile time: 1-2 for `Tensor` operators (`Odometer<1>`/`Odometer<2>`), and 2-3 for `einsum` (operands + result).
+- The odometer also now uses the fixed-size `std::array` to avoid heap allocations for the stride table, as well as the global indices and the dimension sizes. To achieve this, the variable `MAX_AXES` is declared so it is known at compile time
+- The stride table is now stored axis-major (`stride_table[axis][term]`, as ` std::array<std::array<std::ptrdiff_t, NT>, MAX_AXES>`) instead of term-major (`terms_strides[term][axis]`), as `next()` reads every term's stride for one fixed axis at a time, so that read is now contiguous
+- The per-term flat offsets are now signed 64-bit (`std::ptrdiff_t`) instead of `int` to support a larger limit (64-bit).
+- `Tensor` still uses the `std::vector` for its attributes (`shape` and `strides`), so the constructor of `Odometer<NT>` takes in `std::span<const int>`
+- Further improvement on top of v3.8.2: CCSD(T) `indole/sto-3g` 10.271s -> 7.202s (1.43x), `parabenzyne/sto-3g` 27.690s -> 18.417s (1.50x).
+
 ## [v3.8.2] Fixed `terms_strides` instantion bug inside the hot loop of the non-contiguous slow path for `Tensor` operators
 
 - In the non-contiguous slow path for `Tensor` operators, the `std::vector<std::vector<int>> terms_strides` is being instantiated inside the hot loop (iterating over elements) via curly brackets, which is a few heap allocations per element, creating massive overhead cost for any non-contiguous operations with `Tensor`, which is very common especially in CCSD(T), or `einsum` if GEMM is rejected.
