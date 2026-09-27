@@ -2,6 +2,14 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.9.3] Integer type hygiene for `Tensor`/`Odometer`/`einsum`, cached `size()`, private `Tensor` attributes
+
+- `linalg/` mixed integer types in for index computation (`int/size_t/std::ptrdiff_t`, with `static_cast`). Everything that measures or addresses `Tensor` data now uses one signed 64-bit type, `Index` (`std::ptrdiff_t`), It is signed because reversed slices have negative strides. `size_t` remains only for loop counters over a `std::` container's own `.size()`, and `int` only for the compile-time operand count `NT` and the BLAS/cuBLAS boundary (`call_gemm`).
+- `size()` is now cached into `_size` instead of recomputing the product of the shape on every call. All `Tensor` attributes are now private and prefixed with `_` (`_shape`, `_strides`, `_offset`, `_data`), with const getters `shape()`/`strides()`, so call sites change from `t.shape` to `t.shape()`.
+- Other hygiene cleanup: `fill()` previously ran `std::fill` over the entire shared buffer, so now only sets the elements the view covers. Same problem with `clear()`. Both are covered by two new property tests.
+- Removed the unused legacy `TensorView`, deduplicated the row-major stride computation (three copies), and made `gemm_threshold`/`to_device`/`to_host` take signed counts.
+- Small performance regression, attributed to the cached `_size`: CCSD(T) `indole/sto-3g` 6.702s -> 6.778s, `parabenzyne/sto-3g` 17.550s -> 18.154s.
+
 ## [v3.9.2] Fixed `Tensor` constructor that used `std::move` on `const std::vector<double>&`
 
 - The second constructor of `Tensor` allows it to steal data from a vector, but it was not implemented as intended. `std::make_shared<std::vector<double>>(std::move(values))` on `const std::vector<double>& values` copies the vector instead, and this happens for every unary and binary operations. Changed to just `std::vector<double>`, and `std::move` is now used at the call site.
