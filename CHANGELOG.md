@@ -2,10 +2,15 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.9.2] Fixed `Tensor` constructor that used `std::move` on `const std::vector<double>&`
+
+- The second constructor of `Tensor` allows it to steal data from a vector, but it was not implemented as intended. `std::make_shared<std::vector<double>>(std::move(values))` on `const std::vector<double>& values` copies the vector instead, and this happens for every unary and binary operations. Changed to just `std::vector<double>`, and `std::move` is now used at the call site.
+- Performance slightly increased for both, more so for UHF: CCSD(T) `indole/sto-3g` 6.880s -> 6.702s, `parabenzyne/sto-3g` 18.417s -> 17.550s.
+
 ## [v3.9.1] Changed buffer allocation in `einsum` and PertT to `assign()` instead of `=`
 
 - `einsum` pre-allocated `Tensor result` and PertT pre-allocated the buffers for `t3` and its variants, but `=` was used to assign them data, which copies instead. `assign()` was used here to correctly follow the pre-allocation intention.
-- Additional improvement was observed, especially for RHF (having three `t3` variants instead of one in UHF): CCSD(T) `indole/sto-3g` 7.202s -> 6.880s, `parabenzyne/sto-3g` 18.417s -> 18.736s.
+- Additional improvement was observed only for RHF (having three `t3` variants instead of one in UHF): CCSD(T) `indole/sto-3g` 7.202s -> 6.880s, `parabenzyne/sto-3g` 18.417s -> 18.736s.
 - Fixed `v3.9.0` regular run numbers to use frozen core.
 
 ## [v3.9.0] Rewrote the odometer as a fixed-size `Odometer<NT>` counter class
