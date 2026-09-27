@@ -160,9 +160,9 @@ double calc_pert_triples_spat(const Tensor& Iprqs, const Tensor& DEprqs, const T
 
         timing::Scoped _t("  Build T3");
 
-        t3 = t3c_ijk_spat_old(t2, vb, o, v, F_occ, F_virt, i, j, k);
-        t3_diff  = t3 - t3.swapaxes(0, 2);
-        t3_comb1 = 2.0 * t3 - t3.swapaxes(1, 2) - t3.swapaxes(0, 2);
+        t3.assign(t3c_ijk_spat_old(t2, vb, o, v, F_occ, F_virt, i, j, k));
+        t3_diff.assign(t3 - t3.swapaxes(0, 2));
+        t3_comb1.assign(2.0 * t3 - t3.swapaxes(1, 2) - t3.swapaxes(0, 2));
 
         if (gpu_direct) {
             // Same idea as UHF's x1/x2 GPU branch. t3_diff/t3_comb1 were just built on host, one H2D upload each iteration,

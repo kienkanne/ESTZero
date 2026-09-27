@@ -217,7 +217,7 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
     for (size_t i = 0; i < C.size(); ++i) {
         perm_out[i] = static_cast<int>(combined_labels.find(C[i]));
     }
-    result = combined.permute(perm_out);
+    result.assign(combined.permute(perm_out));
     return true;
 }
 

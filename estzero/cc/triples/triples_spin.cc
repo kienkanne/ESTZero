@@ -151,7 +151,7 @@ double calc_pert_triples_spin(const Tensor& DEprqs, const Tensor& t1, const Tens
 
         timing::Scoped _t("  Build T3");
 
-        t3 = t3c_ijk_spin_old(t2, vb, o, v, F_occ, F_virt, i, j, k);
+        t3.assign(t3c_ijk_spin_old(t2, vb, o, v, F_occ, F_virt, i, j, k));
 
         // t3 (a,b,c) is contiguous (freshly built), and the other operands are also contiguous (slicing only the
         // first indices from the left). The output is fed directly into x2 with the correct slicing, which is
