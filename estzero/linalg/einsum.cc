@@ -36,7 +36,7 @@ struct ParsedSubscripts {
     std::unordered_map<char, Index> char_to_col;
 };
 
-ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::vector<Tensor>& operands) {
+ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, Operands operands) {
     std::string subscripts = remove_spaces(raw_subscripts);
 
     // Gate 1: Exactly one arrow check
@@ -91,9 +91,9 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
 
     // Gate 5: Operand dimensionality match check
     for (size_t i = 0; i < terms_strings.size()-1; ++i) {
-        if (operands[i].ndim() != std::ssize(terms_strings[i])) {
+        if (operands[i]->ndim() != std::ssize(terms_strings[i])) {
             throw std::invalid_argument("Operand " + std::to_string(i) + " has " + 
-                                        std::to_string(operands[i].ndim()) + " dimensions, but subscript '" + 
+                                        std::to_string(operands[i]->ndim()) + " dimensions, but subscript '" + 
                                         terms_strings[i] + "' expects " + std::to_string(terms_strings[i].length()) + ".");
         }
     }
@@ -105,7 +105,7 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
     Index next_col = 0;
     for (size_t i = 0; i < terms_strings.size()-1; ++i) {
         const auto& term = terms_strings[i];
-        const auto& shape = operands[i].shape();
+        const auto& shape = operands[i]->shape();
         for (size_t a = 0; a < term.length(); ++a) {
             char c = term[a];
             Index size = shape[a];
@@ -126,7 +126,7 @@ ParsedSubscripts parse_subscripts(const std::string& raw_subscripts, const std::
 }
 
 
-bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands, Tensor& result) {
+bool try_gemm(const std::vector<std::string>& terms_strings, Operands operands, Tensor& result) {
     if (gs == GEMMScheme::ODO) return false;
     if (operands.size() != 2) return false;
 
@@ -179,32 +179,30 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
     std::vector<Index> permB = summed_axes_B;
     permB.insert(permB.end(), right_axes.begin(), right_axes.end());
 
-    Index left_size = 1; for (Index i : left_axes) left_size *= operands[0].shape()[i];
-    Index summed_size = 1; for (Index i : summed_axes_A) summed_size *= operands[0].shape()[i]; // only takes A to compute, same if takes B
-    Index right_size = 1; for (Index i : right_axes) right_size *= operands[1].shape()[i];
+    Index left_size = 1; for (Index i : left_axes) left_size *= operands[0]->shape()[i];
+    Index summed_size = 1; for (Index i : summed_axes_A) summed_size *= operands[0]->shape()[i]; // only takes A to compute, same if takes B
+    Index right_size = 1; for (Index i : right_axes) right_size *= operands[1]->shape()[i];
 
     // Guard on the contraction's total work (FLOPs ~ left*summed*right) instead of raw element count. 
-    // v3.0.1-v3.0.2a declined GEMM whenever any operand alone was small, and this caused problems for UHF
-    // MP2, where the full AO ERI tensor is contracted with a small matrix (C_occ), so the contraction work
-    // is still large, and should be routed through GEMM. Its performance dropped substantially. See CHANGELOG v3.0.3.
     Index total_work = left_size * summed_size * right_size;
     if (total_work < gemm_threshold) { return false; }
 
-    // Freshly built Tensor, guaranteed to be contiguous
-    Tensor M = operands[0].permute(permA).reshape(left_size, summed_size);
-    Tensor N = operands[1].permute(permB).reshape(summed_size, right_size);
+    // Explicitly pass as a span. The template argument resolves before the std::span overload, so it tried 
+    // implicit conversion: `static_cast<long>(std::vector<long>)` -> error
+    Tensor M = operands[0]->permute(std::span<const Index>(permA)).reshape(left_size, summed_size);
+    Tensor N = operands[1]->permute(std::span<const Index>(permB)).reshape(summed_size, right_size);
 
     // combined_labels: left_axes + right_axes (what GEMM produced)
     std::string combined_labels;
     std::vector<Index> combined_shape;
-    for (Index i : left_axes)  { combined_labels += A[i]; combined_shape.push_back(operands[0].shape()[i]); }
-    for (Index i : right_axes) { combined_labels += B[i]; combined_shape.push_back(operands[1].shape()[i]); }
+    for (Index i : left_axes)  { combined_labels += A[i]; combined_shape.push_back(operands[0]->shape()[i]); }
+    for (Index i : right_axes) { combined_labels += B[i]; combined_shape.push_back(operands[1]->shape()[i]); }
 
     Tensor combined;
     
     if (gs == GEMMScheme::EIGEN) {
         Matrix result_mat = M.as_matrix(left_size, summed_size) * N.as_matrix(summed_size, right_size);
-        combined = mat_to_tensor(result_mat).reshape(combined_shape);
+        combined = mat_to_tensor(result_mat).reshape(std::span<const Index>(combined_shape));
     } else {
         // Non-Eigen route: works directly on a vector. BLAS/cuBLAS take 32-bit int dimensions, so this call is
         // the one place Index narrows back to int.
@@ -220,7 +218,7 @@ bool try_gemm(const std::vector<std::string>& terms_strings, const std::vector<T
     for (size_t i = 0; i < C.size(); ++i) {
         perm_out[i] = combined_labels.find(C[i]);
     }
-    result.assign(combined.permute(perm_out));
+    result.assign(combined.permute(std::span<const Index>(perm_out)));
     return true;
 }
 
@@ -228,7 +226,7 @@ namespace {
 
 // Generic odometer route when GEMM is declined. NT = N(operands) + 1.
 template <int NT>
-void odometer_contract(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands,
+void odometer_contract(const std::vector<std::string>& terms_strings, Operands operands,
                        const std::unordered_map<char, Index>& char_to_dim,
                        const std::unordered_map<char, Index>& char_to_col, Tensor& result) {
     // One odometer axis ("column") per distinct label
@@ -251,7 +249,7 @@ void odometer_contract(const std::vector<std::string>& terms_strings, const std:
 
         for (Index axis = 0; axis < std::ssize(term_string); ++axis) {
             Index col = char_to_col.at(term_string[axis]);
-            odo.stride_table[col][term] += operands[term].strides()[axis];
+            odo.stride_table[col][term] += operands[term]->strides()[axis];
     }}
 
     // Technically, parse_subscripts' Gate 4 rejects a duplicate output index, so applying it here is consistency only.
@@ -264,7 +262,7 @@ void odometer_contract(const std::vector<std::string>& terms_strings, const std:
     for (Index c = 0; c < total_combinations; ++c) {
         double product = 1.0;
         for (int term = 0; term < NT - 1; ++term) {
-            product *= operands[term].flat_index(odo.flat[term]);
+            product *= operands[term]->flat_index(odo.flat[term]);
         }
         result.flat_index(odo.flat[NT - 1]) += product;
         odo.next();
@@ -273,7 +271,7 @@ void odometer_contract(const std::vector<std::string>& terms_strings, const std:
 
 } // namespace
 
-Tensor pairwise_einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
+Tensor pairwise_einsum(const std::string& subscripts, Operands operands) {
     auto [terms_strings, char_to_dim, char_to_col] = parse_subscripts(subscripts, operands);
 
     std::vector<Index> result_shape;
@@ -334,7 +332,7 @@ std::string get_output_string(size_t output_idx, std::vector<std::string> terms_
 }
 
 
-Tensor einsum(const std::string& subscripts, const std::vector<Tensor>& operands) {
+Tensor einsum(const std::string& subscripts, Operands operands) {
     if (operands.size() == 1 || operands.size() == 2) {
         return pairwise_einsum(subscripts, operands);
     }
@@ -342,7 +340,7 @@ Tensor einsum(const std::string& subscripts, const std::vector<Tensor>& operands
     // Handle cases with 3 or more operands only
     auto [terms_strings, char_to_dim, char_to_col] = parse_subscripts(subscripts, operands);
 
-    Tensor output = operands[0];
+    Tensor output = *operands[0];
     std::string output_str = terms_strings[0];
 
     for (size_t next_operand = 1; next_operand < operands.size(); ++next_operand) {
@@ -355,9 +353,8 @@ Tensor einsum(const std::string& subscripts, const std::vector<Tensor>& operands
             next_output_str = get_output_string(output_idx, terms_strings, output_str, terms_strings[next_operand]);
         }
 
-        output = pairwise_einsum(
-            output_str + "," + terms_strings[next_operand] + "->" + next_output_str,
-            {output, operands[next_operand]});
+        const std::array<const Tensor*, 2> pair{ &output, operands[next_operand] };
+        output = pairwise_einsum(output_str + "," + terms_strings[next_operand] + "->" + next_output_str, pair);
         output_str = next_output_str;
     }
     return output;

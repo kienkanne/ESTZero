@@ -168,7 +168,7 @@ Tensor build_spin_FN(const Tensor& HA, const Tensor& HB, const Tensor& DEprqs,
 
     const Sli All{};
     const Sli O{0, n_alpha + n_beta};
-    Tensor two_electron = einsum("piqi->pq", {DEprqs.slice(All, O, All, O)});
+    Tensor two_electron = einsum("piqi->pq", DEprqs.slice(All, O, All, O));
 
     return HN + two_electron;
 }

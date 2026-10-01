@@ -1,10 +1,13 @@
 #ifndef TENSOR_H
 #define TENSOR_H
 
-#include <memory>
-#include <vector>
+#include <array>
 #include <cstddef>
+#include <iterator>
+#include <memory>
+#include <span>
 #include <stdexcept>
+#include <vector>
 #include <Eigen/Dense>
 
 
@@ -45,7 +48,7 @@ class Tensor {
         : _shape(std::move(sh)), _strides(std::move(st)), _size(_numel(_shape)), _data(std::move(d)), _offset(off) {}
 
     // Compute size (num element) from new shape for view ops
-    static Index _numel(const std::vector<Index>& sh) {
+    static Index _numel(std::span<const Index> sh) {
         Index n = 1;
         for (Index dim : sh) n *= dim;
         return n;
@@ -89,8 +92,7 @@ class Tensor {
 public:
     const std::vector<Index>& shape() const { return _shape; }
     const std::vector<Index>& strides() const { return _strides; }
-    // static_cast rather than std::ssize: this header is also compiled by nvcc, which defaults to C++17
-    Index ndim() const { return static_cast<Index>(_shape.size()); }
+    Index ndim() const { return std::ssize(_shape); }
     Index size() const { return _size; }
 
     // Sets only the elements this view covers (a slice shares its parent's buffer)
@@ -101,8 +103,9 @@ public:
     // == CONSTRUCTORS =======================================================================
 
     Tensor() = default;
-    explicit Tensor(const std::vector<Index>& shape_);
-    explicit Tensor(const std::vector<Index>& shape_, std::vector<double> values); // no const on values to support std::move
+    // Both by value in combination with std::move to avoid unnecessary copies
+    explicit Tensor(std::vector<Index> shape_);
+    explicit Tensor(std::vector<Index> shape_, std::vector<double> values);
 
     // == ELEMENT ACCESS ==================================================================
 
@@ -123,9 +126,14 @@ public:
 
     Tensor contiguous() const;
 
-    template <typename... Idx>
-    Tensor permute(Idx... idx) const { return permute(std::vector<Index>{ static_cast<Index>(idx)... }); }
-    Tensor permute(const std::vector<Index>& perm) const;
+    // permute/reshape/slice: call sites pass the list directly (t.permute(0, 2, 1, 3), t.slice(O, V)). The
+    // variadic front end packs it into a stack array, so no additional heap allocation.
+    template <typename... I>
+    Tensor permute(I... axes) const {
+        const std::array<Index, sizeof...(I)> perm{ static_cast<Index>(axes)... };
+        return permute(std::span<const Index>(perm));
+    }
+    Tensor permute(std::span<const Index> perm) const;
 
     Tensor swapaxes(Index ax1, Index ax2) const;
 
@@ -133,13 +141,19 @@ public:
     // indexing (t[..., idx, ...]), returning a smaller zero-copy view `Tensor`.
     Tensor select(Index axis, Index index) const;
 
-    template <typename... Idx>
-    Tensor reshape(Idx... idx) const { return reshape(std::vector<Index>{ static_cast<Index>(idx)... }); }
-    Tensor reshape(const std::vector<Index>& new_shape) const;
+    template <typename... I>
+    Tensor reshape(I... extents) const {
+        const std::array<Index, sizeof...(I)> new_shape{ static_cast<Index>(extents)... };
+        return reshape(std::span<const Index>(new_shape));
+    }
+    Tensor reshape(std::span<const Index> new_shape) const;
 
-    template <typename... Slices>
-    Tensor slice(Slices... slices) const { return slice(std::vector<Sli>{ slices... }); };
-    Tensor slice(const std::vector<Sli>& slices) const;
+    template <typename... S>
+    Tensor slice(S... slices) const {
+        const std::array<Sli, sizeof...(S)> all{ slices... };
+        return slice(std::span<const Sli>(all));
+    }
+    Tensor slice(std::span<const Sli> slices) const;
 
     Tensor copy() const;
     Tensor& assign(const Tensor& other);

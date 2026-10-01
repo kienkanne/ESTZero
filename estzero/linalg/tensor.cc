@@ -15,7 +15,7 @@ inline auto power = [](double base, int exp) {
     };
 
 // Natural row-major strides for `shape` (last axis contiguous)
-std::vector<Index> row_major_strides(const std::vector<Index>& shape) {
+std::vector<Index> row_major_strides(std::span<const Index> shape) {
     std::vector<Index> strides(shape.size());
     Index running = 1;
     for (Index axis = std::ssize(shape) - 1; axis >= 0; --axis) {
@@ -126,12 +126,12 @@ Tensor& Tensor::_unary_assign_op(Operation operation) {
 
 // == CONSTRUCTORS =======================================================================
 
-Tensor::Tensor(const std::vector<Index>& shape_)
-    : _shape(shape_), _strides(row_major_strides(_shape)), _size(_numel(_shape)),
+Tensor::Tensor(std::vector<Index> shape_)
+    : _shape(std::move(shape_)), _strides(row_major_strides(_shape)), _size(_numel(_shape)),
       _data(std::make_shared<std::vector<double>>(_size)) {}
 
-Tensor::Tensor(const std::vector<Index>& shape_, std::vector<double> values)
-    : _shape(shape_), _strides(row_major_strides(_shape)), _size(_numel(_shape)) {
+Tensor::Tensor(std::vector<Index> shape_, std::vector<double> values)
+    : _shape(std::move(shape_)), _strides(row_major_strides(_shape)), _size(_numel(_shape)) {
     if (std::ssize(values) != _size) {
         throw std::invalid_argument("Tensor data size does not match shape.");
     }
@@ -142,7 +142,7 @@ Tensor::Tensor(const std::vector<Index>& shape_, std::vector<double> values)
 
 Tensor Tensor::contiguous() const { return _is_contiguous() ? *this : copy(); }
 
-Tensor Tensor::permute(const std::vector<Index>& perm) const {
+Tensor Tensor::permute(std::span<const Index> perm) const {
     if (std::ssize(perm) != ndim()) {
         throw std::invalid_argument("Number of indices must be equal to ndim");
     }
@@ -172,15 +172,15 @@ Tensor Tensor::select(Index axis, Index index) const {
     return Tensor(_data, new_shape, new_strides, new_offset);
 }
 
-Tensor Tensor::reshape(const std::vector<Index>& new_shape) const {
+Tensor Tensor::reshape(std::span<const Index> new_shape) const {
     if (_numel(new_shape) != this->size()) {
         throw std::invalid_argument("New shape is not compatible with current tensor!");
     }
     Tensor t = contiguous();
-    return Tensor(t._data, new_shape, row_major_strides(new_shape), t._offset);
+    return Tensor(t._data, std::vector<Index>(new_shape.begin(), new_shape.end()), row_major_strides(new_shape), t._offset);
 }
 
-Tensor Tensor::slice(const std::vector<Sli>& slices) const {
+Tensor Tensor::slice(std::span<const Sli> slices) const {
     if (std::ssize(slices) != ndim()) {
         throw std::invalid_argument("Number of slices must be equal to ndim");
     }

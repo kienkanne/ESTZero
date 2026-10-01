@@ -15,14 +15,14 @@
 Tensor t3c_ijk_spin_old(const Tensor& t2, VikingsBufferSpin& vb, const int o, const int v,
                const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k) {
 
-    Tensor abc = einsum("ad,bcd->abc", {t2.select(0, i).select(0, j), vb.Wvvvo_k});
-    abc -= einsum("ad,bcd->abc", {t2.select(0, k).select(0, j), vb.Wvvvo_i});
-    abc -= einsum("ad,bcd->abc", {t2.select(0, i).select(0, k), vb.Wvvvo_j});
+    Tensor abc = einsum("ad,bcd->abc", t2.select(0, i).select(0, j), vb.Wvvvo_k);
+    abc -= einsum("ad,bcd->abc", t2.select(0, k).select(0, j), vb.Wvvvo_i);
+    abc -= einsum("ad,bcd->abc", t2.select(0, i).select(0, k), vb.Wvvvo_j);
     Tensor t3 = abc - abc.swapaxes(0, 1) - abc.swapaxes(0, 2);
 
-    abc = einsum("lab,lc->abc", {t2.select(0, i), vb.Wovoo_jk});
-    abc -= einsum("lab,lc->abc", {t2.select(0, j), vb.Wovoo_ik});
-    abc -= einsum("lab,lc->abc", {t2.select(0, k), vb.Wovoo_ji});
+    abc = einsum("lab,lc->abc", t2.select(0, i), vb.Wovoo_jk);
+    abc -= einsum("lab,lc->abc", t2.select(0, j), vb.Wovoo_ik);
+    abc -= einsum("lab,lc->abc", t2.select(0, k), vb.Wovoo_ji);
     t3 -= (abc - abc.swapaxes(0, 2) - abc.swapaxes(1, 2));
 
     Tensor denom({v, v, v});
@@ -41,19 +41,19 @@ Tensor t3c_ijk_spin_old(const Tensor& t2, VikingsBufferSpin& vb, const int o, co
 // Source: https://github.com/CrawfordGroup/pycc/blob/main/pycc/cctriples.py
 Tensor t3c_ijk_spat_old(const Tensor& t2, VikingsBufferSpat& vb, const int o, const int v,
                const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k) {
-    Tensor t3 = einsum("bae,ce->abc", {vb.Wvvvo_i, t2.select(0, k).select(0, j)});
-    t3 += einsum("cae,be->abc", {vb.Wvvvo_i, t2.select(0, j).select(0, k)});
-    t3 += einsum("ace,be->abc", {vb.Wvvvo_k, t2.select(0, j).select(0, i)});
-    t3 += einsum("bce,ae->abc", {vb.Wvvvo_k, t2.select(0, i).select(0, j)});
-    t3 += einsum("cbe,ae->abc", {vb.Wvvvo_j, t2.select(0, i).select(0, k)});
-    t3 += einsum("abe,ce->abc", {vb.Wvvvo_j, t2.select(0, k).select(0, i)});
+    Tensor t3 = einsum("bae,ce->abc", vb.Wvvvo_i, t2.select(0, k).select(0, j));
+    t3 += einsum("cae,be->abc", vb.Wvvvo_i, t2.select(0, j).select(0, k));
+    t3 += einsum("ace,be->abc", vb.Wvvvo_k, t2.select(0, j).select(0, i));
+    t3 += einsum("bce,ae->abc", vb.Wvvvo_k, t2.select(0, i).select(0, j));
+    t3 += einsum("cbe,ae->abc", vb.Wvvvo_j, t2.select(0, i).select(0, k));
+    t3 += einsum("abe,ce->abc", vb.Wvvvo_j, t2.select(0, k).select(0, i));
 
-    t3 -= einsum("mc,mab->abc", {vb.Wovoo_jk, t2.select(0, i)});
-    t3 -= einsum("mb,mac->abc", {vb.Wovoo_kj, t2.select(0, i)});
-    t3 -= einsum("mb,mca->abc", {vb.Wovoo_ij, t2.select(0, k)});
-    t3 -= einsum("ma,mcb->abc", {vb.Wovoo_ji, t2.select(0, k)});
-    t3 -= einsum("ma,mbc->abc", {vb.Wovoo_ki, t2.select(0, j)});
-    t3 -= einsum("mc,mba->abc", {vb.Wovoo_ik, t2.select(0, j)});
+    t3 -= einsum("mc,mab->abc", vb.Wovoo_jk, t2.select(0, i));
+    t3 -= einsum("mb,mac->abc", vb.Wovoo_kj, t2.select(0, i));
+    t3 -= einsum("mb,mca->abc", vb.Wovoo_ij, t2.select(0, k));
+    t3 -= einsum("ma,mcb->abc", vb.Wovoo_ji, t2.select(0, k));
+    t3 -= einsum("ma,mbc->abc", vb.Wovoo_ki, t2.select(0, j));
+    t3 -= einsum("mc,mba->abc", vb.Wovoo_ik, t2.select(0, j));
 
     Tensor denom({v, v, v});
     const double e_ijk = F_occ(i) + F_occ(j) + F_occ(k);
@@ -77,7 +77,7 @@ double calc_pert_triples_noddy(const Tensor& Iprqs, const Tensor& t1, const Tens
     timing::Scoped _t("Perbutative Triples");
 
     // Disconnected triples
-    Tensor tmp = einsum("ia,jkbc->ijkabc", {t1, Iprqs.slice(O, O, V, V)});
+    Tensor tmp = einsum("ia,jkbc->ijkabc", t1, Iprqs.slice(O, O, V, V));
     Tensor t3d = tmp.copy();
 
     t3d -= tmp.swapaxes(3, 4); // ijkbac
@@ -91,8 +91,8 @@ double calc_pert_triples_noddy(const Tensor& Iprqs, const Tensor& t1, const Tens
     t3d += tmp.swapaxes(0, 2).swapaxes(3, 5); // kjicba
 
     // Connected triples
-    tmp =  einsum("jkae,eibc->ijkabc", {t2, Iprqs.slice(V, O, V, V)});
-    tmp -= einsum("imbc,majk->ijkabc", {t2, Iprqs.slice(O, V, O, O)});
+    tmp =  einsum("jkae,eibc->ijkabc", t2, Iprqs.slice(V, O, V, V));
+    tmp -= einsum("imbc,majk->ijkabc", t2, Iprqs.slice(O, V, O, O));
     Tensor t3c = tmp.copy();
 
     t3c -= tmp.swapaxes(3, 4); // ijkbac

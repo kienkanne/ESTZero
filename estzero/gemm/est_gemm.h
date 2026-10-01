@@ -6,6 +6,7 @@
 #include <string>
 #include <cblas.h>
 #include "gemm_all.h"
+#include "einsum.h"
 
 
 enum class GEMMScheme {
@@ -27,9 +28,11 @@ inline void set_gemm_scheme(std::string g) {
     else if (g == "avx_8x8")    gs = GEMMScheme::AVX_8x8;
     else if (g == "avx_16x8")   gs = GEMMScheme::AVX_16x8;
     else if (g == "avx_24x8")   gs = GEMMScheme::AVX_24x8;
-    else if (g == "cutensor")   gs = GEMMScheme::CUTENSOR; // used as einsum backend only for now
+    else if (g == "cutensor")   { gs = GEMMScheme::CUTENSOR; throw std::runtime_error("cuTENSOR temporarily disabled"); }
     else throw std::runtime_error("Unknown gemm-scheme: " + g);
 }
+
+bool try_cutensor(const std::vector<std::string>& terms_strings, Operands operands, Tensor& result);
 
 // Mirroring `gemm_bench.cc` to initialize non-Eigen routes for GEMM
 inline auto call_gemm =

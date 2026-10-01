@@ -14,18 +14,18 @@ Tensor transmo(const Tensor& start,
                 std::string build_mode="full") {
 
     if (build_mode == "full") {
-        Tensor I1 = einsum("pi,pqrs->iqrs", {C1, start});
-        Tensor I2 = einsum("qa,iqrs->iars", {C2, I1}); I1.clear();
-        Tensor I3 = einsum("rj,iars->iajs", {C3, I2}); I2.clear();
-        return      einsum("sb,iajs->iajb", {C4, I3});
+        Tensor I1 = einsum("pi,pqrs->iqrs", C1, start);
+        Tensor I2 = einsum("qa,iqrs->iars", C2, I1); I1.clear();
+        Tensor I3 = einsum("rj,iars->iajs", C3, I2); I2.clear();
+        return      einsum("sb,iajs->iajb", C4, I3);
     }
     else if (build_mode == "to_I2") {
-        Tensor I1 = einsum("pi,pqrs->iqrs", {C1, start});
-        return      einsum("qa,iqrs->iars", {C2, I1});
+        Tensor I1 = einsum("pi,pqrs->iqrs", C1, start);
+        return      einsum("qa,iqrs->iars", C2, I1);
     }
     else if (build_mode == "from_I2") {
-        Tensor I3 = einsum("rj,iars->iajs", {C3, start});
-        return      einsum("sb,iajs->iajb", {C4, I3});
+        Tensor I3 = einsum("rj,iars->iajs", C3, start);
+        return      einsum("sb,iajs->iajb", C4, I3);
     }
     else { throw std::runtime_error("Unknown build mode"); }
 }

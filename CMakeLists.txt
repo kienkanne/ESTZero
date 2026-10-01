@@ -95,6 +95,10 @@ target_compile_options(est_core PUBLIC
     -march=native
 )
 
+# nvcc defaults to C++17, but tensor.h/einsum.h (included by cutensor_gemm.cc) need C++20 (std::span, concepts).
+# Passed as a raw flag because this CMake (3.21) predates CUDA 13 and ignores CMAKE_CUDA_STANDARD for it.
+target_compile_options(est_core PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-std=c++20>)
+
 set_source_files_properties(estzero/gemm/cutensor_gemm.cc PROPERTIES LANGUAGE CUDA)
 set_source_files_properties(estzero/gemm/cublas_gemm.cc PROPERTIES LANGUAGE CUDA)
 set_source_files_properties(estzero/gemm/cuda_ladder.cc PROPERTIES LANGUAGE CUDA)

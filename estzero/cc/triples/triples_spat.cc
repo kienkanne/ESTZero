@@ -51,7 +51,7 @@ Tensor t3c_ijk_spat(const Tensor& t2, VikingsBufferSpat& vb, const int o, const 
 
     // Permutation logic to accumulate the raw output GEMM into t3. (bac) to (abc) would be (1, 0, 2)
     auto add_term = [&](const Tensor& raw, double sign, int pos_a, int pos_b, int pos_c) {
-        t3 += sign * raw.permute({pos_a, pos_b, pos_c});
+        t3 += sign * raw.permute(pos_a, pos_b, pos_c);
     };
 
     // Comment shows the old einsum string, then the raw (physical) axis order the GEMM actually produces

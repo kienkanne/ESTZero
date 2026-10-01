@@ -18,7 +18,7 @@ void check_tensor(const Tensor& actual, const std::vector<Index>& shape,
 // Regression tests: terms_strides used to be built by assignment, so when a
 // label appeared twice in the same operand's term, the second occurrence's
 // stride silently overwrote the first's -- only one of the two tied axes
-// actually moved when that label incremented, e.g. einsum("ii->", {A})
+// actually moved when that label incremented, e.g. einsum("ii->", A)
 // walked A's column stride only, ignoring the row stride entirely. First
 // surfaced building the normal-ordered Fock matrix's two-electron term,
 // F_pq += sum_i <pi||qi>, i.e. einsum("piqi->pq", ...).
@@ -27,7 +27,7 @@ TEST_CASE("einsum: trace via a doubled index, ii->") {
     Tensor A({3, 3}, {1, 2, 3,
                        4, 5, 6,
                        7, 8, 9});
-    double trace = einsum("ii->", {A})();
+    double trace = einsum("ii->", A)();
     CHECK(trace == doctest::Approx(1 + 5 + 9));
 }
 
@@ -42,7 +42,7 @@ TEST_CASE("einsum: rank-4 trace over a doubled index, piqi->pq") {
     for (int j = 0; j < 2; ++j)
         B(p, i, q, j) = p * 1000 + i * 100 + q * 10 + j;
 
-    Tensor R = einsum("piqi->pq", {B});
+    Tensor R = einsum("piqi->pq", B);
     for (int p = 0; p < 2; ++p)
     for (int q = 0; q < 2; ++q) {
         double expected = B(p, 0, q, 0) + B(p, 1, q, 1);
@@ -55,40 +55,40 @@ TEST_CASE("einsum: rank-4 trace over a doubled index, piqi->pq") {
 
 TEST_CASE("einsum: identity, ij->ij") {
     Tensor input({2, 3}, {1, 2, 3, 4, 5, 6});
-    Tensor output = einsum("ij->ij", {input});
+    Tensor output = einsum("ij->ij", input);
     check_tensor(output, {2, 3}, {1, 2, 3, 4, 5, 6});
 }
 
 TEST_CASE("einsum: transpose, ij->ji") {
     Tensor input({2, 3}, {1, 2, 3, 4, 5, 6});
-    Tensor output = einsum("ij->ji", {input});
+    Tensor output = einsum("ij->ji", input);
     check_tensor(output, {3, 2}, {1, 4, 2, 5, 3, 6});
 }
 
 TEST_CASE("einsum: elementwise product, ij,ij->ij") {
     Tensor left({2, 2}, {1, 2, 3, 4});
     Tensor right({2, 2}, {5, 6, 7, 8});
-    Tensor output = einsum("ij,ij->ij", {left, right});
+    Tensor output = einsum("ij,ij->ij", left, right);
     check_tensor(output, {2, 2}, {5, 12, 21, 32});
 }
 
 TEST_CASE("einsum: matrix multiply, ik,kj->ij") {
     Tensor left({2, 3}, {1, 2, 3, 4, 5, 6});
     Tensor right({3, 2}, {7, 8, 9, 10, 11, 12});
-    Tensor output = einsum("ik,kj->ij", {left, right});
+    Tensor output = einsum("ik,kj->ij", left, right);
     check_tensor(output, {2, 2}, {58, 64, 139, 154});
 }
 
 TEST_CASE("einsum: matrix-vector contraction, ij,j->i") {
     Tensor left({2, 3}, {1, 2, 3, 4, 5, 6});
     Tensor right({3}, {10, 20, 30});
-    Tensor output = einsum("ij,j->i", {left, right});
+    Tensor output = einsum("ij,j->i", left, right);
     check_tensor(output, {2}, {140, 320});
 }
 
 TEST_CASE("einsum: full reduction to scalar, ij->") {
     Tensor input({2, 2}, {1, 2, 3, 4});
-    Tensor output = einsum("ij->", {input});
+    Tensor output = einsum("ij->", input);
     check_tensor(output, {}, {10});
 }
 
@@ -102,7 +102,7 @@ TEST_CASE("einsum: swapaxes view preserves logical order") {
                          4, 5, 6});
     Tensor view = input.swapaxes(0, 1);
 
-    Tensor output = einsum("ij->ij", {view});
+    Tensor output = einsum("ij->ij", view);
     check_tensor(output, {3, 2}, {1, 4,
                                  2, 5,
                                  3, 6});
@@ -115,7 +115,7 @@ TEST_CASE("einsum: sliced view uses its offset") {
                          10, 11, 12});
     Tensor view = input.slice(Sli{1, 4, 1}, Sli{});
 
-    Tensor output = einsum("ij->ij", {view});
+    Tensor output = einsum("ij->ij", view);
     check_tensor(output, {3, 3}, {4, 5, 6,
                                  7, 8, 9,
                                  10, 11, 12});
@@ -125,7 +125,7 @@ TEST_CASE("einsum: strided slice respects step") {
     Tensor input({6}, {0, 1, 2, 3, 4, 5});
     Tensor view = input.slice(Sli{0, 6, 2});
 
-    Tensor output = einsum("i->", {view});
+    Tensor output = einsum("i->", view);
     check_tensor(output, {}, {6});
 }
 
@@ -141,7 +141,7 @@ TEST_CASE("einsum: rank-3 batched matrix multiply, bik,bkj->bij") {
                             1, 1, 1, 1});
     Tensor right({2, 2, 2}, {1, 0, 0, 1,
                              2, 0, 0, 2});
-    Tensor output = einsum("bik,bkj->bij", {left, right});
+    Tensor output = einsum("bik,bkj->bij", left, right);
     check_tensor(output, {2, 2, 2}, {1, 2, 3, 4,
                                      2, 2, 2, 2});
 }
@@ -151,7 +151,7 @@ TEST_CASE("einsum: rank-3 contraction over a shared axis, ijk,k->ij") {
     Tensor input({2, 2, 3}, {1, 2, 3, 4, 5, 6,
                              7, 8, 9, 10, 11, 12});
     Tensor vec({3}, {1, 0, -1});
-    Tensor output = einsum("ijk,k->ij", {input, vec});
+    Tensor output = einsum("ijk,k->ij", input, vec);
     // Each output element is input[i,j,0] - input[i,j,2].
     check_tensor(output, {2, 2}, {1 - 3, 4 - 6, 7 - 9, 10 - 12});
 }
@@ -164,7 +164,7 @@ TEST_CASE("einsum: rank-4 contraction, pqrs,rs->pq") {
         9, 10, 11, 12,  13, 14, 15, 16
     });
     Tensor density({2, 2}, {1, 0, 0, 1}); // identity: picks out the trace over r==s
-    Tensor output = einsum("pqrs,rs->pq", {eri, density});
+    Tensor output = einsum("pqrs,rs->pq", eri, density);
     // output[p,q] = eri[p,q,0,0] + eri[p,q,1,1]
     check_tensor(output, {2, 2}, {1 + 4, 5 + 8, 9 + 12, 13 + 16});
 }
@@ -180,8 +180,8 @@ TEST_CASE("einsum: rank-4 two-step transform matches sequential rank-2 transform
     });
     Tensor C({2, 2}, {1, 1, 1, -1});
 
-    Tensor once = einsum("pqrs,ri->pqis", {eri, C});
-    Tensor twice = einsum("pqis,sj->pqij", {once, C});
+    Tensor once = einsum("pqrs,ri->pqis", eri, C);
+    Tensor twice = einsum("pqis,sj->pqij", once, C);
 
     // Reference: brute-force the same sum by hand for a couple of elements.
     auto ref = [&](int p, int q, int i, int j) {
@@ -202,42 +202,42 @@ TEST_CASE("einsum: rank-4 two-step transform matches sequential rank-2 transform
 
 TEST_CASE("einsum: rejects subscripts with no arrow") {
     Tensor matrix({2, 2}, {1, 2, 3, 4});
-    CHECK_THROWS_AS((void)einsum("ij", {matrix}), std::invalid_argument);
+    CHECK_THROWS_AS((void)einsum("ij", matrix), std::invalid_argument);
 }
 
 TEST_CASE("einsum: rejects subscripts with two arrows") {
     Tensor matrix({2, 2}, {1, 2, 3, 4});
-    CHECK_THROWS_AS((void)einsum("ij->i->j", {matrix}), std::invalid_argument);
+    CHECK_THROWS_AS((void)einsum("ij->i->j", matrix), std::invalid_argument);
 }
 
 TEST_CASE("einsum: rejects an empty input term") {
     Tensor matrix({2, 2}, {1, 2, 3, 4});
     Tensor vec({2}, {1, 2});
-    CHECK_THROWS_AS((void)einsum("ij,->i", {matrix, vec}), std::invalid_argument);
+    CHECK_THROWS_AS((void)einsum("ij,->i", matrix, vec), std::invalid_argument);
 }
 
 TEST_CASE("einsum: rejects a duplicate output index") {
     Tensor matrix({2, 2}, {1, 2, 3, 4});
-    CHECK_THROWS_AS((void)einsum("ij->ii", {matrix}), std::invalid_argument);
+    CHECK_THROWS_AS((void)einsum("ij->ii", matrix), std::invalid_argument);
 }
 
 TEST_CASE("einsum: rejects an output index absent from the input terms") {
     Tensor matrix({2, 2}, {1, 2, 3, 4});
-    CHECK_THROWS_AS((void)einsum("ij->k", {matrix}), std::invalid_argument);
+    CHECK_THROWS_AS((void)einsum("ij->k", matrix), std::invalid_argument);
 }
 
 TEST_CASE("einsum: rejects an operand-count mismatch") {
     Tensor matrix({2, 2}, {1, 2, 3, 4});
-    CHECK_THROWS_AS((void)einsum("ij,j->i", {matrix}), std::invalid_argument);
+    CHECK_THROWS_AS((void)einsum("ij,j->i", matrix), std::invalid_argument);
 }
 
 TEST_CASE("einsum: rejects an operand rank mismatch") {
     Tensor matrix({2, 2}, {1, 2, 3, 4});
-    CHECK_THROWS_AS((void)einsum("i->i", {matrix}), std::invalid_argument);
+    CHECK_THROWS_AS((void)einsum("i->i", matrix), std::invalid_argument);
 }
 
 TEST_CASE("einsum: rejects a dimension-size mismatch across a shared index") {
     Tensor matrix({2, 2}, {1, 2, 3, 4});
     Tensor vec({3}, {1, 2, 3});
-    CHECK_THROWS_AS((void)einsum("ij,j->i", {matrix, vec}), std::invalid_argument);
+    CHECK_THROWS_AS((void)einsum("ij,j->i", matrix, vec), std::invalid_argument);
 }

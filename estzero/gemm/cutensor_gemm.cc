@@ -1,5 +1,5 @@
 #include "tensor.h"
-#include "einsum.h"
+#include "est_gemm.h"
 
 // Guarded by EST_HAVE_CUTENSOR (set in CMakeLists.txt, alongside the -lcutensor link) so a
 // CPU only build doesn't have to load this in. Mirrors cublas_gemm.cc's toggle pattern.
@@ -24,7 +24,7 @@ cutensorHandle_t get_handle() {
 
 }  // namespace
 
-bool try_cutensor(const std::vector<std::string>& terms_strings, const std::vector<Tensor>& operands,
+bool try_cutensor(const std::vector<std::string>& terms_strings, Operands operands,
                    Tensor& result) {
     if (operands.size() != 2) return false;
 
@@ -43,8 +43,8 @@ bool try_cutensor(const std::vector<std::string>& terms_strings, const std::vect
 
     // For simplicity, force the data to be contiguous first, providing row-major data to give cuTensor.
     // TODO: pass  non-contiguous Tensor::strides straight through, skipping this copy
-    Tensor A = operands[0].contiguous();
-    Tensor B = operands[1].contiguous();
+    Tensor A = operands[0]->contiguous();
+    Tensor B = operands[1]->contiguous();
 
     const uint32_t numModesA = static_cast<uint32_t>(A_str.size());
     const uint32_t numModesB = static_cast<uint32_t>(B_str.size());
@@ -149,7 +149,7 @@ bool try_cutensor(const std::vector<std::string>& terms_strings, const std::vect
 
 #include <stdexcept>
 
-bool try_cutensor(const std::vector<std::string>&, const std::vector<Tensor>&, Tensor&) {
+bool try_cutensor(const std::vector<std::string>&, Operands, Tensor&) {
     throw std::runtime_error(
         "cutensor_gemm: this build was compiled without EST_HAVE_CUTENSOR -- the cuTENSOR block in "
         "CMakeLists.txt is commented out (clean CPU-only build). Un-comment it to use "
