@@ -364,7 +364,7 @@ def main():
 
     out_dir = Path(args.outdir) if args.outdir is not None else OUT_DIR
 
-    logger = logging.Logger("mySCF")
+    logger = logging.Logger("ESTZero")
     log_path = out_dir / f"{args.name}.log"
 
     logger.addHandler(logging.FileHandler(log_path, mode='w'))
@@ -389,7 +389,7 @@ def main():
         outputs[label] = {"nbf": sys_ref.get("nbf"), "reference": system.get("reference", "rhf")}
 
         for method in methods:
-            print(f"[mySCF/{method}] {label} ...")
+            print(f"[ESTZero/{method}] {label} ...")
 
             try:
                 best     = None
@@ -437,9 +437,9 @@ def main():
                         dE_ccsd = abs(ccsd_e - ccsd_ref_energy)
                         if dE_ccsd >= args.tol:
                             logger.info(
-                                f"[mySCF/{method}] {label} WARNING: intermediate CCSD |dE|={dE_ccsd:.2e} "
-                                f"exceeds tol={args.tol:.1e} vs Psi4 (CCSD(T) total status above is unaffected) "
-                                f"-- the CCSD path itself needs checking.")
+                                f"[ESTZero/{method}] {label} WARNING: intermediate CCSD |dE|={dE_ccsd:.2e} "
+                                f"exceeds tol={args.tol:.1e} vs Psi4 (CCSD(T) total status above is unaffected). "
+                                f"The CCSD path needs checking.")
                             all_pass = False
 
                 eri_s  = phases.get("ERI build",             {}).get("seconds", math.nan)
@@ -492,10 +492,10 @@ def main():
                 collected[label][method] = result
                 outputs[label][method]   = METHOD_SPECS[method]["to_json"](result)
 
-                print(f"[mySCF/{method}] {label} Done!")
+                print(f"[ESTZero/{method}] {label} Done!")
 
             except Exception as e:
-                logger.info(f"[mySCF/{method}] {label} ERROR: {e}")
+                logger.info(f"[ESTZero/{method}] {label} ERROR: {e}")
                 all_pass = False
                 result = {
                     "nbf": sys_ref.get("nbf"), "wall": math.nan, "n_iter": 0, "peak_rss": math.nan,

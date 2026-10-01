@@ -2,6 +2,14 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.9.4] Standardized list-taking APIs (`einsum`, `permute`/`reshape`/`slice`) to variadic call sites over one `std::span` implementation
+
+- `einsum` took its operands as `const std::vector<Tensor>&`, so `einsum("...", {A, B})` heap-allocated the vector and copied each `Tensor` into it. `einsum` now has a variadic numpy-style interface, `einsum("ij,jk->ik", A, B)`, which packs pointers to the operands into a stack array and forwards them as `Operands` (`std::span<const Tensor* const>`). All call sites changed from `{A, B}` to `A, B`.
+- `permute`/`reshape`/`slice` follow the same pattern: variadic call sites (`t.permute(0, 2, 1, 3)`, `t.slice(O, V)`) are packed into a stack `std::array` and forwarded to a single `std::span` overload, which also takes runtime-built lists (`try_gemm`'s `std::vector<Index>`). In `einsum.cc` where the dynamically built `std::vector` is passed into `permute`/`reshape`, `std::span` is explicitly used there to avoid implicit casting.
+- `std::span` and concepts require C++20 in `tensor.h`/`einsum.h`, which are also compiled by nvcc (through `cutensor_gemm.cc`), defaulting to C++17. `-std=c++20` is now passed as a raw CUDA compile option in `CMakeLists.txt`, since CMake 3.21 predates CUDA 13 and ignores `CMAKE_CUDA_STANDARD`.
+- Performance is essentially unchanged, as expected: the operand list was only 0.07-0.16% of the runtime. CCSD(T) `indole/sto-3g` 6.778s -> 6.870s, `parabenzyne/sto-3g` 18.154s -> 18.843s.
+- `cuTENSOR` route is temporarily disabled until the GPU path is implemented for the `Tensor` class explicitly.
+
 ## [v3.9.3] Integer type hygiene for `Tensor`/`Odometer`/`einsum`, cached `size()`, private `Tensor` attributes
 
 - `linalg/` mixed integer types in for index computation (`int/size_t/std::ptrdiff_t`, with `static_cast`). Everything that measures or addresses `Tensor` data now uses one signed 64-bit type, `Index` (`std::ptrdiff_t`), It is signed because reversed slices have negative strides. `size_t` remains only for loop counters over a `std::` container's own `.size()`, and `int` only for the compile-time operand count `NT` and the BLAS/cuBLAS boundary (`call_gemm`).
