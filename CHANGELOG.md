@@ -2,6 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.10.1] `Tensor` shape/strides stored in fixed-size arrays (`MAX_DIM = 6`) instead of `std::vector`
+
+- `Tensor` held its shape and strides as two `std::vector<Index>`, so every new `Tensor` copy made two heap allocations for metadata. They are now `Dims = std::array<Index, MAX_DIM>` plus an explicit `_ndim`, with `MAX_DIM = 6` (the highest rank used is the full T3 tensor in `calc_pert_triples_noddy`). A rank above `MAX_DIM` throws.
+- Only the first `_ndim` entries are meaningful (the rest stay 0), so the arrays must never be read whole. `shape()`/`strides()` now return a `std::span<const Index>` exactly `ndim()` long, and everything inside the class now calls through them instead of the raw `_shape`/`_strides` attribute.
+- Constructors take `std::span<const Index>` (another tensor's `shape()`, a `std::vector`), plus `std::initializer_list<Index>` overloads for a braced shape, `Tensor({o, v})`, since a span can't bind to a braced list before C++26.
+- Performance improved with less heap allocation: CCSD(T) `indole/sto-3g` 6.489s -> 6.348s, `parabenzyne/sto-3g` 17.353s -> 16.721s.
+
 ## [v3.10.0] Revamped `einsum`: cached subscript plans templated on the number of terms, array-based parser
 
 - Every `einsum` call used to re-parse its subscript string, and `try_gemm` re-derived its axes and permutations from the strings. Each distinct subscript is now parsed once into an `EinsumPlan<NT>` (validation, label columns, `try_gemm`'s axes/permutations), held in a `thread_local` cache keyed by `std::string_view` with a transparent hash to lookup a previously parsed subscripts.
@@ -9,6 +16,7 @@ All version updates to this project will be documented in this file. The perform
 - The shape-dependent work that requires the operands (for shapes) is rebuilt on every call into `Binding<NT>` as it's just a few operations.
 - The parser's hash maps/sets were replaced with arrays and `std::bitset<128>` indexed by the (ASCII) label: no heap allocation and no hashing.
 - Three new property tests: a cached plan reused across operand shapes, an operand with the same shape but different strides (a transposed view), and a 3-operand chain against nested pairwise calls.
+- Eigen is now routed through `call_gemm` as well, instead of being left on a separate path in `try_gemm`, a helper of `einsum`.
 - Performance: CCSD(T) `indole/sto-3g` 6.792s -> 6.489s, `parabenzyne/sto-3g` 18.442s -> 17.353s. `parabenzyne/sto-3g` CCSD now converges in 20 iterations instead of 23 (|dE| 1.38e-09 -> 2.14e-08), the same DIIS sensitivity to floating-point summation order as in v3.8.1.
 
 ## [v3.9.4] Standardized list-taking APIs (`einsum`, `permute`/`reshape`/`slice`) to variadic call sites over one `std::span` implementation

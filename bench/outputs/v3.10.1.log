@@ -1,0 +1,101 @@
+
+── SCF ─────────────────────────────────────────────────────────────────────────────────────────────
+system               ref  nbf       |dE|    ok  psi4(s)  wall(s)  ERI(s)  JK/it(ms)  iters  RSS(MB)
+───────────────────────────────────────────────────────────────────────────────────────────────────
+h2_stretched/sto-3g  rhf    2   4.08e-09  PASS    0.038    0.042   0.000        0.0      2    209.8
+h2o/sto-3g           rhf    7   1.47e-09  PASS    0.203    0.037   0.001        0.0      8    211.0
+h2o/cc-pvdz          rhf   24   3.37e-09  PASS    0.072    0.065   0.014        0.3     13    218.3
+fm/def2-svp          rhf   38   2.29e-09  PASS    0.088    0.105   0.036        1.7     15    228.8
+fm/def2-tzvp         rhf   74   4.38e-09  PASS    0.288    0.761   0.363       21.6     16    445.6
+benzene/def2-svp     rhf  114   1.20e-08  PASS    1.384    3.475   1.636      136.2     13   1504.3
+ch3/sto-3g           uhf    8   4.83e-09  PASS    0.048    0.037   0.001        0.0     10    211.0
+o2/sto-3g            uhf   10   3.64e-09  PASS    0.047    0.039   0.002        0.0      8    210.8
+o2/6-31g             uhf   18   9.39e-10  PASS    0.060    0.048   0.008        0.1     12    212.4
+o2/def2-tzvppd       uhf   80   2.83e-09  PASS    0.417    1.256   0.444       29.0     13    531.1
+ch3/aug-cc-pvtz      uhf  115   4.13e-09  PASS    1.403    5.433   1.430      140.0     14   1557.2
+───────────────────────────────────────────────────────────────────────────────────────────────────
+
+── MP2 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+system               ref  nbf       |dE|    ok  psi4(s)  wall(s)  ERI(s)  JK/it(ms) scf_it    MO(s) MP2(ms)  RSS(MB)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+h2_stretched/sto-3g  rhf    2   3.63e-09  PASS    0.043    0.042   0.000        0.0      2   0.000      0.0    209.9
+h2o/sto-3g           rhf    7   2.37e-10  PASS    0.056    0.038   0.001        0.0      8   0.000      0.0    211.3
+h2o/cc-pvdz          rhf   24   3.33e-09  PASS    0.096    0.063   0.014        0.3     13   0.001      0.0    221.1
+fm/def2-svp          rhf   38   9.76e-09  PASS    0.124    0.114   0.036        1.8     15   0.006      0.4    242.1
+fm/def2-tzvp         rhf   74   9.27e-10  PASS    0.608    0.804   0.366       21.4     16   0.041      2.2    519.9
+benzene/def2-svp     rhf  114   3.11e-08  PASS    3.870    3.869   1.635      136.9     13   0.369     18.0   2124.9
+ch3/sto-3g           uhf    8   2.48e-09  PASS    0.057    0.039   0.001        0.0     10   0.000      0.0    211.2
+o2/sto-3g            uhf   10   4.56e-09  PASS    0.063    0.039   0.002        0.0      8   0.000      0.0    211.2
+o2/6-31g             uhf   18   8.42e-09  PASS    0.081    0.049   0.008        0.1     12   0.001      0.0    212.6
+o2/def2-tzvppd       uhf   80   3.66e-08  PASS    0.945    1.374   0.451       28.9     13   0.114      2.0    638.3
+ch3/aug-cc-pvtz      uhf  115   3.17e-09  PASS    3.750    5.719   1.434      140.5     14   0.262      2.3   1742.8
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+── MP3 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+system               ref  nbf       |dE|    ok  psi4(s)  wall(s)  ERI(s)  JK/it(ms) scf_it   MO(s)   MP3(s)  RSS(MB)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+h2_stretched/sto-3g  rhf    2   4.44e-09  PASS    0.054    0.044   0.000        0.0      2   0.000    0.000    209.9
+h2o/sto-3g           rhf    7   3.66e-09  PASS    0.062    0.037   0.001        0.0      8   0.000    0.000    211.0
+ch3/sto-3g           uhf    8   2.96e-09  PASS    0.080    0.038   0.001        0.0     10   0.000    0.000    211.5
+o2/sto-3g            uhf   10   6.24e-09  PASS    0.089    0.040   0.002        0.0      8   0.000    0.000    212.5
+pyrimidine/sto-3g    rhf   34   5.11e-09  PASS    0.295    0.222   0.130        1.0     21   0.017    0.003    255.9
+propargyl/sto-3g     uhf   18   3.48e-08  PASS    0.141    0.076   0.016        0.1     22   0.006    0.004    231.5
+pyrimidine/6-31g     rhf   62   1.14e-08  PASS    1.523    1.117   0.431       10.1     21   0.291    0.076    716.2
+propargyl/6-31g      uhf   33   1.23e-07  PASS    0.296    0.303   0.055        0.9     24   0.044    0.059    476.9
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+── CCSD(T) ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+system               ref  nbf       |dE|    ok  psi4(s)  wall(s)  ERI(s)  JK/it(ms) scf_it   MO(s)  CCSD/it(ms)  cc_it  CCSD(s) PertT(s)  T3/it(ms)  T3_it  RSS(MB)
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+h2_stretched/sto-3g  rhf    2   2.14e-09  PASS    1.139    0.249   0.000        0.0      2   0.000          0.0     14    0.125    0.124      0.360      1    305.0
+h2o/sto-3g           rhf    7   1.73e-09  PASS    1.678    0.258   0.001        0.0      8   0.000          0.1      9    0.118    0.139      0.009     64    305.0
+ch3/sto-3g           uhf    8   1.89e-10  PASS    1.117    0.246   0.001        0.0     10   0.000          0.4      9    0.115    0.131      0.014    343    307.8
+o2/sto-3g            uhf   10   2.27e-08  PASS    2.133    0.273   0.002        0.0      8   0.000          0.8     12    0.125    0.148      0.013   1728    308.6
+pyrimidine/sto-3g    rhf   34   5.45e-07  PASS    2.128    0.761   0.129        1.0     21   0.018          9.2     11    0.386    0.375      0.071   3375    331.9
+propargyl/sto-3g     uhf   18   2.53e-08  PASS    2.718    0.718   0.016        0.1     22   0.005          7.7     20    0.296    0.422      0.081   3375    327.9
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+tol = 1.0e-06 vs Psi4; wall = best of 3 runs
+params: repeats=3 tier=None method=None runall=False tol=1e-06 maxiter=200 econv=1e-08 erischeme=tensor gemmscheme=openblas version=vX.X.X frozen_core=True compact=False outdir=None
+
+--- README.md rows (append) ---
+
+benzene/def2-svp (scf/rhf):
+| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|
+| vX.X.X | 3.475 | 1.636 | 136.2 | 13 | 1504.3 | - |
+
+ch3/aug-cc-pvtz (scf/uhf):
+| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|
+| vX.X.X | 5.433 | 1.430 | 140.0 | 14 | 1557.2 | - |
+
+benzene/def2-svp (mp2/rhf):
+| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform(s) | MP2 energy (ms) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|
+| vX.X.X | 3.869 | 1.635 | 136.9 | 13 | 0.369 | 18.0 | 2124.9 | - |
+
+ch3/aug-cc-pvtz (mp2/uhf):
+| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform(s) | MP2 energy (ms) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|
+| vX.X.X | 5.719 | 1.434 | 140.5 | 14 | 0.262 | 2.3 | 1742.8 | - |
+
+pyrimidine/6-31g (mp3/rhf):
+| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform(s) | MP3 energy (s) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|
+| vX.X.X | 1.117 | 0.431 | 10.1 | 21 | 0.291 | 0.076 | 716.2 | - |
+
+propargyl/6-31g (mp3/uhf):
+| version | Total wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform(s) | MP3 energy (s) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|
+| vX.X.X | 0.303 | 0.055 | 0.9 | 24 | 0.044 | 0.059 | 476.9 | - |
+
+pyrimidine/sto-3g (ccsd_t/rhf):
+| version | Total CCSD wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | PertT(s) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|---|---|
+| vX.X.X | 0.386 | 0.129 | 1.0 | 21 | 0.018 | 9.2 | 11 | 0.375 | 331.9 | - |
+
+propargyl/sto-3g (ccsd_t/uhf):
+| version | Total CCSD wall (s) | ERI build (s) | JK build (per iter) (ms) | N_SCF_iter | MO transform (s) | CC iteration (ms) | N_CC_iter | PertT(s) | Peak RSS (MB) | Note |
+|---|---|---|---|---|---|---|---|---|---|---|
+| vX.X.X | 0.296 | 0.016 | 0.1 | 22 | 0.005 | 7.7 | 20 | 0.422 | 327.9 | - |
