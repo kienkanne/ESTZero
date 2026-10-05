@@ -2,12 +2,21 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.10.0] Revamped `einsum`: cached subscript plans templated on the number of terms, array-based parser
+
+- Every `einsum` call used to re-parse its subscript string, and `try_gemm` re-derived its axes and permutations from the strings. Each distinct subscript is now parsed once into an `EinsumPlan<NT>` (validation, label columns, `try_gemm`'s axes/permutations), held in a `thread_local` cache keyed by `std::string_view` with a transparent hash to lookup a previously parsed subscripts.
+- `NT` (number of terms = inputs + 1, only 2 or 3, the same `NT` as `Odometer<NT>`) is a template parameter throughout, holding their terms in a `std::array<T, NT>`. For 3+ operands, the left-to-right chain's pairwise subscripts are also cached per subscript, and each step uses its own cached pairwise plan.
+- The shape-dependent work that requires the operands (for shapes) is rebuilt on every call into `Binding<NT>` as it's just a few operations.
+- The parser's hash maps/sets were replaced with arrays and `std::bitset<128>` indexed by the (ASCII) label: no heap allocation and no hashing.
+- Three new property tests: a cached plan reused across operand shapes, an operand with the same shape but different strides (a transposed view), and a 3-operand chain against nested pairwise calls.
+- Performance: CCSD(T) `indole/sto-3g` 6.792s -> 6.489s, `parabenzyne/sto-3g` 18.442s -> 17.353s. `parabenzyne/sto-3g` CCSD now converges in 20 iterations instead of 23 (|dE| 1.38e-09 -> 2.14e-08), the same DIIS sensitivity to floating-point summation order as in v3.8.1.
+
 ## [v3.9.4] Standardized list-taking APIs (`einsum`, `permute`/`reshape`/`slice`) to variadic call sites over one `std::span` implementation
 
 - `einsum` took its operands as `const std::vector<Tensor>&`, so `einsum("...", {A, B})` heap-allocated the vector and copied each `Tensor` into it. `einsum` now has a variadic numpy-style interface, `einsum("ij,jk->ik", A, B)`, which packs pointers to the operands into a stack array and forwards them as `Operands` (`std::span<const Tensor* const>`). All call sites changed from `{A, B}` to `A, B`.
 - `permute`/`reshape`/`slice` follow the same pattern: variadic call sites (`t.permute(0, 2, 1, 3)`, `t.slice(O, V)`) are packed into a stack `std::array` and forwarded to a single `std::span` overload, which also takes runtime-built lists (`try_gemm`'s `std::vector<Index>`). In `einsum.cc` where the dynamically built `std::vector` is passed into `permute`/`reshape`, `std::span` is explicitly used there to avoid implicit casting.
 - `std::span` and concepts require C++20 in `tensor.h`/`einsum.h`, which are also compiled by nvcc (through `cutensor_gemm.cc`), defaulting to C++17. `-std=c++20` is now passed as a raw CUDA compile option in `CMakeLists.txt`, since CMake 3.21 predates CUDA 13 and ignores `CMAKE_CUDA_STANDARD`.
-- Performance is essentially unchanged, as expected: the operand list was only 0.07-0.16% of the runtime. CCSD(T) `indole/sto-3g` 6.778s -> 6.870s, `parabenzyne/sto-3g` 18.154s -> 18.843s.
+- Performance is essentially unchanged, as expected: the operand list was only 0.07-0.16% of the runtime. CCSD(T) `indole/sto-3g` 6.778s -> 6.792s, `parabenzyne/sto-3g` 18.154s -> 18.442s.
 - `cuTENSOR` route is temporarily disabled until the GPU path is implemented for the `Tensor` class explicitly.
 
 ## [v3.9.3] Integer type hygiene for `Tensor`/`Odometer`/`einsum`, cached `size()`, private `Tensor` attributes
