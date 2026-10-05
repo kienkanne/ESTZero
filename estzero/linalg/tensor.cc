@@ -48,21 +48,22 @@ template <typename Operation>
 Tensor Tensor::_binary_op(const Tensor& other, Operation operation) const {
     bool fast = _match_check(other);
     const Index n = this->size();
-    std::vector<double> values(n);
+
+    Tensor result = Tensor::empty(shape());
 
     if (fast) {
         for (Index i = 0; i != n; ++i) {
-            values[i] = operation(this->flat_index(i), other.flat_index(i));
+            result.flat_index(i) = operation(this->flat_index(i), other.flat_index(i));
         }
     } else {
         Odometer<2> odo(shape(), {strides(), other.strides()}); // terms: this, other
 
         for (Index i = 0; i != n; ++i) {
-            values[i] = operation(this->flat_index(odo.flat[0]), other.flat_index(odo.flat[1]));
+            result.flat_index(i) = operation(this->flat_index(odo.flat[0]), other.flat_index(odo.flat[1]));
             odo.next();
         }
     }
-    return Tensor(shape(), std::move(values));
+    return result;
 }
 
 // Same fast/general split as _binary_op, but for binary assignments
@@ -92,21 +93,22 @@ Tensor& Tensor::_binary_assign_op(const Tensor& other, Operation operation) {
 template <typename Operation>
 Tensor Tensor::_unary_op(Operation operation) const {
     const Index n = this->size();
-    std::vector<double> values(n);
+    
+    Tensor result = Tensor::empty(shape());
 
     if (_is_contiguous()) {
         for (Index i = 0; i != n; ++i) {
-            values[i] = operation(this->flat_index(i));
+            result.flat_index(i) = operation(this->flat_index(i));
         }
     } else {
         Odometer<1> odo(shape(), {strides()});
 
         for (Index i = 0; i != n; ++i) {
-            values[i] = operation(this->flat_index(odo.flat[0]));
+            result.flat_index(i) = operation(this->flat_index(odo.flat[0]));
             odo.next();
         }
     }
-    return Tensor(shape(), std::move(values));
+    return result;
 }
 
 template <typename Operation>
@@ -133,7 +135,7 @@ Tensor& Tensor::_unary_assign_op(Operation operation) {
 // _to_dims runs first (declaration order), so a rank above MAX_DIM throws before anything else is computed
 Tensor::Tensor(std::span<const Index> shape_)
     : _shape(_to_dims(shape_)), _strides(row_major_strides(shape_)), _ndim(std::ssize(shape_)),
-      _size(_numel(shape_)), _data(std::make_shared<std::vector<double>>(_size)) {}
+      _size(_numel(shape_)), _data(std::make_shared<double[]>(_size)) {}
 
 Tensor::Tensor(std::span<const Index> shape_, std::vector<double> values)
     : _shape(_to_dims(shape_)), _strides(row_major_strides(shape_)), _ndim(std::ssize(shape_)),
@@ -141,7 +143,15 @@ Tensor::Tensor(std::span<const Index> shape_, std::vector<double> values)
     if (std::ssize(values) != _size) {
         throw std::invalid_argument("Tensor data size does not match shape.");
     }
-    _data = std::make_shared<std::vector<double>>(std::move(values));
+    _data = std::make_shared_for_overwrite<double[]>(_size);
+    std::move(values.begin(), values.end(), _data.get());
+}
+
+Tensor Tensor::empty(std::span<const Index> shape_) {
+    return Tensor(std::make_shared_for_overwrite<double[]>(_numel(shape_)), 
+                _to_dims(shape_), 
+                row_major_strides(shape_), 
+                std::ssize(shape_), 0);
 }
 
 // == VIEW & COPY METHODS =============================================================

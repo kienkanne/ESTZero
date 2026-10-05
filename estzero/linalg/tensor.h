@@ -50,12 +50,12 @@ class Tensor {
     Dims _strides{};
     Index _ndim = 0;
     Index _size = 0;
-    std::shared_ptr<std::vector<double>> _data;
+    std::shared_ptr<double[]> _data;
     Index _offset = 0; // For slicing
 
     // Private constructor for creating zero-copy views.
     // View ops (permute/swapaxes/select/reshape/slice) comes through here
-    Tensor(std::shared_ptr<std::vector<double>> d, const Dims& sh, const Dims& st, Index nd, Index off)
+    Tensor(std::shared_ptr<double[]> d, const Dims& sh, const Dims& st, Index nd, Index off)
         : _shape(sh), _strides(st), _ndim(nd), _size(_numel(shape())), _data(std::move(d)), _offset(off) {}
 
     // Copies a shape into the fixed-size array, rejecting a rank above MAX_DIM
@@ -128,28 +128,37 @@ public:
     Tensor() = default;
     // The span overloads take any runtime shape (another tensor's shape(), a std::vector)
     // The initializer_list overloads take a braced shape, Tensor({o, v}); span can't bind to before C++26.
+    // These are similar to np.zeros (default initialize to fill zero)
     explicit Tensor(std::span<const Index> shape_);
     explicit Tensor(std::span<const Index> shape_, std::vector<double> values); // by value to support std::move
-    
+
     explicit Tensor(std::initializer_list<Index> shape_)
         : Tensor(std::span<const Index>(shape_.begin(), shape_.size())) {}
     explicit Tensor(std::initializer_list<Index> shape_, std::vector<double> values)
         : Tensor(std::span<const Index>(shape_.begin(), shape_.size()), std::move(values)) {}
+
+    // Use std::make_shared_for_overwrite<double[]>(n) to left uninitilized (only safe when overwrite right away)
+    // Use static member function so .empty() can't be called on existing Tensor
+    // Similar to np.empty
+    static Tensor empty(std::span<const Index> shape_);
+    static Tensor empty(std::initializer_list<Index> shape_) {
+        return Tensor::empty(std::span<const Index>(shape_.begin(), shape_.size()));
+    }
 
     // == ELEMENT ACCESS ==================================================================
 
     // WARNING: Be careful when using on a strided slice or an axis-permuting swapaxes
     // views walk the buffer in a different order than operator() would, because the
     // flat index of underlying contiguous data is still the original
-    double flat_index(Index index) const { return (*_data)[_offset + index]; }
-    double& flat_index(Index index) { return (*_data)[_offset + index]; }
+    double flat_index(Index index) const { return _data.get()[_offset + index]; }
+    double& flat_index(Index index) { return _data.get()[_offset + index]; }
 
     // The number of indices must match ndim()
     template <typename... Idx>
-    double& operator()(Idx... idx) { return (*_data)[_offset_of(idx...)]; }
+    double& operator()(Idx... idx) { return _data.get()[_offset_of(idx...)]; }
 
     template <typename... Idx>
-    double operator()(Idx... idx) const { return (*_data)[_offset_of(idx...)]; }
+    double operator()(Idx... idx) const { return _data.get()[_offset_of(idx...)]; }
 
     // == VIEW & COPY METHODS =============================================================
 
@@ -192,7 +201,7 @@ public:
         if (!_is_contiguous()) {
             throw std::runtime_error("Current Tensor view is not contiguous! Data might mismatch!");
         }
-        return _data->data() + _offset; }
+        return _data.get() + _offset; }
 
     // == ARITHMETIC OPERATIONS (defined in tensor.cc) ======================================
 

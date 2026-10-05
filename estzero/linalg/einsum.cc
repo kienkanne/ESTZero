@@ -11,6 +11,7 @@
 #include "est_gemm.h"
 #include "einsum.h"
 #include "odometer.h"
+#include "tensor.h"
 
 namespace {
 
@@ -264,14 +265,14 @@ bool try_gemm(const EinsumPlan<3>& plan, Binding<3>& b, Operands operands, Tenso
     Tensor M = operands[0]->permute(std::span<const Index>(plan.permA)).reshape(b.left_size, b.summed_size);
     Tensor N = operands[1]->permute(std::span<const Index>(plan.permB)).reshape(b.summed_size, b.right_size);
 
-    // BLAS/cuBLAS take 32-bit int dimensions, so this call is the one place Index narrows back to int.
-    std::vector<double> result_data(b.left_size * b.right_size);
+    // Empty gemm output without needing for 0-initialization (beta=0.0)
+    Tensor gemm_out = Tensor::empty(std::move(b.combined_shape));
+
     call_gemm(gs, static_cast<int>(b.left_size), static_cast<int>(b.right_size), static_cast<int>(b.summed_size),
-              M.data_ptr(), N.data_ptr(), result_data.data());
-    Tensor combined(std::move(b.combined_shape), std::move(result_data));
+              M.data_ptr(), N.data_ptr(), gemm_out.data_ptr());
 
     // Reorder combined's axes into the caller's actual requested order
-    result.assign(combined.permute(std::span<const Index>(plan.perm_out)));
+    result.assign(gemm_out.permute(std::span<const Index>(plan.perm_out)));
     return true;
 }
 
@@ -314,11 +315,14 @@ void odometer_contract(const EinsumPlan<NT>& plan, const Binding<NT>& b, Operand
 template <int NT>
 Tensor pairwise_einsum(const EinsumPlan<NT>& plan, Operands operands) {
     Binding<NT> b = bind_operands(plan, operands);
-    Tensor result(std::move(b.result_shape)); // constructor already computes correct natural strides
+    Tensor result = Tensor::empty(std::move(b.result_shape)); // constructor already computes correct natural strides
 
     if constexpr (NT == 3) {
         if (try_gemm(plan, b, operands, result)) return result; // modifies `result` directly
     }
+
+    // Odometer path still needs result to be 0-initialized
+    result.fill(0.0);
     odometer_contract<NT>(plan, b, operands, result);
     return result;
 }
