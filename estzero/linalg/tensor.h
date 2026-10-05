@@ -158,10 +158,6 @@ public:
     Tensor copy() const;
     Tensor& assign(const Tensor& other);
 
-    // Zero-copy view of a contiguous Tensor's buffer as an row-major Eigen matrix, for GEMM.
-    // WARNING: Only safe to use when this this is already packed row-major (straight out of reshape())
-    Eigen::Map<const Matrix> as_matrix(Index rows, Index cols) const;
-
     // Get raw data pointer (+ offset). Contiguous is still checked for safety
     double* data_ptr() const {
         if (!_is_contiguous()) {

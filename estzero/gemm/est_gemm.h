@@ -34,12 +34,32 @@ inline void set_gemm_scheme(std::string g) {
 
 bool try_cutensor(const std::vector<std::string>& terms_strings, Operands operands, Tensor& result);
 
-// Mirroring `gemm_bench.cc` to initialize non-Eigen routes for GEMM
+// C (M x N) = alpha * op(A) * op(B) + beta * C, where op(A) is M x K and op(B) is K x N (stored transposed if trans).
 inline auto call_gemm =
     [](GEMMScheme gs, int M, int N, int K, const double *A, const double *B, double *C,
         double alpha = 1.0, double beta = 0.0, bool transA = false, bool transB = false) {
 
-        if (gs == GEMMScheme::OPENBLAS) {
+        if (gs == GEMMScheme::EIGEN) {
+            // Zero-copy row-major views of the raw buffers; a transposed operand is stored as its transpose.
+            Eigen::Map<const Matrix> Am(A, transA ? K : M, transA ? M : K);
+            Eigen::Map<const Matrix> Bm(B, transB ? N : K, transB ? K : N);
+            Eigen::Map<Matrix> Cm(C, M, N);
+
+            // generic lambda for Eigen
+            auto gemm = [&](const auto& opA, const auto& opB) {
+                if (beta == 0.0) {
+                    Cm.noalias() = alpha * opA * opB;
+                } else {
+                    Cm *= beta;
+                    Cm.noalias() += alpha * opA * opB;
+                }
+            };
+            if      (!transA && !transB) gemm(Am, Bm);
+            else if ( transA && !transB) gemm(Am.transpose(), Bm);
+            else if (!transA &&  transB) gemm(Am, Bm.transpose());
+            else                         gemm(Am.transpose(), Bm.transpose());
+        }
+        else if (gs == GEMMScheme::OPENBLAS) {
             auto TA = (transA) ? CblasTrans : CblasNoTrans;
             auto TB = (transB) ? CblasTrans : CblasNoTrans;
 

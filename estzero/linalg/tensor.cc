@@ -220,16 +220,6 @@ void Tensor::fill(double value) {
     _unary_assign_op([value](double) { return value; });
 }
 
-Eigen::Map<const Matrix> Tensor::as_matrix(Index rows, Index cols) const {
-    if (!_is_contiguous()) {
-        throw std::runtime_error("Current Tensor view is not contiguous! Data might mismatch!");
-    }
-    if (rows * cols != size()) {
-        throw std::runtime_error("Requested rows and cols do not match Tensor size!");
-    }
-    return Eigen::Map<const Matrix>(_data->data() + _offset, rows, cols);
-}
-
 // == ARITHMETIC OPERATIONS =============================================================
 
 Tensor Tensor::operator+(const Tensor& other) const {
