@@ -7,11 +7,14 @@
 
 namespace {
 
+// shape()/strides() are std::span (no operator==); copy into a vector to compare and print in CHECKs
+std::vector<Index> as_vector(std::span<const Index> s) { return {s.begin(), s.end()}; }
+
 // doctest has no Tensor comparison; compare element-wise over the flat storage.
 // ADDED the new contiguous() method. flat_index already got a warning for its uses cases,
 // so contiguous is required here for using flat_index() to validate
 void check_tensor_approx(const Tensor& a, const Tensor& b, double eps) {
-    REQUIRE(a.shape() == b.shape());
+    REQUIRE(as_vector(a.shape()) == as_vector(b.shape()));
     Tensor ac = a.contiguous();
     Tensor bc = b.contiguous();
 

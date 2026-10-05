@@ -5,10 +5,13 @@
 
 namespace {
 
+// shape()/strides() are std::span (no operator==); copy into a vector to compare and print in CHECKs
+std::vector<Index> as_vector(std::span<const Index> s) { return {s.begin(), s.end()}; }
+
 // doctest has no Tensor comparison; compare element-wise over the flat storage.
 void check_tensor(const Tensor& actual, const std::vector<Index>& shape,
                    const std::vector<double>& expected) {
-    REQUIRE(actual.shape() == shape);
+    REQUIRE(as_vector(actual.shape()) == shape);
     for (size_t i = 0; i < expected.size(); ++i)
         CHECK(actual.flat_index(i) == doctest::Approx(expected[i]));
 }
@@ -272,7 +275,7 @@ TEST_CASE("einsum: a cached subscript plan is reused correctly across operand sh
         for (auto [m, k, n] : {std::array<Index, 3>{2, 3, 2}, {16, 8, 16}, {5, 1, 7}}) {
             const Tensor A = filled({m, k}, 0.5), B = filled({k, n}, -1.25);
             const Tensor C = einsum("ik,kj->ij", A, B);
-            REQUIRE(C.shape() == std::vector<Index>{m, n});
+            REQUIRE(as_vector(C.shape()) == std::vector<Index>{m, n});
             for (Index i = 0; i < m; ++i)
             for (Index j = 0; j < n; ++j) {
                 double sum = 0.0;
@@ -288,7 +291,7 @@ TEST_CASE("einsum: a 3-operand chain matches nested pairwise contractions") {
         const Tensor A = filled({6, 4}, 0.3), B = filled({4, 5, 3}, -0.7), C = filled({3, 6}, 1.1);
         const Tensor chained = einsum("ij,jkl,li->ik", A, B, C);
         const Tensor nested = einsum("ikl,li->ik", einsum("ij,jkl->ikl", A, B), C);
-        REQUIRE(chained.shape() == nested.shape());
+        REQUIRE(as_vector(chained.shape()) == as_vector(nested.shape()));
         for (Index i = 0; i < chained.size(); ++i)
             CHECK(chained.flat_index(i) == doctest::Approx(nested.flat_index(i)));
     });
