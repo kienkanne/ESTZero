@@ -1,0 +1,12 @@
+
+── CCSD(T) ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+system               ref  nbf       |dE|    ok  psi4(s)  wall(s)  ERI(s)  JK/it(ms) scf_it   MO(s)  CCSD/it(ms)  cc_it  CCSD(s) PertT(s)  T3/it(ms)  T3_it  RSS(MB)
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+indole/sto-3g        rhf   52   1.10e-07  PASS    9.859    5.841   0.551        5.0     26   0.106         67.2     24    2.566    3.276      0.276  10648    452.5
+parabenzyne/sto-3g   uhf   34   2.14e-08  PASS    6.001   14.179   0.129        1.0     14   0.034        141.6     20    3.177   11.003      0.458  21952    596.5
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+tol = 1.0e-06 vs Psi4; wall = best of 2 runs
+params: repeats=2 tier=['stress'] method=None runall=True tol=1e-06 maxiter=200 econv=1e-08 erischeme=tensor gemmscheme=openblas version=vX.X.X frozen_core=True compact=False outdir=bench/outputs_stress/
+
+--- README.md rows (append) ---

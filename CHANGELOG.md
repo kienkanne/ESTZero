@@ -2,6 +2,15 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.10.2] `Tensor` data as `std::shared_ptr<double[]>`, `Tensor::empty()` for uninitialized buffers, fixed `--eri-scheme vector`
+
+- `Tensor`'s buffer is now simplifies to `std::shared_ptr<double[]>` instead of `std::shared_ptr<std::vector<double>>`, avoiding one pointer hop. It doesn't save anything really, but it allows for additional manipulation.
+- New special "constructor": `Tensor::empty(shape)` (like `np.empty`), allocated with `std::make_shared_for_overwrite<double[]>`, (no without zero-filling), while `Tensor(shape)` stays zero-filled like `np.zeros`. `Tensor::empty()` is now used only where every element is overwritten right away: the element-wise op results (`_binary_op`/`_unary_op`), `try_gemm`'s GEMM output (`beta = 0`, so no reading C), and the `einsum` result, which is zeroed only when the odometer path (which accumulates with `+=`) is actually taken.
+- The shape + values constructor now takes `std::span<const double>` instead of `std::vector<double>` for consistency. 
+- `eri_vector_to_tensor` now writes straight into `Tensor::empty(...)` instead of building an nbf^4 vector and copying it, and `build_eri_tensor` dropped a redundant `fill(0.0)` on its already zero-filled nbf^4 tensor.
+- Fixed `--eri-scheme vector` crashing for every post-HF method (surfaced bug from a while ago) due to wrong if/else chain in `wfn.cc`.
+- Avoiding 0-initialization for `Tensor` ops and `einsum` improved performance: CCSD(T) `indole/sto-3g` 6.348s -> 5.841s, `parabenzyne/sto-3g` 16.721s -> 14.179s.
+
 ## [v3.10.1] `Tensor` shape/strides stored in fixed-size arrays (`MAX_DIM = 6`) instead of `std::vector`
 
 - `Tensor` held its shape and strides as two `std::vector<Index>`, so every new `Tensor` copy made two heap allocations for metadata. They are now `Dims = std::array<Index, MAX_DIM>` plus an explicit `_ndim`, with `MAX_DIM = 6` (the highest rank used is the full T3 tensor in `calc_pert_triples_noddy`). A rank above `MAX_DIM` throws.
