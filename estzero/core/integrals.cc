@@ -84,8 +84,7 @@ Matrix compute_schwarz_bounds(libint2::Engine& engine, const libint2::BasisSet& 
 
 Tensor build_eri_tensor(libint2::Engine& engine, const libint2::BasisSet& obs, int verbose) {
     int nbf = obs.nbf();
-    Tensor eri_tensor({nbf, nbf, nbf, nbf});
-    eri_tensor.fill(0.0);
+    Tensor eri_tensor({nbf, nbf, nbf, nbf}); // zero-filled: quartets skipped by Schwarz screening must stay 0
 
     auto shell2bf = obs.shell2bf();
     const auto& buf_vec = engine.results();
@@ -198,7 +197,10 @@ std::vector<double> build_eri_vector(libint2::Engine& engine, const libint2::Bas
 
 // Transform the eri_vector to eri_tensor
 Tensor eri_vector_to_tensor(const std::vector<double>& eri_vector, int nbf) {
-    std::vector<double> data(static_cast<size_t>(nbf) * nbf * nbf * nbf);
+    // Written straight into the Tensor's buffer: no intermediate nbf^4 vector and no copy. empty() is safe
+    // because the loop below writes every element (row-major order, matching the contiguous new Tensor).
+    Tensor eri_tensor = Tensor::empty({nbf, nbf, nbf, nbf});
+    double* data = eri_tensor.data_ptr();
     size_t idx = 0;
     for (int p = 0; p < nbf; ++p) {
     for (int q = 0; q < nbf; ++q) {
@@ -206,5 +208,5 @@ Tensor eri_vector_to_tensor(const std::vector<double>& eri_vector, int nbf) {
     for (int s = 0; s < nbf; ++s) {
         data[idx++] = eri_vector[eri_index(p, q, r, s)];
     }}}}
-    return Tensor({nbf, nbf, nbf, nbf}, std::move(data)); // hand over nbf^4 buffer, no copy
+    return eri_tensor;
 }

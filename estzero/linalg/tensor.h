@@ -130,12 +130,17 @@ public:
     // The initializer_list overloads take a braced shape, Tensor({o, v}); span can't bind to before C++26.
     // These are similar to np.zeros (default initialize to fill zero)
     explicit Tensor(std::span<const Index> shape_);
-    explicit Tensor(std::span<const Index> shape_, std::vector<double> values); // by value to support std::move
-
     explicit Tensor(std::initializer_list<Index> shape_)
         : Tensor(std::span<const Index>(shape_.begin(), shape_.size())) {}
-    explicit Tensor(std::initializer_list<Index> shape_, std::vector<double> values)
-        : Tensor(std::span<const Index>(shape_.begin(), shape_.size()), std::move(values)) {}
+
+    explicit Tensor(std::span<const Index> shape_, std::span<const double> values);
+    explicit Tensor(std::initializer_list<Index> shape_, std::span<const double> values)
+        : Tensor(std::span<const Index>(shape_.begin(), shape_.size()), values) {}
+
+    // Tests generate the values manually via brace lists
+    explicit Tensor(std::initializer_list<Index> shape_, std::initializer_list<double> values)
+        : Tensor(std::span<const Index>(shape_.begin(), shape_.size()),
+                 std::span<const double>(values.begin(), values.size())) {}
 
     // Use std::make_shared_for_overwrite<double[]>(n) to left uninitilized (only safe when overwrite right away)
     // Use static member function so .empty() can't be called on existing Tensor

@@ -146,12 +146,12 @@ double WaveFunction::get_energy(const std::string reference, const std::string m
         this->eri_tensor = eri_vector_to_tensor(eri_vector, this->nbf);
     }
 
-    else if (method == "mp2") {
+    if (method == "mp2") {
         if (reference == "rhf") {
             const Tensor Iiajb = transmo_spat_iajb(this->eri_tensor, sr.CA, this->n_docc, n_frozen);
             return E_scf + calc_rhf_mp2_E(Iiajb, sr.epsA, this->n_docc, n_frozen);
         }
-        else if (reference == "uhf") {
+        else { // "uhf": any other reference already threw above
             const auto& [Iiajb_AA, Iiajb_BB, Iiajb_AB] = transmo_spin_iajb(
                 this->eri_tensor, sr.CA, this->n_alpha, sr.CB, this->n_beta, n_frozen);
             return E_scf + calc_uhf_mp2_E(Iiajb_AA, Iiajb_BB, Iiajb_AB, sr.epsA, sr.epsB,

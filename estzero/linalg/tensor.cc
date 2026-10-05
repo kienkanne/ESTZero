@@ -137,14 +137,14 @@ Tensor::Tensor(std::span<const Index> shape_)
     : _shape(_to_dims(shape_)), _strides(row_major_strides(shape_)), _ndim(std::ssize(shape_)),
       _size(_numel(shape_)), _data(std::make_shared<double[]>(_size)) {}
 
-Tensor::Tensor(std::span<const Index> shape_, std::vector<double> values)
+Tensor::Tensor(std::span<const Index> shape_, std::span<const double> values)
     : _shape(_to_dims(shape_)), _strides(row_major_strides(shape_)), _ndim(std::ssize(shape_)),
       _size(_numel(shape_)) {
     if (std::ssize(values) != _size) {
         throw std::invalid_argument("Tensor data size does not match shape.");
     }
-    _data = std::make_shared_for_overwrite<double[]>(_size);
-    std::move(values.begin(), values.end(), _data.get());
+    _data = std::make_shared_for_overwrite<double[]>(_size); // every element is written by the copy below
+    std::copy(values.begin(), values.end(), _data.get());
 }
 
 Tensor Tensor::empty(std::span<const Index> shape_) {
@@ -322,10 +322,11 @@ double Tensor::sum() const {
 
 // == EIGEN CONVERSIONS ====================================================================
 
+// Copies (an Eigen matrix never gives up its buffer). Matrix is row-major, so its data is already in Tensor order.
 Tensor mat_to_tensor(const Matrix& M) {
-    return Tensor({M.rows(), M.cols()}, std::vector<double>(M.data(), M.data() + M.size()));
+    return Tensor({M.rows(), M.cols()}, std::span<const double>(M.data(), M.size()));
 }
 
 Tensor vec_to_tensor(const Vector& V) {
-    return Tensor({V.size()}, std::vector<double>(V.data(), V.data() + V.size()));
+    return Tensor({V.size()}, std::span<const double>(V.data(), V.size()));
 }
