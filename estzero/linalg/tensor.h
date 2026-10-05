@@ -1,12 +1,15 @@
 #ifndef TENSOR_H
 #define TENSOR_H
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
+#include <initializer_list>
 #include <iterator>
 #include <memory>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <vector>
 #include <Eigen/Dense>
 
@@ -19,6 +22,11 @@ using Vector = Eigen::VectorXd;
 // One signed 64-bit type for everything that measures or addresses Tensor data: extents, strides, offsets,
 // flat indices, element counts, and axis numbers.
 using Index = std::ptrdiff_t;
+
+// Maximum rank of a Tensor. shape/strides live in fixed-size arrays (no heap allocation per view or copy)
+// 6 is the highest rank used anywhere (the full T3 tensor in calc_pert_triples_noddy).
+constexpr Index MAX_DIM = 6;
+using Dims = std::array<Index, MAX_DIM>;
 
 // For slicing
 struct Sli {
@@ -34,18 +42,32 @@ struct Sli {
 // The per-element accessors are kept inline instead of moving to `.cc`. Those are called in hot loops and are very 
 // cheap, so they are inlined here for compiler visbility to avoid any per-call overhead. 
 class Tensor {
-    // All state is private and read through the const getters below, so `_size` can never go stale: `_shape`
-    // only changes by building a new Tensor (every constructor sets `_size`).
-    std::vector<Index> _shape;
-    std::vector<Index> _strides;
-    Index _size = 0;   // Cached product of `_shape`. 0 only for an empty (default-constructed or cleared) Tensor
+    // All state is private and read through the const getters below.
+    //
+    // `_shape`/`_strides` are fixed-size: only the first `_ndim` entries are meaningful, the rest stay 0. 
+    // They must go through ndim(), or the shape()/strides() spans, which are exactly ndim long, to avoid errors.
+    Dims _shape{};
+    Dims _strides{};
+    Index _ndim = 0;
+    Index _size = 0;
     std::shared_ptr<std::vector<double>> _data;
     Index _offset = 0; // For slicing
 
-    // Private constructor for creating zero-copy views. 
+    // Private constructor for creating zero-copy views.
     // View ops (permute/swapaxes/select/reshape/slice) comes through here
-    Tensor(std::shared_ptr<std::vector<double>> d, std::vector<Index> sh, std::vector<Index> st, Index off)
-        : _shape(std::move(sh)), _strides(std::move(st)), _size(_numel(_shape)), _data(std::move(d)), _offset(off) {}
+    Tensor(std::shared_ptr<std::vector<double>> d, const Dims& sh, const Dims& st, Index nd, Index off)
+        : _shape(sh), _strides(st), _ndim(nd), _size(_numel(shape())), _data(std::move(d)), _offset(off) {}
+
+    // Copies a shape into the fixed-size array, rejecting a rank above MAX_DIM
+    static Dims _to_dims(std::span<const Index> sh) {
+        if (std::ssize(sh) > MAX_DIM) {
+            throw std::invalid_argument("Tensor rank " + std::to_string(sh.size()) + " exceeds MAX_DIM (" +
+                                        std::to_string(MAX_DIM) + ")");
+        }
+        Dims dims{};
+        std::copy(sh.begin(), sh.end(), dims.begin());
+        return dims;
+    }
 
     // Compute size (num element) from new shape for view ops
     static Index _numel(std::span<const Index> sh) {
@@ -57,7 +79,7 @@ class Tensor {
     // Flat buffer position of element (idx...), shared by both operator() overloads.
     template <typename... Idx>
     Index _offset_of(Idx... idx) const {
-        if (sizeof...(idx) != _shape.size()) {
+        if (static_cast<Index>(sizeof...(idx)) != _ndim) {
             throw std::invalid_argument("Number of indices must be equal to ndim");
         }
         const Index ind[] = { static_cast<Index>(idx)... };
@@ -90,9 +112,10 @@ class Tensor {
     template <typename Operation> Tensor& _unary_assign_op(Operation operation);
 
 public:
-    const std::vector<Index>& shape() const { return _shape; }
-    const std::vector<Index>& strides() const { return _strides; }
-    Index ndim() const { return std::ssize(_shape); }
+    // std::span to return ndim() long
+    std::span<const Index> shape() const { return { _shape.data(), static_cast<size_t>(_ndim) }; }
+    std::span<const Index> strides() const { return { _strides.data(), static_cast<size_t>(_ndim) }; }
+    Index ndim() const { return _ndim; }
     Index size() const { return _size; }
 
     // Sets only the elements this view covers (a slice shares its parent's buffer)
@@ -103,9 +126,15 @@ public:
     // == CONSTRUCTORS =======================================================================
 
     Tensor() = default;
-    // Both by value in combination with std::move to avoid unnecessary copies
-    explicit Tensor(std::vector<Index> shape_);
-    explicit Tensor(std::vector<Index> shape_, std::vector<double> values);
+    // The span overloads take any runtime shape (another tensor's shape(), a std::vector)
+    // The initializer_list overloads take a braced shape, Tensor({o, v}); span can't bind to before C++26.
+    explicit Tensor(std::span<const Index> shape_);
+    explicit Tensor(std::span<const Index> shape_, std::vector<double> values); // by value to support std::move
+    
+    explicit Tensor(std::initializer_list<Index> shape_)
+        : Tensor(std::span<const Index>(shape_.begin(), shape_.size())) {}
+    explicit Tensor(std::initializer_list<Index> shape_, std::vector<double> values)
+        : Tensor(std::span<const Index>(shape_.begin(), shape_.size()), std::move(values)) {}
 
     // == ELEMENT ACCESS ==================================================================
 
