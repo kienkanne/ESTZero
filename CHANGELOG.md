@@ -2,6 +2,14 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.10.3] Row-wise odometer: the innermost axis is a plain loop for `Tensor` element-wise ops and `einsum`'s odometer path
+
+- The odometer only walks the outer `ndim-1` axes, once per row, and the innermost axis is a plain loop with fixed strides: `out[j] = op(a_row[j * sa], b_row[j * sb])`. This makes the innermost loop much faster without the odometer overhead.
+- This is achieved for `Tensor` ops (`binary`, `unary`, and `sum`) via a shared helper, `for_each_row<NT>` in `tensor.cc`, to walk the outer axes with the odometer, and takes in a lambda for the innermost operation. Zero-extent views return early, and rank-0 tensors are contiguous so they don't reach the helper.
+- `einsum`'s odometer path (`odometer_contract`) uses the same strategy: the odometer walks all label columns but the last, whose stride-table entries drive a plain inner loop.
+- New property test: every converted op (binary, unary, `assign`/`+=`/`*=` through a strided view, `sum`) on non-contiguous views of rank 1, 2 and 4 (reversed/strided innermost axes, one-sided strides, a zero-extent view) against `einsum`'s identity contraction as an independent reference.
+- The largest single gain so far, as non-contiguous element-wise ops (mostly the triples) were the biggest non-GEMM cost: CCSD(T) `indole/sto-3g` 5.841s -> 3.999s, `parabenzyne/sto-3g` 14.179s -> 8.936s.
+
 ## [v3.10.2] `Tensor` data as `std::shared_ptr<double[]>`, `Tensor::empty()` for uninitialized buffers, fixed `--eri-scheme vector`
 
 - `Tensor`'s buffer is now simplifies to `std::shared_ptr<double[]>` instead of `std::shared_ptr<std::vector<double>>`, avoiding one pointer hop. It doesn't save anything really, but it allows for additional manipulation.

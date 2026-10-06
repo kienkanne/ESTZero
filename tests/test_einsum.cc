@@ -318,9 +318,10 @@ TEST_CASE("einsum: a cached plan is rebound for an operand with the same shape b
 
 // ── call_gemm backends ──────────────────────────────────────────────────────
 // Every backend implements the same BLAS contract (C = alpha * op(A) * op(B) + beta * C, row-major, op = optional
-// transpose), so Eigen must agree with OpenBLAS for every transpose combination, including beta != 0.
+// transpose), so Eigen must agree with OpenBLAS for every transpose combination, including beta != 0. The
+// odometer scheme has no GEMM, so it must throw rather than silently leave C untouched.
 
-TEST_CASE("call_gemm: Eigen matches OpenBLAS for all transpose combinations, alpha and beta") {
+TEST_CASE("call_gemm: Eigen matches OpenBLAS for all transpose combinations, alpha and beta; ODO throws") {
     const int M = 5, N = 3, K = 4;
     std::vector<double> A(M * K), B(K * N), C0(M * N);
     for (size_t i = 0; i < A.size(); ++i)  A[i]  = 0.3 + 0.17 * i - 0.01 * i * i;
@@ -334,5 +335,10 @@ TEST_CASE("call_gemm: Eigen matches OpenBLAS for all transpose combinations, alp
         call_gemm(GEMMScheme::EIGEN,    M, N, K, A.data(), B.data(), C_eigen.data(), 0.7, beta, transA, transB);
         call_gemm(GEMMScheme::OPENBLAS, M, N, K, A.data(), B.data(), C_blas.data(),  0.7, beta, transA, transB);
         for (size_t i = 0; i < C0.size(); ++i) CHECK(C_eigen[i] == doctest::Approx(C_blas[i]));
+
+        std::vector<double> C_odo = C0;
+        CHECK_THROWS_AS(call_gemm(GEMMScheme::ODO, M, N, K, A.data(), B.data(), C_odo.data(), 0.7, beta, transA, transB),
+                        std::runtime_error);
+        CHECK(C_odo == C0);
     }
 }
