@@ -41,7 +41,7 @@ void for_each_row(std::span<const Index> shape, const std::array<std::span<const
     Index rows = 1;
     for (Index axis = 0; axis < last; ++axis) rows *= shape[axis];
     for (Index r = 0; r != rows; ++r) {
-        row(odo.flat, shape[last]);
+        row(odo.flat, shape[last]); /* perform operation across row here */
         odo.next();
     }
 }
@@ -85,7 +85,7 @@ Tensor Tensor::_binary_op(const Tensor& other, Operation operation) const {
             const double* a_row = a + flat[0];
             const double* b_row = b + flat[1];
             for (Index j = 0; j != inner; ++j) out[j] = operation(a_row[j * sa], b_row[j * sb]);
-            out += inner;
+            out += inner; // manually walk the result flat index (already contiguous)
         });
     }
     return result;
@@ -137,7 +137,7 @@ Tensor Tensor::_unary_op(Operation operation) const {
             [&](const std::array<Index, 1>& flat, Index inner) {
             const double* a_row = a + flat[0];
             for (Index j = 0; j != inner; ++j) out[j] = operation(a_row[j * sa]);
-            out += inner;
+            out += inner; // manually walk the result flat index (already contiguous)
         });
     }
     return result;

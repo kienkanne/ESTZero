@@ -1,0 +1,77 @@
+[ESTZero/ccsd_t] h2_stretched/sto-3g ERROR: SCF binary failed:
+
+nbf: 2
+Schwarz screening: skipped 0 / 6 shell quartets (0.0%)
+SCF Iter    1 | E = -0.78379265 | dE = -7.838e-01 | rms_E 6.968e-16
+SCF Iter    2 | E = -0.78379265 | dE = 2.220e-16 | rms_E 5.697e-16
+SCF converged!
+CC Iter   1 | E_cc = -0.08871922 | dE = -8.872e-02
+CC Iter   2 | E_cc = -0.13861420 | dE = -4.989e-02
+CC Iter   3 | E_cc = -0.15753743 | dE = -1.892e-02
+CC Iter   4 | E_cc = -0.16299378 | dE = -5.456e-03
+CC Iter   5 | E_cc = -0.16439133 | dE = -1.398e-03
+CC Iter   6 | E_cc = -0.16473663 | dE = -3.453e-04
+CC Iter   7 | E_cc = -0.16482115 | dE = -8.452e-05
+CC Iter   8 | E_cc = -0.16484179 | dE = -2.064e-05
+CC Iter   9 | E_cc = -0.16484683 | dE = -5.038e-06
+CC Iter  10 | E_cc = -0.16484806 | dE = -1.229e-06
+CC Iter  11 | E_cc = -0.16484836 | dE = -3.000e-07
+CC Iter  12 | E_cc = -0.16484843 | dE = -7.321e-08
+CC Iter  13 | E_cc = -0.16484845 | dE = -1.786e-08
+CC Iter  14 | E_cc = -0.16484846 | dE = -4.359e-09
+CCSD converged!
+ESTZero error: call_gemm: unknown GEMMScheme
+
+[ESTZero/ccsd_t] h2o/sto-3g ERROR: SCF binary failed:
+
+nbf: 7
+Schwarz screening: skipped 0 / 120 shell quartets (0.0%)
+SCF Iter    1 | E = -73.23272415 | dE = -7.323e+01 | rms_E 1.146e-01
+SCF Iter    2 | E = -74.94578796 | dE = -1.713e+00 | rms_E 1.479e-02
+SCF Iter    3 | E = -74.96216760 | dE = -1.638e-02 | rms_E 2.911e-03
+SCF Iter    4 | E = -74.96296513 | dE = -7.975e-04 | rms_E 5.910e-04
+SCF Iter    5 | E = -74.96301811 | dE = -5.298e-05 | rms_E 1.865e-04
+SCF Iter    6 | E = -74.96302312 | dE = -5.011e-06 | rms_E 1.370e-05
+SCF Iter    7 | E = -74.96302314 | dE = -1.703e-08 | rms_E 1.027e-07
+SCF Iter    8 | E = -74.96302314 | dE = -7.390e-13 | rms_E 1.297e-09
+SCF converged!
+CC Iter   1 | E_cc = -0.03554565 | dE = -3.555e-02
+CC Iter   2 | E_cc = -0.04489825 | dE = -9.353e-03
+CC Iter   3 | E_cc = -0.04778646 | dE = -2.888e-03
+CC Iter   4 | E_cc = -0.04943264 | dE = -1.646e-03
+CC Iter   5 | E_cc = -0.04944103 | dE = -8.385e-06
+CC Iter   6 | E_cc = -0.04943811 | dE = 2.915e-06
+CC Iter   7 | E_cc = -0.04943872 | dE = -6.095e-07
+CC Iter   8 | E_cc = -0.04943857 | dE = 1.564e-07
+CC Iter   9 | E_cc = -0.04943856 | dE = 1.787e-09
+CCSD converged!
+ESTZero error: call_gemm: unknown GEMMScheme
+
+[ESTZero/ccsd_t] ch3/sto-3g ERROR: SCF binary failed:
+
+nbf: 8
+Schwarz screening: skipped 0 / 231 shell quartets (0.0%)
+SCF Iter    1 | E_scf = -36.60218594 | dE = -3.660e+01 | rms_E 1.113e-01
+SCF Iter    2 | E_scf = -39.06166276 | dE = -2.459e+00 | rms_E 1.354e-02
+SCF Iter    3 | E_scf = -39.07626011 | dE = -1.460e-02 | rms_E 1.474e-03
+SCF Iter    4 | E_scf = -39.07655765 | dE = -2.975e-04 | rms_E 7.787e-04
+SCF Iter    5 | E_scf = -39.07670657 | dE = -1.489e-04 | rms_E 8.441e-05
+SCF Iter    6 | E_scf = -39.07670780 | dE = -1.235e-06 | rms_E 1.183e-05
+SCF Iter    7 | E_scf = -39.07670781 | dE = -1.315e-08 | rms_E 2.818e-07
+SCF Iter    8 | E_scf = -39.07670781 | dE = -6.771e-12 | rms_E 3.785e-08
+SCF Iter    9 | E_scf = -39.07670781 | dE = -1.990e-13 | rms_E 1.023e-08
+SCF Iter   10 | E_scf = -39.07670781 | dE = 0.000e+00 | rms_E 3.920e-09
+SCF converged!
+CC Iter   1 | E_cc = -0.05011520 | dE = -5.012e-02
+CC Iter   2 | E_cc = -0.05431989 | dE = -4.205e-03
+CC Iter   3 | E_cc = -0.05602000 | dE = -1.700e-03
+CC Iter   4 | E_cc = -0.05762275 | dE = -1.603e-03
+CC Iter   5 | E_cc = -0.05770835 | dE = -8.559e-05
+CC Iter   6 | E_cc = -0.05770284 | dE = 5.511e-06
+CC Iter   7 | E_cc = -0.05770378 | dE = -9.428e-07
+CC Iter   8 | E_cc = -0.05770374 | dE = 3.633e-08
+CC Iter   9 | E_cc = -0.05770373 | dE = 1.496e-08
+CC Iter  10 | E_cc = -0.05770372 | dE = 6.064e-09
+CCSD converged!
+ESTZero error: call_gemm: unknown GEMMScheme
+

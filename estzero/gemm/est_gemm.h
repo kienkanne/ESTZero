@@ -35,50 +35,50 @@ inline void set_gemm_scheme(std::string g) {
 bool try_cutensor(const std::vector<std::string>& terms_strings, Operands operands, Tensor& result);
 
 // C (M x N) = alpha * op(A) * op(B) + beta * C, where op(A) is M x K and op(B) is K x N (stored transposed if trans).
-inline auto call_gemm =
-    [](GEMMScheme gs, int M, int N, int K, const double *A, const double *B, double *C,
-        double alpha = 1.0, double beta = 0.0, bool transA = false, bool transB = false) {
+inline void call_gemm(GEMMScheme gs, int M, int N, int K, const double *A, const double *B, double *C,
+                    double alpha = 1.0, double beta = 0.0, bool transA = false, bool transB = false) {
+    if (gs == GEMMScheme::ODO) return;
 
-        if (gs == GEMMScheme::EIGEN) {
-            // Zero-copy row-major views of the raw buffers; a transposed operand is stored as its transpose.
-            Eigen::Map<const Matrix> Am(A, transA ? K : M, transA ? M : K);
-            Eigen::Map<const Matrix> Bm(B, transB ? N : K, transB ? K : N);
-            Eigen::Map<Matrix> Cm(C, M, N);
+    else if (gs == GEMMScheme::EIGEN) {
+        // Zero-copy row-major views of the raw buffers; a transposed operand is stored as its transpose.
+        Eigen::Map<const Matrix> Am(A, transA ? K : M, transA ? M : K);
+        Eigen::Map<const Matrix> Bm(B, transB ? N : K, transB ? K : N);
+        Eigen::Map<Matrix> Cm(C, M, N);
 
-            // generic lambda for Eigen
-            auto gemm = [&](const auto& opA, const auto& opB) {
-                if (beta == 0.0) {
-                    Cm.noalias() = alpha * opA * opB;
-                } else {
-                    Cm *= beta;
-                    Cm.noalias() += alpha * opA * opB;
-                }
-            };
-            if      (!transA && !transB) gemm(Am, Bm);
-            else if ( transA && !transB) gemm(Am.transpose(), Bm);
-            else if (!transA &&  transB) gemm(Am, Bm.transpose());
-            else                         gemm(Am.transpose(), Bm.transpose());
-        }
-        else if (gs == GEMMScheme::OPENBLAS) {
-            auto TA = (transA) ? CblasTrans : CblasNoTrans;
-            auto TB = (transB) ? CblasTrans : CblasNoTrans;
+        // generic lambda for Eigen
+        auto gemm = [&](const auto& opA, const auto& opB) {
+            if (beta == 0.0) {
+                Cm.noalias() = alpha * opA * opB;
+            } else {
+                Cm *= beta;
+                Cm.noalias() += alpha * opA * opB;
+            }
+        };
+        if      (!transA && !transB) gemm(Am, Bm);
+        else if ( transA && !transB) gemm(Am.transpose(), Bm);
+        else if (!transA &&  transB) gemm(Am, Bm.transpose());
+        else                         gemm(Am.transpose(), Bm.transpose());
+    }
+    else if (gs == GEMMScheme::OPENBLAS) {
+        auto TA = (transA) ? CblasTrans : CblasNoTrans;
+        auto TB = (transB) ? CblasTrans : CblasNoTrans;
 
-            // Leading dimension changes with transpose (row->column if trans)
-            const int lda = transA ? M : K;
-            const int ldb = transB ? K : N;
+        // Leading dimension changes with transpose (row->column if trans)
+        const int lda = transA ? M : K;
+        const int ldb = transB ? K : N;
 
-            cblas_dgemm(CblasRowMajor, TA, TB,
-                M, N, K, alpha, A, lda, B, ldb, beta, C, N /*ldc*/);
-        }
-        else if (gs == GEMMScheme::CUBLAS_DGEMM) cublas_dgemm(M, N, K, alpha, beta, A, B, C, nullptr, transA, transB);
-        else if (gs == GEMMScheme::CUBLAS_SGEMM) cublas_sgemm(M, N, K, alpha, beta, A, B, C, nullptr, transA, transB);
-        
-        else if (transA || transB) throw std::runtime_error("Tranpose not yet implemented for AVX family!");
-        else if (gs == GEMMScheme::AVX_8x8)      avx_8x8(M, N, K, alpha, beta, A, B, C);
-        else if (gs == GEMMScheme::AVX_16x8)    avx_16x8(M, N, K, alpha, beta, A, B, C);
-        else if (gs == GEMMScheme::AVX_24x8)    avx_24x8(M, N, K, alpha, beta, A, B, C);
-        else throw std::runtime_error("call_gemm: unknown GEMMScheme");
-    };
+        cblas_dgemm(CblasRowMajor, TA, TB,
+            M, N, K, alpha, A, lda, B, ldb, beta, C, N /*ldc*/);
+    }
+    else if (gs == GEMMScheme::CUBLAS_DGEMM) cublas_dgemm(M, N, K, alpha, beta, A, B, C, nullptr, transA, transB);
+    else if (gs == GEMMScheme::CUBLAS_SGEMM) cublas_sgemm(M, N, K, alpha, beta, A, B, C, nullptr, transA, transB);
+    
+    else if (transA || transB) throw std::runtime_error("Tranpose not yet implemented for AVX family!");
+    else if (gs == GEMMScheme::AVX_8x8)      avx_8x8(M, N, K, alpha, beta, A, B, C);
+    else if (gs == GEMMScheme::AVX_16x8)    avx_16x8(M, N, K, alpha, beta, A, B, C);
+    else if (gs == GEMMScheme::AVX_24x8)    avx_24x8(M, N, K, alpha, beta, A, B, C);
+    else throw std::runtime_error("call_gemm: unknown GEMMScheme");
+};
 
 
 #endif

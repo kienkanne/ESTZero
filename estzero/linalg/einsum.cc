@@ -280,16 +280,19 @@ bool try_gemm(const EinsumPlan<3>& plan, Binding<3>& b, Operands operands, Tenso
 template <int NT>
 void odometer_contract(const EinsumPlan<NT>& plan, const Binding<NT>& b, Operands operands, Tensor& result) {
     // One odometer axis ("column") per distinct label
-    Odometer<NT> odo(plan.ncols);
+    // Same row-wise innermost strategy seen in Tensor ops: odometer only walks ncols-1 axes
+    Odometer<NT> odo(plan.ncols - 1);
 
-    Index total_combinations = 1;
-    for (Index col = 0; col < plan.ncols; ++col) {
+    Index total_comb_outer = 1;
+    for (Index col = 0; col < plan.ncols - 1; ++col) {
         odo.dims[col] = b.extents[col];
-        total_combinations *= b.extents[col];
+        total_comb_outer *= b.extents[col];
     }
 
     // stride_table[col][term] = how much term's flat offset moves per +1 of the label in column `col`. Each
-    // term's entries are a relabeled copy of its own strides
+    // term's entries are a relabeled copy of its own strides.
+    // The stride table is still built the same, because indicating `plan.ncols - 1` above already ensures
+    // that it walks from the ncols-1 axis (see `odometer.h`: `for (Index axis = naxes - 1 ...`)
     for (int term = 0; term < NT - 1; ++term) {
         const auto& strides = operands[term]->strides();
         for (size_t axis = 0; axis < plan.term_cols[term].size(); ++axis) {
@@ -301,12 +304,16 @@ void odometer_contract(const EinsumPlan<NT>& plan, const Binding<NT>& b, Operand
         odo.stride_table[plan.term_cols.back()[axis]][NT - 1] += result_strides[axis];
     }
 
-    for (Index c = 0; c < total_combinations; ++c) {
-        double product = 1.0;
-        for (int term = 0; term < NT - 1; ++term) {
-            product *= operands[term]->flat_index(odo.flat[term]);
+    for (Index c = 0; c < total_comb_outer; ++c) {
+        const Index last = plan.ncols - 1; // innermost global axis index
+        for (Index j = 0; j != b.extents[last]; ++j) { // derives from b.extents, odo.dims wasn't built to `last`
+            double product = 1.0;
+            for (int term = 0; term < NT - 1; ++term) {
+                product *= operands[term]->flat_index(odo.flat[term] + j * odo.stride_table[last][term]);
+            }
+            result.flat_index(odo.flat[NT - 1] + j * odo.stride_table[last][NT - 1]) += product; 
         }
-        result.flat_index(odo.flat[NT - 1]) += product;
+
         odo.next();
     }
 }
