@@ -265,6 +265,22 @@ bool try_gemm(const EinsumPlan<3>& plan, Binding<3>& b, Operands operands, Tenso
     Tensor M = operands[0]->permute(std::span<const Index>(plan.permA)).reshape(b.left_size, b.summed_size);
     Tensor N = operands[1]->permute(std::span<const Index>(plan.permB)).reshape(b.summed_size, b.right_size);
 
+    // Check if the permutation already match the correct ordering to avoid additional allocation/copy
+    bool correct_perm = true;
+    for (int i=0; i != result.ndim(); i++) {
+        if (plan.perm_out[i] != i) {
+            // Permutation doesn't match, need to allocate and copy
+            correct_perm = false; break;
+        }
+    }
+
+    if (correct_perm) {
+        // Use the result tensor directly if the permutation matches
+        call_gemm(gs, static_cast<int>(b.left_size), static_cast<int>(b.right_size), static_cast<int>(b.summed_size),
+                  M.data_ptr(), N.data_ptr(), result.data_ptr());
+        return true;
+    }
+
     // Empty gemm output without needing for 0-initialization (beta=0.0)
     Tensor gemm_out = Tensor::empty(std::move(b.combined_shape));
 

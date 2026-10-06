@@ -2,6 +2,12 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.11.1] Added correct permutation check in `einsum` to avoid intermediate buffer if possible
+
+- `try_gemm` in `einsum` now checks if `perm_out` already matches the correct requested order (0,1,2...) (identity), and if yes, `call_gemm` writes directly into the result `Tensor` instead of allocating an intermediate buffer to later permute and assign to result.
+- This small change boosted the performance for UHF CCSD(T), while keeping RHF the same: `parabenzyne/sto-3g` 9.509s -> 9.068s. Peak RSS also regressed slightly 532.5 -> 527.8 MB.
+- The less strict permutation condition added here can be further utilized by adding tranpose support in `einsum` and reorder the indices at the call site to get the correct GEMM order.
+
 ## [v3.11.0] Triples reorganization: the live (T) path is `einsum` only, the v3.7.x explicit GEMM work moved to `triples/legacy/`
 
 - The live (T) path (`triples_spin.cc`/`triples_spat.cc`) now goes through `einsum` only (fix). The einsum t3 kernels (`t3c_ijk_{spin,spat}_old` in `triples_legacy.cc`, already wired into the live drivers are renamed `t3c_ijk_{spin,spat}_einsum` and moved into the live files. The x1/x2 accumulations per (i,j,k) that still called `call_gemm` directly are now einsums (`"abc,bc->a"`, `"abc,c->ab"`, `"abc,dbc->ad"`, `"mc,abc->mab"`) with the same coefficients (reverted), and every `gpu_direct`/`to_device` branch is removed.
