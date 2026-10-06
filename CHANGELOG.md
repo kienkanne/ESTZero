@@ -2,6 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.11.0] Triples reorganization: the live (T) path is `einsum` only, the v3.7.x explicit GEMM work moved to `triples/legacy/`
+
+- The live (T) path (`triples_spin.cc`/`triples_spat.cc`) now goes through `einsum` only (fix). The einsum t3 kernels (`t3c_ijk_{spin,spat}_old` in `triples_legacy.cc`, already wired into the live drivers are renamed `t3c_ijk_{spin,spat}_einsum` and moved into the live files. The x1/x2 accumulations per (i,j,k) that still called `call_gemm` directly are now einsums (`"abc,bc->a"`, `"abc,c->ab"`, `"abc,dbc->ad"`, `"mc,abc->mab"`) with the same coefficients (reverted), and every `gpu_direct`/`to_device` branch is removed.
+- The v3.7.1-v3.7.5 explicit-GEMM work is moved to `triples/legacy/` isn't called. `triples_gemm.{cc,h}` (`t3c_ijk_{spin,spat}_gemm` and the previous drivers as `calc_pert_triples_{spin,spat}_gemm`, cuBLAS-direct path included), `buffers_gemm.h` (the CUDA `VikingsBuffer{Spin,Spat}`), and `triples_noddy.{cc,h}` (`calc_pert_triples_noddy`). `triples_legacy.{cc,h}` are deleted, and `legacy/` is added to the include directories.
+- `buffers.h` is now a host-only `TriplesBuffer{Spin,Spat}` (no CUDA, no `est_gemm.h`, no `gemm_out` scratch). The v3.7.3 W-slice hoisting (each slice packed once per i/j/k level) is kept, since the einsum kernels use it too.
+- Performance: CCSD(T) `indole/sto-3g` 3.999s -> 3.840s, `parabenzyne/sto-3g` 8.936s -> 9.509s (PertT 6.285s -> 6.935s). The UHF regressed because of the copy in `"mc,abc->mab"` was avoided because it was the correct GEMM order, but `try_gemm` always copies even when the permutation is already correct. Peak RSS is down for both (452.8 -> 440.0 MB, 597.0 -> 532.5 MB).
+
 ## [v3.10.3] Row-wise odometer: the innermost axis is a plain loop for `Tensor` element-wise ops and `einsum`'s odometer path
 
 - The odometer only walks the outer `ndim-1` axes, once per row, and the innermost axis is a plain loop with fixed strides: `out[j] = op(a_row[j * sa], b_row[j * sb])`. This makes the innermost loop much faster without the odometer overhead.
