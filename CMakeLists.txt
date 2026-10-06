@@ -55,7 +55,8 @@ add_library(est_core STATIC
     estzero/cc/builders/pre_iter.cc
     estzero/cc/triples/triples_spin.cc
     estzero/cc/triples/triples_spat.cc
-    estzero/cc/triples/triples_legacy.cc
+    estzero/cc/triples/legacy/triples_gemm.cc
+    estzero/cc/triples/legacy/triples_noddy.cc
     estzero/linalg/tensor.cc
     estzero/linalg/einsum.cc
 
@@ -79,6 +80,7 @@ target_include_directories(est_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/cc
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/cc/builders
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/cc/triples
+    ${CMAKE_CURRENT_SOURCE_DIR}/estzero/cc/triples/legacy
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/linalg
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/estzero/gemm

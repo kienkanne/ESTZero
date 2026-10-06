@@ -37,7 +37,8 @@ bool try_cutensor(const std::vector<std::string>& terms_strings, Operands operan
 // C (M x N) = alpha * op(A) * op(B) + beta * C, where op(A) is M x K and op(B) is K x N (stored transposed if trans).
 inline void call_gemm(GEMMScheme gs, int M, int N, int K, const double *A, const double *B, double *C,
                     double alpha = 1.0, double beta = 0.0, bool transA = false, bool transB = false) {
-    if (gs == GEMMScheme::ODO) return;
+    // The odometer scheme means "no manually calling GEMM": einsum never reaches here under it, so a direct call is a caller bug.
+    if (gs == GEMMScheme::ODO) throw std::runtime_error("call_gemm: the odometer scheme has no GEMM backend");
 
     else if (gs == GEMMScheme::EIGEN) {
         // Zero-copy row-major views of the raw buffers; a transposed operand is stored as its transpose.
