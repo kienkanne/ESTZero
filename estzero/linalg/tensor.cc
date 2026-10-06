@@ -28,6 +28,24 @@ Dims row_major_strides(std::span<const Index> shape) {
     return strides;
 }
 
+// Row-wise walk of a non-contiguous view (shared by all element-wise ops): the odometer advances only over the
+// outer ndim-1 axes, once per row, and `row(flat, inner)` runs the innermost axis as a plain loop starting at each
+// term's offset `flat[t]`. Rows come in row-major order, i.e. the same element order as a contiguous walk.
+template <int NT, typename Row>
+void for_each_row(std::span<const Index> shape, const std::array<std::span<const Index>, NT>& strides, Row /*lambda*/ row) {
+    const Index last = std::ssize(shape) - 1;
+    std::array<std::span<const Index>, NT> outer_strides;
+    for (int t = 0; t < NT; ++t) outer_strides[t] = strides[t].first(last);
+    Odometer<NT> odo(shape.first(last), outer_strides);
+
+    Index rows = 1;
+    for (Index axis = 0; axis < last; ++axis) rows *= shape[axis];
+    for (Index r = 0; r != rows; ++r) {
+        row(odo.flat, shape[last]);
+        odo.next();
+    }
+}
+
 } // namespace
 
 // == ARITHMETIC HELPERS ================================================================
@@ -55,13 +73,20 @@ Tensor Tensor::_binary_op(const Tensor& other, Operation operation) const {
         for (Index i = 0; i != n; ++i) {
             result.flat_index(i) = operation(this->flat_index(i), other.flat_index(i));
         }
-    } else {
-        Odometer<2> odo(shape(), {strides(), other.strides()}); // terms: this, other
+    } else if (n != 0) { // a zero-extent view has nothing to do
+        // Row-wise (see for_each_row): the innermost axis is a plain loop with fixed strides, no odometer logic
+        const Index sa = _strides[ndim() - 1], sb = other._strides[ndim() - 1];
+        const double* a = _data.get() + _offset;
+        const double* b = other._data.get() + other._offset;
+        double* out = result.data_ptr(); // fresh and contiguous: rows are consecutive (last stride = 1)
 
-        for (Index i = 0; i != n; ++i) {
-            result.flat_index(i) = operation(this->flat_index(odo.flat[0]), other.flat_index(odo.flat[1]));
-            odo.next();
-        }
+        for_each_row<2>(shape(), {strides(), other.strides()}, 
+            [&](const std::array<Index, 2>& flat, Index inner) {
+            const double* a_row = a + flat[0];
+            const double* b_row = b + flat[1];
+            for (Index j = 0; j != inner; ++j) out[j] = operation(a_row[j * sa], b_row[j * sb]);
+            out += inner;
+        });
     }
     return result;
 }
@@ -77,14 +102,17 @@ Tensor& Tensor::_binary_assign_op(const Tensor& other, Operation operation) {
             this->flat_index(i) = operation(
                 this->flat_index(i), other.flat_index(i));
         }
-    } else {
-        Odometer<2> odo(shape(), {strides(), other.strides()}); // terms: this, other
+    } else if (n != 0) {
+        const Index sa = _strides[ndim() - 1], sb = other._strides[ndim() - 1];
+        double* a = _data.get() + _offset;
+        const double* b = other._data.get() + other._offset;
 
-        for (Index i = 0; i != n; ++i) {
-            this->flat_index(odo.flat[0]) = operation(
-                this->flat_index(odo.flat[0]), other.flat_index(odo.flat[1]));
-            odo.next();
-        }
+        for_each_row<2>(shape(), {strides(), other.strides()},
+            [&](const std::array<Index, 2>& flat, Index inner) {
+            double* a_row = a + flat[0];
+            const double* b_row = b + flat[1];
+            for (Index j = 0; j != inner; ++j) a_row[j * sa] = operation(a_row[j * sa], b_row[j * sb]);
+        });
     }
     return *this;
 }
@@ -100,13 +128,17 @@ Tensor Tensor::_unary_op(Operation operation) const {
         for (Index i = 0; i != n; ++i) {
             result.flat_index(i) = operation(this->flat_index(i));
         }
-    } else {
-        Odometer<1> odo(shape(), {strides()});
+    } else if (n != 0) {
+        const Index sa = _strides[ndim() - 1];
+        const double* a = _data.get() + _offset;
+        double* out = result.data_ptr();
 
-        for (Index i = 0; i != n; ++i) {
-            result.flat_index(i) = operation(this->flat_index(odo.flat[0]));
-            odo.next();
-        }
+        for_each_row<1>(shape(), {strides()},
+            [&](const std::array<Index, 1>& flat, Index inner) {
+            const double* a_row = a + flat[0];
+            for (Index j = 0; j != inner; ++j) out[j] = operation(a_row[j * sa]);
+            out += inner;
+        });
     }
     return result;
 }
@@ -119,13 +151,15 @@ Tensor& Tensor::_unary_assign_op(Operation operation) {
         for (Index i = 0; i != n; ++i) {
             this->flat_index(i) = operation(this->flat_index(i));
         }
-    } else {
-        Odometer<1> odo(shape(), {strides()});
+    } else if (n != 0) {
+        const Index sa = _strides[ndim() - 1];
+        double* a = _data.get() + _offset;
 
-        for (Index i = 0; i != n; ++i) {
-            this->flat_index(odo.flat[0]) = operation(this->flat_index(odo.flat[0]));
-            odo.next();
-        }
+        for_each_row<1>(shape(), {strides()},
+            [&](const std::array<Index, 1>& flat, Index inner) {
+            double* a_row = a + flat[0];
+            for (Index j = 0; j != inner; ++j) a_row[j * sa] = operation(a_row[j * sa]);
+        });
     }
     return *this;
 }
@@ -312,11 +346,13 @@ double Tensor::sum() const {
         return total;
     }
 
-    Odometer<1> odo(shape(), {strides()});
-    for (Index i = 0; i != n; ++i) {
-        total += flat_index(odo.flat[0]);
-        odo.next();
-    }
+    if (n == 0) return total;
+    const Index sa = _strides[ndim() - 1];
+    const double* a = _data.get() + _offset;
+    for_each_row<1>(shape(), {strides()}, [&](const std::array<Index, 1>& flat, Index inner) {
+        const double* a_row = a + flat[0];
+        for (Index j = 0; j != inner; ++j) total += a_row[j * sa];
+    });
     return total;
 }
 

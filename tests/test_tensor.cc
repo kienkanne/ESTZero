@@ -1,6 +1,7 @@
 #include "doctest.h"
 
 #include "tensor.h"
+#include "einsum.h"
 
 namespace {
 
@@ -606,4 +607,64 @@ TEST_CASE("Tensor: select on a middle axis shifts the later axes and shrinks ndi
     CHECK(scalar.shape().empty());
     CHECK(scalar.size() == 1);
     CHECK(scalar() == doctest::Approx(t(1, 2, 3, 4)));
+}
+
+// ── Row-wise element-wise ops (non-contiguous path) ──────────────────────────
+// Every element-wise op walks non-contiguous views row by row (outer odometer, plain loop over the innermost
+// axis). The reference is einsum's identity contraction ("abcd->abcd"), which (gs = odometer in the tests) runs
+// einsum's own per-element odometer: a fully independent path. Covers ranks 1 (no outer axes at all), 2 and 4,
+// reversed/strided innermost axes, one-sided strides, and a zero-extent view.
+
+namespace {
+Tensor reference_copy(const Tensor& x) {
+    const std::string labels = std::string("abcdef").substr(0, x.ndim());
+    return einsum(labels + "->" + labels, x);
+}
+void check_equal(const Tensor& got, const Tensor& want) {
+    REQUIRE(as_vector(got.shape()) == as_vector(want.shape()));
+    const Tensor g = reference_copy(got); // compare in logical order whatever got's layout is
+    for (Index i = 0; i < want.size(); ++i) CHECK(g.flat_index(i) == doctest::Approx(want.flat_index(i)));
+}
+} // namespace
+
+TEST_CASE("Tensor: row-wise element-wise ops on non-contiguous views match an independent reference") {
+    Tensor v({8});
+    for (Index i = 0; i < 8; ++i) v.flat_index(i) = 1.5 * i - 2.0;
+    Tensor m({3, 4});
+    for (Index i = 0; i < m.size(); ++i) m.flat_index(i) = 0.3 * i * i - i + 1.0;
+    Tensor t({2, 3, 4, 5});
+    for (Index i = 0; i < t.size(); ++i) t.flat_index(i) = 0.01 * i + 0.5;
+
+    const std::vector<std::pair<Tensor, Tensor>> pairs = {
+        {v.slice(Sli{0, 8, 2}), v.slice(Sli{7, -9, -2})},                                    // rank 1: strided, reversed
+        {m.swapaxes(0, 1).slice(Sli{0, 4}, Sli{0, 3, 2}), m.swapaxes(0, 1).slice(Sli{0, 4}, Sli{1, 3})},
+        {t.permute(3, 1, 0, 2), t.permute(3, 1, 0, 2).copy()},                               // rank 4, one side strided
+        {t.permute(1, 0, 3, 2), t.swapaxes(0, 1).swapaxes(2, 3)},
+        {m.slice(Sli{0, 3}, Sli{2, 2}).swapaxes(0, 1), m.slice(Sli{0, 3}, Sli{1, 1}).swapaxes(0, 1)}, // zero extent
+    };
+    for (const auto& [x, y] : pairs) {
+        const Tensor rx = reference_copy(x), ry = reference_copy(y);
+        check_equal(x - y, rx - ry);              // _binary_op
+        check_equal(x.copy(), rx);                // _unary_op
+        check_equal(x * 2.5, rx * 2.5);           // _unary_op (scalar)
+        CHECK(x.sum() == doctest::Approx(rx.sum())); // sum
+
+        // _binary_assign_op / _unary_assign_op write through a strided view into its parent buffer
+        Tensor dst = reference_copy(t).permute(3, 1, 0, 2); // fresh buffer, non-contiguous view of it
+        if (dst.shape()[0] == x.shape()[0] && dst.ndim() == x.ndim()) {
+            dst.assign(x);
+            check_equal(dst, rx);
+            dst += y;
+            check_equal(dst, rx + ry);
+            dst *= 0.5;
+            check_equal(dst, (rx + ry) * 0.5);
+        }
+    }
+
+    // assign/+= into strided views of matching rank 1 and 2 as well
+    Tensor dv({8});
+    Tensor dv_view = dv.slice(Sli{7, -9, -2});
+    dv_view.assign(v.slice(Sli{0, 8, 2}));
+    dv_view += v.slice(Sli{1, 8, 2});
+    check_equal(dv_view, reference_copy(v.slice(Sli{0, 8, 2})) + reference_copy(v.slice(Sli{1, 8, 2})));
 }
