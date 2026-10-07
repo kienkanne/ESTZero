@@ -668,3 +668,135 @@ TEST_CASE("Tensor: row-wise element-wise ops on non-contiguous views match an in
     dv_view += v.slice(Sli{1, 8, 2});
     check_equal(dv_view, reference_copy(v.slice(Sli{0, 8, 2})) + reference_copy(v.slice(Sli{1, 8, 2})));
 }
+
+// ── reshape: view whenever one exists ──────────────────────────────────────
+// reshape splits any axis and merges adjacent axes whose strides line up (stride[i] == stride[i+1] * shape[i+1],
+// size-1 axes skipped) without copying; only otherwise does it copy into row-major order. "View" is checked by
+// data_ptr() equality: a view keeps the source's buffer and offset, a copy gets a fresh buffer.
+
+TEST_CASE("Tensor: reshape views or copies as the merge rule says") {
+    Tensor t({4, 5, 6});
+    for (Index i = 0; i < t.size(); ++i) t.flat_index(i) = 0.5 * i - 3.0;
+
+    // t[:,1:3,:] is (4,2,6) strides (30,6,1): the inner two axes merge, all three don't (the slice left gaps)
+    const Tensor s = t.slice(Sli{}, Sli{1, 3}, Sli{});
+    const Tensor merged_inner = s.reshape(4, 12);
+    CHECK(as_vector(merged_inner.strides()) == std::vector<Index>{30, 1});
+    CHECK(merged_inner.data_ptr() == s.data_ptr());
+    check_equal(merged_inner, reference_copy(s).reshape(4, 12));
+
+    const Tensor flat = s.reshape(48);
+    CHECK(as_vector(flat.strides()) == std::vector<Index>{1});
+    CHECK(flat.data_ptr() != s.data_ptr());
+    check_equal(flat, reference_copy(s).reshape(48));
+
+    // A 2D transpose (3,2) strides (1,3) can't flatten as a view
+    Tensor m({2, 3});
+    for (Index i = 0; i < m.size(); ++i) m.flat_index(i) = i;
+    const Tensor mt = m.swapaxes(0, 1);
+    const Tensor mt_flat = mt.reshape(6);
+    CHECK(mt_flat.data_ptr() != mt.data_ptr());
+    check_equal(mt_flat, reference_copy(mt).reshape(6));
+
+    // Splitting always works, strided too: [::2] of (12,) is (6,) stride 2 -> (2,3) strides (6,2)
+    Tensor v({12});
+    for (Index i = 0; i < v.size(); ++i) v.flat_index(i) = i;
+    const Tensor every_other = v.slice(Sli{0, 12, 2});
+    const Tensor split = every_other.reshape(2, 3);
+    CHECK(as_vector(split.strides()) == std::vector<Index>{6, 2});
+    CHECK(split.data_ptr() == every_other.data_ptr());
+    check_equal(split, reference_copy(every_other).reshape(2, 3));
+
+    // "abij" (4,5,2,3) permuted to (i,j,a,b) -> (ij,ab) is a view with strides (1,6): a transposed matrix
+    Tensor abij({4, 5, 2, 3});
+    for (Index i = 0; i < abij.size(); ++i) abij.flat_index(i) = 0.1 * i;
+    const Tensor ijab = abij.permute(2, 3, 0, 1);
+    const Tensor ij_ab = ijab.reshape(6, 20);
+    CHECK(as_vector(ij_ab.strides()) == std::vector<Index>{1, 6});
+    CHECK(ij_ab.data_ptr() == ijab.data_ptr());
+    check_equal(ij_ab, reference_copy(ijab).reshape(6, 20));
+}
+
+TEST_CASE("Tensor: reshape treats size-1 axes as wildcards, including leading and trailing ones") {
+    Tensor t({3, 4, 5});
+    for (Index i = 0; i < t.size(); ++i) t.flat_index(i) = i;
+
+    // t[:,:,1:2] is (3,4,1) strides (20,5,1): the size-1 axis' stride (1) must not block merging (3,4)
+    const Tensor s = t.slice(Sli{}, Sli{}, Sli{1, 2});
+    const Tensor r = s.reshape(12);
+    CHECK(as_vector(r.strides()) == std::vector<Index>{5});
+    CHECK(r.data_ptr() == s.data_ptr());
+    check_equal(r, reference_copy(s).reshape(12));
+
+    // Leading/trailing 1s on either side
+    Tensor w({6});
+    for (Index i = 0; i < w.size(); ++i) w.flat_index(i) = 2.0 * i;
+    const Tensor padded = w.reshape(1, 2, 3, 1);
+    CHECK(as_vector(padded.shape()) == std::vector<Index>{1, 2, 3, 1});
+    CHECK(padded.data_ptr() == w.data_ptr());
+    check_equal(padded, reference_copy(w).reshape(1, 2, 3, 1));
+    const Tensor unpadded = padded.reshape(6);
+    CHECK(unpadded.data_ptr() == w.data_ptr());
+    check_equal(unpadded, w);
+}
+
+TEST_CASE("Tensor: reshape of a reversed slice is a view with negative strides") {
+    Tensor w({6}, {0, 1, 2, 3, 4, 5});
+    const Tensor rev = w.slice(Sli{5, -8, -1}); // [5,4,3,2,1,0], stride -1
+    const Tensor r = rev.reshape(2, 3);
+    CHECK(as_vector(r.strides()) == std::vector<Index>{-3, -1});
+    CHECK(r.data_ptr() == rev.data_ptr());
+    CHECK(r(0, 0) == doctest::Approx(5));
+    CHECK(r(0, 2) == doctest::Approx(3));
+    CHECK(r(1, 2) == doctest::Approx(0));
+}
+
+TEST_CASE("Tensor: reshape of a zero-size view, and reshape rejections") {
+    Tensor m({3, 4});
+    const Tensor empty = m.slice(Sli{0, 3}, Sli{2, 2}); // (3, 0)
+    const Tensor r = empty.reshape(0, 5);
+    CHECK(as_vector(r.shape()) == std::vector<Index>{0, 5});
+    CHECK(r.size() == 0);
+
+    CHECK_THROWS_AS(m.reshape(5, 2), std::invalid_argument);              // element count mismatch
+    CHECK_THROWS_AS(m.reshape(1, 1, 1, 1, 1, 3, 4), std::invalid_argument); // rank above MAX_DIM
+}
+
+TEST_CASE("Tensor: writes through a reshape view reach the source") {
+    // reshape now shares the buffer for non-contiguous sources too, so a write through it is a write to the source
+    Tensor t({4, 5, 6});
+    const Tensor s = t.slice(Sli{}, Sli{1, 3}, Sli{});
+    Tensor r = s.reshape(4, 12);
+    r(2, 7) = 42.0; // (2, 7) in (4, 12) is (2, 1, 1) in s, i.e. (2, 2, 1) in t
+    CHECK(t(2, 2, 1) == doctest::Approx(42.0));
+}
+
+TEST_CASE("Tensor: reshape of non-contiguous views matches reshaping an independent contiguous copy") {
+    Tensor t({2, 3, 4, 5});
+    for (Index i = 0; i < t.size(); ++i) t.flat_index(i) = 0.01 * i * i - 0.3 * i + 1.0;
+
+    struct Case { Tensor x; std::vector<Index> new_shape; bool view; };
+    const std::vector<Case> cases = {
+        {t.permute(1, 2, 3, 0),                        {12, 10},     false}, // (5,2) strides (1,60) don't merge
+        {t.permute(2, 3, 0, 1),                        {20, 6},      true},  // block swap: (ab, ij) transposed
+        {t.permute(0, 2, 3, 1),                        {2, 20, 3},   true},  // middle block (4,5) merges
+        {t.permute(0, 2, 3, 1),                        {40, 3},      false}, // axis 0 and (4,5) aren't adjacent in memory
+        {t.select(1, 2),                               {2, 20},      true},  // (2,4,5) strides (60,5,1): (4,5) merges
+        {t.select(1, 2),                               {8, 5},       false}, // ... (2,4) doesn't, the selected axis left a gap
+        {t.select(3, 1),                               {24},         true},  // (2,3,4) strides (60,20,5): uniform stride 5
+        {t.select(2, 1),                               {6, 5},       true},  // (2,3,5) strides (60,20,1): (2,3) merges
+        {t.select(2, 1),                               {30},         false}, // ... (3,5) doesn't
+        {t.select(2, 1),                               {2, 3, 1, 5}, true},  // a size-1 axis inserted mid-run
+        {t.slice(Sli{}, Sli{}, Sli{3, -6, -1}, Sli{}), {6, 4, 5},    true},  // reversed axis 2 kept separate
+        {t.slice(Sli{}, Sli{}, Sli{3, -6, -1}, Sli{}), {6, 20},      false}, // -5 != 1 * 5: reversed axis can't merge
+        {t.slice(Sli{}, Sli{}, Sli{}, Sli{4, -7, -1}), {24, 5},      true},  // reversed innermost axis, outer three merge
+    };
+    for (const auto& [x, new_shape, view] : cases) {
+        CAPTURE(as_vector(x.shape()));
+        CAPTURE(new_shape);
+        const Tensor r = x.reshape(std::span<const Index>(new_shape));
+        CHECK(as_vector(r.shape()) == new_shape);
+        CHECK((r.data_ptr() == x.data_ptr()) == view);
+        check_equal(r, reference_copy(x).reshape(std::span<const Index>(new_shape)));
+    }
+}

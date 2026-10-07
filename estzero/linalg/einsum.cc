@@ -257,13 +257,45 @@ const EinsumPlan<NT>& plan_for(std::string_view subscripts) {
     return cache.emplace(std::string(subscripts), make_plan<NT>(subscripts)).first->second;
 }
 
-bool try_gemm(const EinsumPlan<3>& plan, Binding<3>& b, Operands operands, Tensor& result) {
-    if (!b.use_gemm) return false;
+struct BlasOperand { bool trans; int ld; };
+
+// Reads a 2D (rows x cols) operand's strides: column stride 1 -> row-major (ld = row stride), row stride 1 ->
+// column-major, i.e. transposed (ld = column stride). 
+// `strided` = the backend takes trans + any ld (Eigen, OpenBLAS); otherwise only an already packed operand passes.
+BlasOperand as_blas_operand(Tensor& t, bool strided) {
+    const Index rows = t.shape()[0], cols = t.shape()[1];
+    const Index rs = t.strides()[0], cs = t.strides()[1];
+
+    // The ld must be a valid BLAS leading dimension, >= the stored row length, which also rejects negative 
+    // strides (reversed slices). Anything else is packed into row-major.
+    if (strided) {
+        if (cs == 1 && rs >= cols) return {false, static_cast<int>(rs)}; // row-major
+        if (rs == 1 && cs >= rows) return {true,  static_cast<int>(cs)}; // column-major = transposed
+    } else if (cs == 1 && rs == cols) {
+        return {false, static_cast<int>(cols)}; // already packed
+    }
+    t = t.contiguous();
+    return {false, static_cast<int>(cols)};
+}
+
+bool try_gemm(const EinsumPlan<3>& plan, Binding<3>& bd, Operands operands, Tensor& result) {
+    if (!bd.use_gemm) return false;
+
+    const int M = static_cast<int>(bd.left_size);
+    const int N = static_cast<int>(bd.right_size);
+    const int K = static_cast<int>(bd.summed_size);
 
     // Explicitly pass as a span. The template argument resolves before the std::span overload, so it tried
     // implicit conversion: `static_cast<long>(std::vector<long>)` -> error
-    Tensor M = operands[0]->permute(std::span<const Index>(plan.permA)).reshape(b.left_size, b.summed_size);
-    Tensor N = operands[1]->permute(std::span<const Index>(plan.permB)).reshape(b.summed_size, b.right_size);
+    // reshape returns a view whenever one exists, so A/B may be strided: as_blas_operand turns their strides into
+    // trans + ld, and packs only when BLAS can't read them in place.
+    Tensor A = operands[0]->permute(std::span<const Index>(plan.permA)).reshape(M, K);
+    Tensor B = operands[1]->permute(std::span<const Index>(plan.permB)).reshape(K, N);
+
+    const bool strided = (gs == GEMMScheme::EIGEN || gs == GEMMScheme::OPENBLAS);
+    const auto [transA, lda] = as_blas_operand(A, strided);
+    const auto [transB, ldb] = as_blas_operand(B, strided);
+    const int ldc = N; // result and gemm_out are fresh and contiguous
 
     // Check if the permutation already match the correct ordering to avoid additional allocation/copy
     bool correct_perm = true;
@@ -276,16 +308,13 @@ bool try_gemm(const EinsumPlan<3>& plan, Binding<3>& b, Operands operands, Tenso
 
     if (correct_perm) {
         // Use the result tensor directly if the permutation matches
-        call_gemm(gs, static_cast<int>(b.left_size), static_cast<int>(b.right_size), static_cast<int>(b.summed_size),
-                  M.data_ptr(), N.data_ptr(), result.data_ptr());
+        call_gemm(gs, M, N, K, lda, ldb, ldc, A.data_ptr(), B.data_ptr(), result.data_ptr(), transA, transB);
         return true;
     }
 
     // Empty gemm output without needing for 0-initialization (beta=0.0)
-    Tensor gemm_out = Tensor::empty(std::move(b.combined_shape));
-
-    call_gemm(gs, static_cast<int>(b.left_size), static_cast<int>(b.right_size), static_cast<int>(b.summed_size),
-              M.data_ptr(), N.data_ptr(), gemm_out.data_ptr());
+    Tensor gemm_out = Tensor::empty(std::move(bd.combined_shape));
+    call_gemm(gs, M, N, K, lda, ldb, ldc, A.data_ptr(), B.data_ptr(), gemm_out.data_ptr(), transA, transB);
 
     // Reorder combined's axes into the caller's actual requested order
     result.assign(gemm_out.permute(std::span<const Index>(plan.perm_out)));

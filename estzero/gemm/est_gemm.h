@@ -35,16 +35,19 @@ inline void set_gemm_scheme(std::string g) {
 bool try_cutensor(const std::vector<std::string>& terms_strings, Operands operands, Tensor& result);
 
 // C (M x N) = alpha * op(A) * op(B) + beta * C, where op(A) is M x K and op(B) is K x N (stored transposed if trans).
-inline void call_gemm(GEMMScheme gs, int M, int N, int K, const double *A, const double *B, double *C,
-                    double alpha = 1.0, double beta = 0.0, bool transA = false, bool transB = false) {
+// Row-major with BLAS leading dimensions: A is stored (trans ? K x M : M x K) with row stride lda, likewise B, and C
+// (M x N) with row stride ldc. Eigen and OpenBLAS take any valid ld, the other backends only packed ones (ld = row length).
+inline void call_gemm(GEMMScheme gs, int M, int N, int K, int lda, int ldb, int ldc, const double *A, const double *B, double *C,
+                    bool transA = false, bool transB = false, double alpha = 1.0, double beta = 0.0) {
     // The odometer scheme means "no manually calling GEMM": einsum never reaches here under it, so a direct call is a caller bug.
     if (gs == GEMMScheme::ODO) throw std::runtime_error("call_gemm: the odometer scheme has no GEMM backend");
 
     else if (gs == GEMMScheme::EIGEN) {
-        // Zero-copy row-major views of the raw buffers; a transposed operand is stored as its transpose.
-        Eigen::Map<const Matrix> Am(A, transA ? K : M, transA ? M : K);
-        Eigen::Map<const Matrix> Bm(B, transB ? N : K, transB ? K : N);
-        Eigen::Map<Matrix> Cm(C, M, N);
+        // Zero-copy row-major views of the raw buffers. For a row-major Map the outer stride is the row stride (~BLAS ld)
+        using Stride = Eigen::OuterStride<>;
+        Eigen::Map<const Matrix, 0, Stride> Am(A, transA ? K : M, transA ? M : K, Stride(lda));
+        Eigen::Map<const Matrix, 0, Stride> Bm(B, transB ? N : K, transB ? K : N, Stride(ldb));
+        Eigen::Map<Matrix, 0, Stride> Cm(C, M, N, Stride(ldc));
 
         // generic lambda for Eigen
         auto gemm = [&](const auto& opA, const auto& opB) {
@@ -64,12 +67,11 @@ inline void call_gemm(GEMMScheme gs, int M, int N, int K, const double *A, const
         auto TA = (transA) ? CblasTrans : CblasNoTrans;
         auto TB = (transB) ? CblasTrans : CblasNoTrans;
 
-        // Leading dimension changes with transpose (row->column if trans)
-        const int lda = transA ? M : K;
-        const int ldb = transB ? K : N;
-
         cblas_dgemm(CblasRowMajor, TA, TB,
-            M, N, K, alpha, A, lda, B, ldb, beta, C, N /*ldc*/);
+            M, N, K, alpha, A, lda, B, ldb, beta, C, ldc);
+    }
+    else if (lda != (transA ? M : K) || ldb != (transB ? K : N) || ldc != N) {
+        throw std::runtime_error("call_gemm: this GEMM scheme only takes packed operands (ld = row length)");
     }
     else if (gs == GEMMScheme::CUBLAS_DGEMM) cublas_dgemm(M, N, K, alpha, beta, A, B, C, nullptr, transA, transB);
     else if (gs == GEMMScheme::CUBLAS_SGEMM) cublas_sgemm(M, N, K, alpha, beta, A, B, C, nullptr, transA, transB);

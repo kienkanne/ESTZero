@@ -316,28 +316,108 @@ TEST_CASE("einsum: a cached plan is rebound for an operand with the same shape b
     });
 }
 
+TEST_CASE("einsum: GEMM path with operands whose permute+reshape is a non-contiguous view") {
+    // reshape returns a strided view when one exists, e.g. lab -> (ab, l) is (1, l-stride): a transposed matrix.
+    // try_gemm passes those as trans + ld (Eigen, OpenBLAS) or packs them; never as if they were packed:
+    // data_ptr() doesn't check contiguity, so that would silently read the wrong elements.
+    // Sizes keep every contraction above the GEMM FLOP threshold. These are the (T) einsum shapes.
+    const Index l = 4, a = 6, b = 7, c = 8;
+    const Tensor lab = filled({l, a, b}, 0.3), lc = filled({l, c}, -0.2);
+    const Tensor ad = filled({a, c}, 0.1), bcd = filled({b, a, c}, -0.5); // "ad,bcd->abc" with d = c's extent
+    const Tensor mc = filled({l, c}, 0.7), abc = filled({a, b, c}, 0.05);
+
+    // K = 1: an outer product has no summed label, so reshape adds a size-1 K axis whose stride means nothing
+    const Tensor x = filled({40}, 0.2), y = filled({40}, -0.3);
+    // Padded views: lda > row length. mc_pad is (l, c) with row stride 20 (normal, lda = 20); lab_pad is (l, a, b)
+    // with row stride (a+2)*b, so (ab, l) is transposed with lda = (a+2)*b > a*b
+    const Tensor mc_pad = filled({l, 20}, 0.4).slice(Sli{}, Sli{2, 2 + c});
+    const Tensor lab_pad = filled({l, a + 2, b}, -0.1).slice(Sli{}, Sli{1, 1 + a}, Sli{});
+
+    // Negative strides (reversed slices): a unit stride on one axis isn't enough, the other stride must be a valid
+    // leading dimension (>= the row length), or BLAS rejects the call and leaves the result uninitialized.
+    const Tensor X = filled({40, 40}, 0.1), Y = filled({40, 40}, 0.5);
+    const Tensor x_rev = x.slice(Sli{39, -42, -1});                          // (40,) stride -1 -> (40,1) strides (-1,1)
+    const Tensor X_rev = X.slice(Sli{39, -42, -1}, Sli{});                   // strides (-40, 1)
+    const Tensor X_revT = X.slice(Sli{}, Sli{39, -42, -1}).swapaxes(0, 1);   // strides (-1, 40)
+
+    // Reference: the odometer path, computed once
+    const GEMMScheme saved = gs;
+    gs = GEMMScheme::ODO;
+    const Tensor ref1 = einsum("lab,lc->abc", lab, lc);
+    const Tensor ref2 = einsum("ad,bcd->abc", ad, bcd);
+    const Tensor ref3 = einsum("mc,abc->mab", mc, abc);
+    const Tensor ref4 = einsum("abc,dbc->ad", abc, bcd.permute(1, 0, 2).slice(Sli{0, a}, Sli{}, Sli{}));
+    const Tensor ref5 = einsum("i,j->ij", x, y);
+    const Tensor ref6 = einsum("mc,abc->mab", mc_pad, abc);
+    const Tensor ref7 = einsum("lab,lc->abc", lab_pad, lc);
+    const Tensor ref8 = einsum("i,j->ij", x_rev, y);
+    const Tensor ref9 = einsum("ij,jk->ik", X_rev, Y);
+    const Tensor ref10 = einsum("ij,jk->ik", X_revT, Y);
+    gs = saved;
+
+    for_each_cpu_scheme([&] {
+        const auto same = [](const Tensor& got, const Tensor& want) {
+            REQUIRE(got.size() == want.size());
+            for (Index i = 0; i < want.size(); ++i) CHECK(got.flat_index(i) == doctest::Approx(want.flat_index(i)));
+        };
+        same(einsum("lab,lc->abc", lab, lc), ref1);
+        same(einsum("ad,bcd->abc", ad, bcd), ref2);
+        same(einsum("mc,abc->mab", mc, abc), ref3);
+        same(einsum("abc,dbc->ad", abc, bcd.permute(1, 0, 2).slice(Sli{0, a}, Sli{}, Sli{})), ref4);
+        same(einsum("i,j->ij", x, y), ref5);
+        same(einsum("mc,abc->mab", mc_pad, abc), ref6);
+        same(einsum("lab,lc->abc", lab_pad, lc), ref7);
+        same(einsum("i,j->ij", x_rev, y), ref8);
+        same(einsum("ij,jk->ik", X_rev, Y), ref9);
+        same(einsum("ij,jk->ik", X_revT, Y), ref10);
+    });
+}
+
 // ── call_gemm backends ──────────────────────────────────────────────────────
 // Every backend implements the same BLAS contract (C = alpha * op(A) * op(B) + beta * C, row-major, op = optional
-// transpose), so Eigen must agree with OpenBLAS for every transpose combination, including beta != 0. The
-// odometer scheme has no GEMM, so it must throw rather than silently leave C untouched.
+// transpose, leading dimensions lda/ldb/ldc = row strides of the stored matrices). Eigen and OpenBLAS must both match
+// a naive reference for every transpose combination, beta != 0, and padded leading dimensions (ld > row length),
+// without touching the padding. The odometer scheme has no GEMM, so it must throw rather than silently leave C
+// untouched.
 
-TEST_CASE("call_gemm: Eigen matches OpenBLAS for all transpose combinations, alpha and beta; ODO throws") {
+TEST_CASE("call_gemm: Eigen and OpenBLAS match a naive reference for all transposes, alpha/beta, padded ld; ODO throws") {
     const int M = 5, N = 3, K = 4;
-    std::vector<double> A(M * K), B(K * N), C0(M * N);
-    for (size_t i = 0; i < A.size(); ++i)  A[i]  = 0.3 + 0.17 * i - 0.01 * i * i;
-    for (size_t i = 0; i < B.size(); ++i)  B[i]  = -0.8 + 0.23 * i;
-    for (size_t i = 0; i < C0.size(); ++i) C0[i] = 0.05 * i - 0.4;
+    const double alpha = 0.7;
 
+    for (int pad : {0, 3})
     for (bool transA : {false, true})
     for (bool transB : {false, true})
     for (double beta : {0.0, 1.3}) {
-        std::vector<double> C_eigen = C0, C_blas = C0;
-        call_gemm(GEMMScheme::EIGEN,    M, N, K, A.data(), B.data(), C_eigen.data(), 0.7, beta, transA, transB);
-        call_gemm(GEMMScheme::OPENBLAS, M, N, K, A.data(), B.data(), C_blas.data(),  0.7, beta, transA, transB);
-        for (size_t i = 0; i < C0.size(); ++i) CHECK(C_eigen[i] == doctest::Approx(C_blas[i]));
+        // Stored shapes: A is (K x M) when transposed, else (M x K); likewise B. ld = stored row length + pad.
+        const int a_rows = transA ? K : M, a_cols = transA ? M : K;
+        const int b_rows = transB ? N : K, b_cols = transB ? K : N;
+        const int lda = a_cols + pad, ldb = b_cols + pad, ldc = N + pad;
+
+        std::vector<double> A(a_rows * lda), B(b_rows * ldb), C0(M * ldc);
+        for (size_t i = 0; i < A.size(); ++i)  A[i]  = 0.3 + 0.17 * i - 0.01 * i * i;
+        for (size_t i = 0; i < B.size(); ++i)  B[i]  = -0.8 + 0.23 * i;
+        for (size_t i = 0; i < C0.size(); ++i) C0[i] = 0.05 * i - 0.4;
+
+        const auto opA = [&](int i, int k) { return transA ? A[k * lda + i] : A[i * lda + k]; };
+        const auto opB = [&](int k, int j) { return transB ? B[j * ldb + k] : B[k * ldb + j]; };
+        std::vector<double> C_ref = C0;
+        for (int i = 0; i < M; ++i)
+        for (int j = 0; j < N; ++j) {
+            double sum = 0.0;
+            for (int k = 0; k < K; ++k) sum += opA(i, k) * opB(k, j);
+            C_ref[i * ldc + j] = alpha * sum + beta * C0[i * ldc + j];
+        }
+
+        CAPTURE(pad); CAPTURE(transA); CAPTURE(transB); CAPTURE(beta);
+        for (GEMMScheme scheme : {GEMMScheme::EIGEN, GEMMScheme::OPENBLAS}) {
+            std::vector<double> C = C0;
+            call_gemm(scheme, M, N, K, lda, ldb, ldc, A.data(), B.data(), C.data(), transA, transB, alpha, beta);
+            for (size_t i = 0; i < C0.size(); ++i) CHECK(C[i] == doctest::Approx(C_ref[i])); // padding stays C0
+        }
 
         std::vector<double> C_odo = C0;
-        CHECK_THROWS_AS(call_gemm(GEMMScheme::ODO, M, N, K, A.data(), B.data(), C_odo.data(), 0.7, beta, transA, transB),
+        CHECK_THROWS_AS(call_gemm(GEMMScheme::ODO, M, N, K, lda, ldb, ldc, A.data(), B.data(), C_odo.data(),
+                                  transA, transB, alpha, beta),
                         std::runtime_error);
         CHECK(C_odo == C0);
     }
