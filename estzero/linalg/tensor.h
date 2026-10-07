@@ -7,6 +7,7 @@
 #include <initializer_list>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -93,6 +94,9 @@ class Tensor {
     // == ARITHMETIC HELPERS (defined in tensor.cc) =========================================
 
     bool _match_check(const Tensor& other) const;
+    // Strides that view (shape, strides) as new_shape without copying, or nullopt when no view exists
+    static std::optional<Dims> _view_strides(std::span<const Index> shape, std::span<const Index> strides,
+                                             std::span<const Index> new_shape);
 
     // A view is contiguous only when its strides match row-major strides.
     bool _is_contiguous() const {
@@ -201,12 +205,9 @@ public:
     Tensor copy() const;
     Tensor& assign(const Tensor& other);
 
-    // Get raw data pointer (+ offset). Contiguous is still checked for safety
-    double* data_ptr() const {
-        if (!_is_contiguous()) {
-            throw std::runtime_error("Current Tensor view is not contiguous! Data might mismatch!");
-        }
-        return _data.get() + _offset; }
+    // Raw pointer to the view's first element (buffer + offset). Not checked for contiguity: the caller reads
+    // the layout from strides() (e.g. a BLAS leading dimension), or calls contiguous() first.
+    double* data_ptr() const { return _data.get() + _offset; }
 
     // == ARITHMETIC OPERATIONS (defined in tensor.cc) ======================================
 

@@ -226,12 +226,63 @@ Tensor Tensor::select(Index axis, Index index) const {
     return Tensor(_data, new_shape, new_strides, _ndim - 1, new_offset);
 }
 
+std::optional<Dims> Tensor::_view_strides(std::span<const Index> shape, std::span<const Index> strides,
+                                          std::span<const Index> new_shape) {
+    if (_numel(shape) == 0) return row_major_strides(new_shape); // nothing to address, any strides work
+
+    // Size-1 axes are never stepped along, so their strides mean nothing: drop them first
+    Dims sh{}, st{};
+    Index nd = 0;
+    for (Index k = 0; k < std::ssize(shape); ++k) {
+        if (shape[k] == 1) continue;
+        sh[nd] = shape[k];
+        st[nd] = strides[k];
+        ++nd;
+    }
+
+    Dims out{};
+    const Index new_nd = std::ssize(new_shape);
+    Index o = 0, n = 0;
+    while (o < nd && n < new_nd) {
+        // One run: old axes [o0, o] and new axes [n0, n] holding the same number of elements. Stays in bounds
+        // because both shapes hold the same nonzero element count (check outside this function)
+        const Index o0 = o, n0 = n;
+        Index old_prod = sh[o], new_prod = new_shape[n];
+        while (old_prod != new_prod) {
+            if (old_prod < new_prod) old_prod *= sh[++o];
+            else                     new_prod *= new_shape[++n];
+        }
+
+        // Merge check condition: each old axis must step exactly over the whole next one (locally contiguous)
+        for (Index k = o0; k < o; ++k) {
+            if (st[k] != st[k + 1] * sh[k + 1]) return std::nullopt;
+        }
+
+        // New strides: start from the run's innermost old stride, multiply outward (like row_major_strides)
+        Index s = st[o];
+        for (Index k = n; k >= n0; --k) {
+            out[k] = s;
+            s *= new_shape[k];
+        }
+        ++o; ++n;
+    }
+    for (; n < new_nd; ++n) out[n] = 1; // leftover new axes can only be size 1
+    return out;
+}
+
+// A view whenever one exists (splitting any axis, or merging axes whose strides line up), so a non-contiguous
+// tensor no longer has to be copied just because it isn't contiguous as a whole. Otherwise copies into row-major order.
 Tensor Tensor::reshape(std::span<const Index> new_shape) const {
     if (_numel(new_shape) != this->size()) {
         throw std::invalid_argument("New shape is not compatible with current tensor!");
     }
-    Tensor t = contiguous();
-    return Tensor(t._data, _to_dims(new_shape), row_major_strides(new_shape), std::ssize(new_shape), t._offset);
+    const Dims dims = _to_dims(new_shape); // throws above MAX_DIM, before _view_strides writes into a Dims
+
+    if (const auto view = _view_strides(shape(), strides(), new_shape)) {
+        return Tensor(_data, dims, *view, std::ssize(new_shape), _offset);
+    }
+    Tensor t = copy(); // not viewable, new copy
+    return Tensor(t._data, dims, row_major_strides(new_shape), std::ssize(new_shape), t._offset);
 }
 
 Tensor Tensor::slice(std::span<const Sli> slices) const {
