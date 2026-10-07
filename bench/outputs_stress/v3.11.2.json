@@ -1,0 +1,40 @@
+{
+  "indole/sto-3g": {
+    "nbf": 52,
+    "reference": "rhf",
+    "ccsd_t": {
+      "wall(s)": 3.901658105198294,
+      "eri(s)": 0.5317,
+      "jk(ms)": 4.953,
+      "mo(s)": 0.0784,
+      "cc(ms)": 50.046,
+      "cc_iters": 24,
+      "ccsd(s)": 2.006458105198294,
+      "ptriples(s)": 1.8952,
+      "ptriples(E)": -0.02286254,
+      "dE_ccsd": 9.966140623873798e-08,
+      "build_t3(s)": 1.7942,
+      "build_t3(ms/it)": 0.169,
+      "build_t3_iters": 10648
+    }
+  },
+  "parabenzyne/sto-3g": {
+    "nbf": 34,
+    "reference": "uhf",
+    "ccsd_t": {
+      "wall(s)": 8.41413153288886,
+      "eri(s)": 0.1291,
+      "jk(ms)": 0.968,
+      "mo(s)": 0.0228,
+      "cc(ms)": 114.362,
+      "cc_iters": 20,
+      "ccsd(s)": 2.54433153288886,
+      "ptriples(s)": 5.8698,
+      "ptriples(E)": -0.01804571,
+      "dE_ccsd": 2.2567746782442555e-08,
+      "build_t3(s)": 5.4364,
+      "build_t3(ms/it)": 0.248,
+      "build_t3_iters": 21952
+    }
+  }
+}

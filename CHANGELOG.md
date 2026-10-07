@@ -2,6 +2,14 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.11.2] `reshape` returns a view if possible, and `try_gemm` passes strided operands to BLAS as trans + leading dimension
+
+- `reshape` used to copy any tensor that wasn't fully contiguous. It now returns a view whenever the general merge rule, similar to in NumPy/PyTorch, allows one (`Tensor::_view_strides`): size-1 axes are dropped first, the old and new shapes are walked in runs with equal element counts, each run's old axes must merge (`stride[k] == stride[k+1] * shape[k+1]`), and the new strides are built right to left from the run's innermost stride. It copies only when no view exists.
+- `call_gemm` now takes `lda`/`ldb`/`ldc` explicitly, the full BLAS contract, instead of deriving them from M/N/K (which assumed packed operands). The Eigen branch maps the buffers with `OuterStride<>(ld)`. The packed-only backends (cuBLAS (fix later), manual AVX) throw on a non-packed `ld`.
+- `try_gemm` reads each permuted 2D operand's strides (`as_blas_operand`): column stride 1 means row-major with `ld` = row stride, row stride 1 means transposed with `ld` = column stride, and anything else is packed as before. The `ld` must also be a valid BLAS leading dimension (at least the stored row length), to reject negative strides (reversed slices).
+- New tests: `reshape` view/copy cases, `call_gemm` transpose combinations, and `einsum` transposed and padded views, a K = 1 outer product, and reversed (negative-stride) operands.
+- Performance: CCSD(T) `parabenzyne/sto-3g` 9.068s -> 8.414s (PertT 6.497s -> 5.870s) by avoid packing a few operands in (T). `indole/sto-3g` regressed slightly, 3.794s -> 3.902s. It seemed like OpenBLAS picks its small-matrix kernels per transpose combination, and some RHF (T) GEMMs now fall back to its general path (problem on small size benchmark systems). Peak RSS unchanged.
+
 ## [v3.11.1] Added correct permutation check in `einsum` to avoid intermediate buffer if possible
 
 - `try_gemm` in `einsum` now checks if `perm_out` already matches the correct requested order (0,1,2...) (identity), and if yes, `call_gemm` writes directly into the result `Tensor` instead of allocating an intermediate buffer to later permute and assign to result.
