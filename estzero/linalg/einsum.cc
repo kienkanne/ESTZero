@@ -28,6 +28,8 @@ LabelSet labels_of(std::string_view term) {
     return set;
 }
 
+enum PermStatus { Iden, Trans, Perm };
+
 // Einsum plan for one pairwise contraction. NT = number of terms (inputs + output), the same NT as Odometer<NT>:
 // 2 (1 input, 1 output) or 3 (2 inputs, the GEMM-style case).
 template <int NT>
@@ -45,6 +47,7 @@ struct EinsumPlan {
     std::vector<Index> left_axes, summed_axes, right_axes; // axes of A kept, axes of A/B summed, axes of B kept
     std::vector<Index> permA, permB;               // (left, summed) for A, (summed, right) for B
     std::vector<Index> perm_out;                   // GEMM output (left labels + right labels) -> requested order
+    PermStatus perm_status;                        // identity and tranpose bypass intermediate buffer allocation
 };
 
 // The shape-dependent part. Rebuilt on every call from the operands (it's a handful of integer ops).
@@ -119,23 +122,23 @@ void check_operand_count(size_t n_operands, size_t n_input_terms) {
 
 // Builds the string-only part of try_gemm (see EinsumPlan).
 void plan_gemm_strings(EinsumPlan<3>& plan) {
-    const std::string& A = plan.terms[0];
-    const std::string& B = plan.terms[1];
-    const std::string& C = plan.terms[2]; // requested output order, used for the final permutation
+    const std::string& A_str = plan.terms[0];
+    const std::string& B_str = plan.terms[1];
+    const std::string& C_str = plan.terms[2]; // requested output order, used for the final permutation
 
-    const LabelSet a_set = labels_of(A), b_set = labels_of(B), c_set = labels_of(C);
+    const LabelSet a_set = labels_of(A_str), b_set = labels_of(B_str), c_set = labels_of(C_str);
 
     // Repeated label in a single operand (i.e. "piqi"): a set smaller than the term means a duplicate
-    if (A.size() != a_set.count() || B.size() != b_set.count()) return;
+    if (A_str.size() != a_set.count() || B_str.size() != b_set.count()) return;
 
     // Batch index check (index in A is not in B and C, or same for B)
     // This doesn't occur in this codebase, but just decline for simplcity here, not doing GEMM-supported batch
-    for (char c : A) {
+    for (char c : A_str) {
         const auto l = to_ascii(c);
         if (b_set[l] && c_set[l]) return;
         if (!c_set[l] && !b_set[l]) return;
     }
-    for (char c : B) {
+    for (char c : B_str) {
         const auto l = to_ascii(c);
         if (!c_set[l] && !a_set[l]) return;
     }
@@ -143,26 +146,50 @@ void plan_gemm_strings(EinsumPlan<3>& plan) {
     // Walk A once: kept-left axes (C has it), summed axes (C doesn't have it).
     // The summed labels are the same for both A and B, so B finds its summed axes by A's summed labels.
     std::string summed_labels;
-    for (Index i = 0; i < std::ssize(A); ++i) {
-        if (c_set[to_ascii(A[i])]) plan.left_axes.push_back(i);
-        else { plan.summed_axes.push_back(i); summed_labels += A[i]; }
+    for (Index i = 0; i < std::ssize(A_str); ++i) {
+        if (c_set[to_ascii(A_str[i])]) plan.left_axes.push_back(i);
+        else { plan.summed_axes.push_back(i); summed_labels += A_str[i]; }
     }
-    for (Index i = 0; i < std::ssize(B); ++i) {
-        if (c_set[to_ascii(B[i])]) plan.right_axes.push_back(i);
+    for (Index i = 0; i < std::ssize(B_str); ++i) {
+        if (c_set[to_ascii(B_str[i])]) plan.right_axes.push_back(i);
     }
 
     plan.permA = plan.left_axes;
     plan.permA.insert(plan.permA.end(), plan.summed_axes.begin(), plan.summed_axes.end());
-    for (char c : summed_labels) plan.permB.push_back(B.find(c));
+    for (char c : summed_labels) plan.permB.push_back(B_str.find(c));
     plan.permB.insert(plan.permB.end(), plan.right_axes.begin(), plan.right_axes.end());
 
     // combined_labels: left_axes + right_axes (what GEMM produces); perm_out reorders it into C
     std::string combined_labels;
-    for (Index i : plan.left_axes)  combined_labels += A[i];
-    for (Index i : plan.right_axes) combined_labels += B[i];
-    for (char c : C) plan.perm_out.push_back(combined_labels.find(c));
+    for (Index i : plan.left_axes)  combined_labels += A_str[i];
+    for (Index i : plan.right_axes) combined_labels += B_str[i];
+    for (char c : C_str) plan.perm_out.push_back(combined_labels.find(c));
 
     plan.gemm_eligible = true;
+
+    const int out_nd = plan.perm_out.size();
+
+    // Check for identity
+    plan.perm_status = PermStatus::Iden;
+    for (int i=0; i != out_nd; i++) {
+        if (plan.perm_out[i] != i) {
+            plan.perm_status = PermStatus::Perm; break;
+        }
+    }
+
+    if (plan.perm_status == PermStatus::Iden) return;
+
+    // Check for transpose
+    plan.perm_status = PermStatus::Trans;
+    auto it = std::find(plan.perm_out.begin(), plan.perm_out.end(), 0);
+    int idx_0 = it - plan.perm_out.begin();
+
+    const int n_left = plan.left_axes.size(); // Index to start from
+    for (int i = 0; i != out_nd; i++) {
+        if (plan.perm_out[i] != (i + n_left) % out_nd) { 
+            plan.perm_status = PermStatus::Perm; break; 
+        }
+    }
 }
 
 // The string-only part of the plan.
@@ -295,20 +322,17 @@ bool try_gemm(const EinsumPlan<3>& plan, Binding<3>& bd, Operands operands, Tens
     const bool strided = (gs == GEMMScheme::EIGEN || gs == GEMMScheme::OPENBLAS);
     const auto [transA, lda] = as_blas_operand(A, strided);
     const auto [transB, ldb] = as_blas_operand(B, strided);
-    const int ldc = N; // result and gemm_out are fresh and contiguous
+    const int ldc = N; // result and gemm_out are fresh and contiguous (= M if C.T)
 
-    // Check if the permutation already match the correct ordering to avoid additional allocation/copy
-    bool correct_perm = true;
-    for (int i=0; i != result.ndim(); i++) {
-        if (plan.perm_out[i] != i) {
-            // Permutation doesn't match, need to allocate and copy
-            correct_perm = false; break;
-        }
+    if (plan.perm_status == PermStatus::Iden) {
+        // Use the result tensor directly if the permutation is identity
+        call_gemm(gs, M, N, K, lda, ldb, ldc, A.data_ptr(), B.data_ptr(), result.data_ptr(), transA, transB);
+        return true;
     }
 
-    if (correct_perm) {
-        // Use the result tensor directly if the permutation matches
-        call_gemm(gs, M, N, K, lda, ldb, ldc, A.data_ptr(), B.data_ptr(), result.data_ptr(), transA, transB);
+    if (plan.perm_status == PermStatus::Trans) {
+        // Use the result tensor directly AND swap calls input if permutation is valid transpose
+        call_gemm(gs, N, M, K, ldb, lda, /*ldc*/ M, B.data_ptr(), A.data_ptr(), result.data_ptr(), !transB, !transA);
         return true;
     }
 

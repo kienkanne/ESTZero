@@ -340,6 +340,13 @@ TEST_CASE("einsum: GEMM path with operands whose permute+reshape is a non-contig
     const Tensor X_rev = X.slice(Sli{39, -42, -1}, Sli{});                   // strides (-40, 1)
     const Tensor X_revT = X.slice(Sli{}, Sli{39, -42, -1}).swapaxes(0, 1);   // strides (-1, 40)
 
+    // Output is C^T, (B's free labels | A's free labels): computed as op(B)^T op(A)^T straight into the result.
+    // L != R and M != N, so a wrong rotation amount or a wrong ldc (must be M) shows up. The RHF (T) t3 terms.
+    const Tensor mc6 = filled({6, 8}, 0.2), mab6 = filled({6, 7, 9}, -0.4);    // L = 1 (c), R = 2 (a,b)
+    const Tensor bce = filled({7, 8, 5}, 0.3), ae = filled({9, 5}, 0.1);       // L = 2 (b,c), R = 1 (a)
+    // Not C^T, but perm_out = (2,3,0,1) is a rotation by n/2 with L = 1: only a rotation by exactly L may count
+    const Tensor mp = filled({4, 5}, 0.6), mqrs = filled({4, 3, 4, 6}, -0.2);
+
     // Reference: the odometer path, computed once
     const GEMMScheme saved = gs;
     gs = GEMMScheme::ODO;
@@ -353,6 +360,9 @@ TEST_CASE("einsum: GEMM path with operands whose permute+reshape is a non-contig
     const Tensor ref8 = einsum("i,j->ij", x_rev, y);
     const Tensor ref9 = einsum("ij,jk->ik", X_rev, Y);
     const Tensor ref10 = einsum("ij,jk->ik", X_revT, Y);
+    const Tensor ref11 = einsum("mc,mab->abc", mc6, mab6);
+    const Tensor ref12 = einsum("bce,ae->abc", bce, ae);
+    const Tensor ref13 = einsum("mp,mqrs->rspq", mp, mqrs);
     gs = saved;
 
     for_each_cpu_scheme([&] {
@@ -370,6 +380,9 @@ TEST_CASE("einsum: GEMM path with operands whose permute+reshape is a non-contig
         same(einsum("i,j->ij", x_rev, y), ref8);
         same(einsum("ij,jk->ik", X_rev, Y), ref9);
         same(einsum("ij,jk->ik", X_revT, Y), ref10);
+        same(einsum("mc,mab->abc", mc6, mab6), ref11);
+        same(einsum("bce,ae->abc", bce, ae), ref12);
+        same(einsum("mp,mqrs->rspq", mp, mqrs), ref13);
     });
 }
 

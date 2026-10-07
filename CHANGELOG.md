@@ -2,6 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.11.3] `try_gemm` writes a transposed output (C^T) directly into the result
+
+- When the requested output is (B's free labels, A's free labels), i.e. C^T, `try_gemm` now computes C^T = op(B)^T op(A)^T straight into the result: A and B (with their own `ld`s) swap places, both transpose flags flip, M and N swap, and `ldc` = M.
+- The plan classifies `perm_out` once per subscript (`PermStatus`): identity, C^T, or a general permutation (unchanged path).
+- New tests: the two RHF (T) C^T terms (`mc,mab->abc`, `bce,ae->abc`, with L != R and M != N, so a wrong rotation amount or `ldc` shows up) and `mp,mqrs->rspq`, a rotation by n/2 with L = 1 that must not count as C^T.
+- Performance: only RHF (T) is affected (2 of its 12 t3 terms per (i,j,k); no UHF (T) einsum is C^T). CCSD(T) `indole/sto-3g` 3.902s -> 3.854s (PertT 1.895s -> 1.840s), `parabenzyne/sto-3g` unchanged (8.414s -> 8.398s).
+
 ## [v3.11.2] `reshape` returns a view if possible, and `try_gemm` passes strided operands to BLAS as trans + leading dimension
 
 - `reshape` used to copy any tensor that wasn't fully contiguous. It now returns a view whenever the general merge rule, similar to in NumPy/PyTorch, allows one (`Tensor::_view_strides`): size-1 axes are dropped first, the old and new shapes are walked in runs with equal element counts, each run's old axes must merge (`stride[k] == stride[k+1] * shape[k+1]`), and the new strides are built right to left from the run's innermost stride. It copies only when no view exists.
