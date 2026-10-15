@@ -16,4 +16,26 @@ struct TriplesBlocks {
     Tensor vovv; // (1,k): permute to (1,0,2,3)
     Tensor ooov; // (0,j).(0,k): No permute
 };
+
+// eps_a + eps_b + eps_c over the virtuals, the (i,j,k)-independent part of the denominator: built once
+inline Tensor virtual_denominator(const Tensor& F_virt, const int v) {
+    Tensor eps_abc({v, v, v});
+    for (int a = 0; a < v; ++a) {
+    for (int b = 0; b < v; ++b) {
+    for (int c = 0; c < v; ++c) {
+        eps_abc(a, b, c) = F_virt(a) + F_virt(b) + F_virt(c);
+    }}}
+    return eps_abc;
+}
+
+// t3 /= (e_ijk - eps_abc) in place, one pass. Both are freshly built (v,v,v) tensors, so contiguous.
+// TODO: introduce broadcasting support for `Tensor`
+// noinline: compiled on its own this loop vectorizes (vdivpd), but when LTO inlines it into the large driver loop GCC
+// emits the scalar version (one vdivsd per element), measured ~0.3 s slower on parabenzyne/sto-3g.
+[[gnu::noinline]] inline void divide_by_denominator(Tensor& t3, const double e_ijk, const Tensor& eps_abc) {
+    double* __restrict t = t3.data_ptr();
+    const double* __restrict e = eps_abc.data_ptr();
+    for (Index n = 0; n < t3.size(); ++n) t[n] /= e_ijk - e[n];
+}
+
 #endif

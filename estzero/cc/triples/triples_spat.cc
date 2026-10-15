@@ -11,8 +11,8 @@
 // Source: https://github.com/CrawfordGroup/pycc/blob/main/pycc/cctriples.py
 //
 // The explicit-GEMM version of this batch (v3.7.x) is t3c_ijk_spat_gemm in legacy/triples_gemm.cc.
-Tensor t3c_ijk_spat_einsum(const Tensor& t2, const TriplesBlocks& W, const int o, const int v,
-               const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k) {
+Tensor t3c_ijk_spat_einsum(const Tensor& t2, const TriplesBlocks& W, const Tensor& F_occ, 
+                            const Tensor& eps_abc, int i, int j, int k) {
     const auto Wvvvo = [&](int x) { return W.vvvo.select(0, x); };                 // (b, a, e)
     const auto Wovoo = [&](int x, int y) { return W.ovoo.select(0, x).select(0, y); }; // (m, c)
 
@@ -30,14 +30,10 @@ Tensor t3c_ijk_spat_einsum(const Tensor& t2, const TriplesBlocks& W, const int o
     t3 -= einsum("ma,mbc->abc", Wovoo(k, i), t2.select(0, j));
     t3 -= einsum("mc,mba->abc", Wovoo(i, k), t2.select(0, j));
 
-    Tensor denom({v, v, v});
     const double e_ijk = F_occ(i) + F_occ(j) + F_occ(k);
-    for (int a = 0; a < v; ++a) {
-    for (int b = 0; b < v; ++b) {
-    for (int c = 0; c < v; ++c) {
-        denom(a, b, c) = e_ijk - (F_virt(a) + F_virt(b) + F_virt(c));
-    }}}
-    return t3 / denom;
+    divide_by_denominator(t3, e_ijk, eps_abc);
+
+    return t3;
 }
 
 // Loops over occupied (i,j,k), builds one (v,v,v) connected-T3 batch (t3c_ijk_spat_einsum above) at a
@@ -52,10 +48,11 @@ double calc_pert_triples_spat(const Tensor& Iprqs, const Tensor& DEprqs, const T
 
     Tensor F_diag({FN.shape()[0]});
     for (int i = 0; i != FN.shape()[0]; ++i) { F_diag(i) = FN(i, i); }
-    Tensor F_occ  = F_diag.slice(O);
-    Tensor F_virt = F_diag.slice(V);
-    Tensor Fov    = FN.slice(O, V);
+    const Tensor F_occ  = F_diag.slice(O);
+    const Tensor F_virt = F_diag.slice(V);
+    const Tensor Fov    = FN.slice(O, V);
 
+    const Tensor eps_abc = virtual_denominator(F_virt, v);
     Tensor x1(t1.shape()), x2(t2.shape());
 
     // Each block copied once, contiguous, loop indices leading (see TriplesBlocks)
@@ -72,7 +69,7 @@ double calc_pert_triples_spat(const Tensor& Iprqs, const Tensor& DEprqs, const T
     for (int k = 0; k < o; ++k) {
         timing::Scoped _t("  Build T3");
 
-        const Tensor t3 = t3c_ijk_spat_einsum(t2, W, o, v, F_occ, F_virt, i, j, k);
+        const Tensor t3 = t3c_ijk_spat_einsum(t2, W, F_occ, eps_abc, i, j, k);
         const Tensor t3_diff = t3 - t3.swapaxes(0, 2);
         const Tensor t3_comb1 = 2.0 * t3 - t3.swapaxes(1, 2) - t3.swapaxes(0, 2);
 
