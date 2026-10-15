@@ -8,28 +8,38 @@ A repository building electronic structure theory methods from the ground up RHF
 
 ```
 estzero/
-├── est/
-│   ├── wfn.cc/h          WaveFunction: loads geometry+basis, orchestrates SCF -> post-HF
-│   ├── integrals.cc      8-fold-symmetric ERI build (permutational symmetry, Schwarz screening)
+├── main.cc               CLI entry point: parse options, load molecule, dispatch reference/method
+├── wfn.cc/h              WaveFunction: loads geometry+basis, orchestrates SCF -> post-HF
+├── core/
+│   ├── integrals.cc/h    8-fold-symmetric ERI build (permutational symmetry, Schwarz screening)
 │   ├── jk_build.cc/h     Symmetry-driven J/K contraction (single-pass scatter, not dense N^4)
-│   ├── rhf.cc / uhf.cc   SCF loops: DIIS, symmetric orthogonalization, SAD/GWH guess
+│   ├── rhf.cc / uhf.cc   SCF loops: DIIS, symmetric orthogonalization, core/GWH guess
 │   ├── transmo.cc/h      AO -> MO integral transform (RHF single-spin, UHF 3-block aa/bb/ab)
+│   └── frozen_core.h     Per-element frozen-core orbital counts
+├── mpn/
 │   ├── mp2.cc/h          MP2 correlation energy
-│   ├── mp3.cc/h          MP3, built directly on the CC module's intermediates
-│   ├── cc_build/cc_iter/cc_spin/cc_spat.cc/h
-│   │                     Shared CCSD intermediates + iteration loop; spin-orbital (UHF) vs
-│   │                     spatial-orbital (RHF) T1/T2 formulations
-│   └── cc_triples.cc/h  CCSD(T): the batched "vikings" perturbative-triples algorithm
+│   └── mp3.cc/h          MP3, built directly on the CC module's intermediates
+├── cc/
+│   ├── cc_driver/cc_iter.cc/h
+│   │                     CC inputs, spin-orbital (UHF) vs spatial-orbital (RHF) dispatch,
+│   │                     shared CCSD iteration loop
+│   ├── builders/         pre_iter (Fock, denominators), intmds (F/W intermediates, taus),
+│   │                     amps (T1/T2 updates and CC energy) for both formulations
+│   ├── triples/          CCSD(T): batched "vikings" perturbative triples, einsum-only;
+│   │                     legacy/ keeps the explicit-GEMM and noddy (full T3) versions
+│   └── verify_ccsd.cc    Standalone cross-check of the UHF spin-orbital MP2 pipeline
 ├── linalg/
-│   ├── tensor.h          One dense array type: row-major, shared_ptr, zero-copy views
+│   ├── tensor.cc/h       One dense array type: row-major, shared_ptr, zero-copy views
 │   ├── einsum.cc/h       From scratch einsum: pairwise contraction, GEMM fast path
-│   ├── odometer.h        O(1) pers tep index walker shared by einsum and Tensor's own ops
-│   └── diis.h/sym_ortho.h  DIIS extrapolation / symmetric orthogonalizer
+│   ├── odometer.h        O(1) per step index walker shared by einsum and Tensor's own ops
+│   └── diis.h/sym_ortho.h/guess.h
+│                         DIIS extrapolation / symmetric orthogonalizer / initial guesses
 ├── gemm/
-│   ├── naive/mkn_RxR/mnk_RxR/avx512.cc
+│   ├── naive/mkn_RxR/mnk_RxR/avx512/avx_blis.cc
 │   │                     Hand-rolled GEMM ladder: naive loops -> register blocking -> AVX-512
-│   └── cublas_gemm/cutensor_gemm/cuda_ladder.cc
-│                         GPU backends: cuBLAS, cuTENSOR, hand-written CUDA kernels
+│   ├── cublas_gemm/cutensor_gemm/cuda_ladder.cc
+│   │                     GPU backends: cuBLAS, cuTENSOR, hand-written CUDA kernels
+│   └── gemm_bench.cc     Standalone GEMM microbenchmark
 └── utils/timer.h         Scoped phase timer
 
 bench/    Benchmark + accuracy vs Psi4, the GEMM microbenchmark

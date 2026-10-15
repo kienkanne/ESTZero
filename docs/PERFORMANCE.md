@@ -152,6 +152,7 @@ For RHF, the test used to track through different versions is benzene/def2-svp (
 | v1.5.3 | 3.985 | 1.769 | 136.7 | 16 | 1301.0 | Fix: `.at()` replaced with unchecked indexing in `Tensor`. JK faster than v1.5.2; ERI still slower than v1.5.0 (vector), now purely from the 8-fold write expansion, not indexing overhead |
 | v3.6.0 | 3.489 | 1.634 | 137.4 | 13 | 1504.5 | Added Schwarz screening for ERI building, 10% shell quartets skipped, and the gain is small. This is due to benzene itself is a small molecule. |
 | v3.6.1 | 3.212 | 1.635 | 137.2 | 11 | 1504.4 | Added GWH initial guess, saved 2 iterations. |
+| v3.12.0 | 2.493 | 0.886 | 118.6 | 13 | 1503.6 | Build hygiene: libint2 rebuilt as Release (`-O3 -march=native`; it had no `-O` flag at all), and `NDEBUG` on (Release build type). ERI ~1.8x faster from libint alone, JK -15% from Eigen's asserts off. |
 
 #### UHF
 
@@ -166,6 +167,7 @@ Version 1.1.0 reorganize the benchmark suite to separate the reference and the m
 | v1.5.3 | 5.725 | 1.460 | 281.6 | 15 | 1352.9 | Same fix and gains as RHF SCF |
 | v3.6.0 | 5.453 | 1.432 | 140.6 | 14 | 1557.2 | Added Schwarz screening for ERI building. The build doesn't speed up by any because CH3 is small, all atoms are close |
 | v3.6.1 | 5.183 | 1.437 | 140.8 | 13 | 1557.0 | Added GWH initial guess, saved an iteration. |
+| v3.12.0 | 4.197 | 0.712 | 121.6 | 14 | 1554.0 | Same build hygiene as RHF SCF: optimized libint2 (ERI ~2x faster) and `NDEBUG` (JK -15%). |
 
 > (1) Total time for both alpha and beta calculation time per iteration
 

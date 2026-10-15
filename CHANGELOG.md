@@ -2,6 +2,20 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.12.0] Build hygiene: optimized libint2, Release build with `NDEBUG`
+
+- `libint2.a` was configured with an empty `CMAKE_BUILD_TYPE`, so CMake passed no `-O` flag and the whole library was compiled at `-O0`. It is rebuilt as Release with `-march=native` (`-O3 -DNDEBUG -march=native`, 28 MB) into a separate prefix, `../libint_install_O3`, from `../libint-2.7.0-beta.3/build_O3`. `LIBINT_ROOT` is now a CMake cache variable defaulting to it; the old install is kept for A/B testing.
+- `build/` was `Debug`: the `-O3 -g -march=native` from `target_compile_options` were there, but nothing defined `NDEBUG`, so Eigen's bounds-check assertions ran. `CMakeLists.txt` now defaults to `Release` when no build type is given, and `build/` (what `bench/benchmark.py` runs) is reconfigured as Release. An assert-enabled `build-debug/` (`Debug`, same optimization flags) is kept for development.
+- A/B on one pinned core, best of 3, each change in isolation:
+
+  | benzene/def2-svp SCF | ERI build (s) | JK build (s) | Total (s) |
+  |---|---|---|---|
+  | Debug, `-O0` libint | 1.612 | 1.802 | 3.447 |
+  | Release (`NDEBUG`), `-O0` libint | 1.625 | 1.535 | 3.187 |
+  | Release, `-O3` libint | 0.875 | 1.539 | 2.435 |
+
+- The build hygiene improved the baseline SCF for every method: benzene/def2-svp SCF 3.507s -> 2.493s, ch3/aug-cc-pvtz SCF 5.510s -> 4.197s, `indole/sto-3g` 3.646s -> 3.391s, `parabenzyne/sto-3g` 7.006s -> 6.836s.
+
 ## [v3.11.5] Moved `eps_abc` building for denominator outside of `ijk` loop
 
 - The denominator was rebuilt every time inside the `t3_ijk` builders, but part of it only depends on `abc`, which can be built separately first.
