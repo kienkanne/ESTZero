@@ -11,21 +11,24 @@
 // Source: https://github.com/CrawfordGroup/pycc/blob/main/pycc/cctriples.py
 //
 // The explicit-GEMM version of this batch (v3.7.x) is t3c_ijk_spat_gemm in legacy/triples_gemm.cc.
-Tensor t3c_ijk_spat_einsum(const Tensor& t2, TriplesBufferSpat& tb, const int o, const int v,
+Tensor t3c_ijk_spat_einsum(const Tensor& t2, const TriplesBlocks& W, const int o, const int v,
                const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k) {
-    Tensor t3 = einsum("bae,ce->abc", tb.Wvvvo_i, t2.select(0, k).select(0, j));
-    t3 += einsum("cae,be->abc", tb.Wvvvo_i, t2.select(0, j).select(0, k));
-    t3 += einsum("ace,be->abc", tb.Wvvvo_k, t2.select(0, j).select(0, i));
-    t3 += einsum("bce,ae->abc", tb.Wvvvo_k, t2.select(0, i).select(0, j));
-    t3 += einsum("cbe,ae->abc", tb.Wvvvo_j, t2.select(0, i).select(0, k));
-    t3 += einsum("abe,ce->abc", tb.Wvvvo_j, t2.select(0, k).select(0, i));
+    const auto Wvvvo = [&](int x) { return W.vvvo.select(0, x); };                 // (b, a, e)
+    const auto Wovoo = [&](int x, int y) { return W.ovoo.select(0, x).select(0, y); }; // (m, c)
 
-    t3 -= einsum("mc,mab->abc", tb.Wovoo_jk, t2.select(0, i));
-    t3 -= einsum("mb,mac->abc", tb.Wovoo_kj, t2.select(0, i));
-    t3 -= einsum("mb,mca->abc", tb.Wovoo_ij, t2.select(0, k));
-    t3 -= einsum("ma,mcb->abc", tb.Wovoo_ji, t2.select(0, k));
-    t3 -= einsum("ma,mbc->abc", tb.Wovoo_ki, t2.select(0, j));
-    t3 -= einsum("mc,mba->abc", tb.Wovoo_ik, t2.select(0, j));
+    Tensor t3 = einsum("bae,ce->abc", Wvvvo(i), t2.select(0, k).select(0, j));
+    t3 += einsum("cae,be->abc", Wvvvo(i), t2.select(0, j).select(0, k));
+    t3 += einsum("ace,be->abc", Wvvvo(k), t2.select(0, j).select(0, i));
+    t3 += einsum("bce,ae->abc", Wvvvo(k), t2.select(0, i).select(0, j));
+    t3 += einsum("cbe,ae->abc", Wvvvo(j), t2.select(0, i).select(0, k));
+    t3 += einsum("abe,ce->abc", Wvvvo(j), t2.select(0, k).select(0, i));
+
+    t3 -= einsum("mc,mab->abc", Wovoo(j, k), t2.select(0, i));
+    t3 -= einsum("mb,mac->abc", Wovoo(k, j), t2.select(0, i));
+    t3 -= einsum("mb,mca->abc", Wovoo(i, j), t2.select(0, k));
+    t3 -= einsum("ma,mcb->abc", Wovoo(j, i), t2.select(0, k));
+    t3 -= einsum("ma,mbc->abc", Wovoo(k, i), t2.select(0, j));
+    t3 -= einsum("mc,mba->abc", Wovoo(i, k), t2.select(0, j));
 
     Tensor denom({v, v, v});
     const double e_ijk = F_occ(i) + F_occ(j) + F_occ(k);
@@ -53,43 +56,30 @@ double calc_pert_triples_spat(const Tensor& Iprqs, const Tensor& DEprqs, const T
     Tensor F_virt = F_diag.slice(V);
     Tensor Fov    = FN.slice(O, V);
 
-    auto tb  = TriplesBufferSpat(t1, t2, o, v);
-    Tensor& x1 = tb.x1; Tensor& x2 = tb.x2; Tensor& t3 = tb.t3;
-    Tensor& t3_diff = tb.t3_diff; Tensor& t3_comb1 = tb.t3_comb1;
+    Tensor x1(t1.shape()), x2(t2.shape());
 
-    // Non-copying views
-    Tensor Wvvvo = Iprqs.slice(V, V, V, O);
-    Tensor Wovoo = Iprqs.slice(O, V, O, O);
-
-    Tensor Wvovv = Iprqs.slice(V, O, V, V);
-    Tensor Wooov = Iprqs.slice(O, O, O, V);
-    Tensor DEoovv = DEprqs.slice(O, O, V, V);
+    // Each block copied once, contiguous, loop indices leading (see TriplesBlocks)
+    const TriplesBlocks W{
+        .vvvo = Iprqs.slice(V, V, V, O).permute(3, 0, 1, 2).copy(),
+        .ovoo = Iprqs.slice(O, V, O, O).permute(2, 3, 0, 1).copy(),
+        .oovv = DEprqs.slice(O, O, V, V).copy(),
+        .vovv = Iprqs.slice(V, O, V, V).permute(1, 0, 2, 3).copy(),
+        .ooov = Iprqs.slice(O, O, O, V).copy(),
+    };
 
     for (int i = 0; i < o; ++i) {
-        tb.Wvvvo_i.assign(Wvvvo.select(3, i));
-
     for (int j = 0; j < o; ++j) {
-        tb.Wvvvo_j.assign(Wvvvo.select(3, j));
-        tb.Wovoo_ij.assign(Wovoo.select(2, i).select(2, j));
-        tb.Wovoo_ji.assign(Wovoo.select(2, j).select(2, i));
-
     for (int k = 0; k < o; ++k) {
-        tb.Wvvvo_k.assign(Wvvvo.select(3, k));
-        tb.Wovoo_jk.assign(Wovoo.select(2, j).select(2, k));
-        tb.Wovoo_kj.assign(Wovoo.select(2, k).select(2, j));
-        tb.Wovoo_ik.assign(Wovoo.select(2, i).select(2, k));
-        tb.Wovoo_ki.assign(Wovoo.select(2, k).select(2, i));
-
         timing::Scoped _t("  Build T3");
 
-        t3.assign(t3c_ijk_spat_einsum(t2, tb, o, v, F_occ, F_virt, i, j, k));
-        t3_diff.assign(t3 - t3.swapaxes(0, 2));
-        t3_comb1.assign(2.0 * t3 - t3.swapaxes(1, 2) - t3.swapaxes(0, 2));
+        const Tensor t3 = t3c_ijk_spat_einsum(t2, W, o, v, F_occ, F_virt, i, j, k);
+        const Tensor t3_diff = t3 - t3.swapaxes(0, 2);
+        const Tensor t3_comb1 = 2.0 * t3 - t3.swapaxes(1, 2) - t3.swapaxes(0, 2);
 
         // Same contractions as the UHF version, just no 0.25 factor here
-        x1.select(0, i) += einsum("abc,bc->a", t3_diff, DEoovv.select(0, j).select(0, k));
-        x2.select(0, i).select(0, j) += einsum("abc,dbc->ad", t3_comb1, Wvovv.select(1, k));
-        x2.select(0, i) -= einsum("mc,abc->mab", Wooov.select(0, j).select(0, k), t3_comb1);
+        x1.select(0, i) += einsum("abc,bc->a", t3_diff, W.oovv.select(0, j).select(0, k));
+        x2.select(0, i).select(0, j) += einsum("abc,dbc->ad", t3_comb1, W.vovv.select(0, k));
+        x2.select(0, i) -= einsum("mc,abc->mab", W.ooov.select(0, j).select(0, k), t3_comb1);
         x2.select(0, i).select(0, j) += einsum("abc,c->ab", t3_diff, Fov.select(0, k));
     }}}
 

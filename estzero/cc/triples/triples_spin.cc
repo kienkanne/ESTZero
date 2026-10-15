@@ -10,17 +10,20 @@
 // Source: https://github.com/CrawfordGroup/pycc/blob/main/pycc/cctriples.py
 //
 // The explicit-GEMM version of this batch (v3.7.x) is t3c_ijk_spin_gemm in legacy/triples_gemm.cc.
-Tensor t3c_ijk_spin_einsum(const Tensor& t2, TriplesBufferSpin& tb, const int o, const int v,
+Tensor t3c_ijk_spin_einsum(const Tensor& t2, const TriplesBlocks& W, const int o, const int v,
                const Tensor& F_occ, const Tensor& F_virt, int i, int j, int k) {
+    // Helpers for slicing
+    const auto Wvvvo = [&](int x) { return W.vvvo.select(0, x); };
+    const auto Wovoo = [&](int x, int y) { return W.ovoo.select(0, x).select(0, y); };
 
-    Tensor abc = einsum("ad,bcd->abc", t2.select(0, i).select(0, j), tb.Wvvvo_k);
-    abc -= einsum("ad,bcd->abc", t2.select(0, k).select(0, j), tb.Wvvvo_i);
-    abc -= einsum("ad,bcd->abc", t2.select(0, i).select(0, k), tb.Wvvvo_j);
+    Tensor abc = einsum("ad,bcd->abc", t2.select(0, i).select(0, j), Wvvvo(k));
+    abc -= einsum("ad,bcd->abc", t2.select(0, k).select(0, j), Wvvvo(i));
+    abc -= einsum("ad,bcd->abc", t2.select(0, i).select(0, k), Wvvvo(j));
     Tensor t3 = abc - abc.swapaxes(0, 1) - abc.swapaxes(0, 2);
 
-    abc = einsum("lab,lc->abc", t2.select(0, i), tb.Wovoo_jk);
-    abc -= einsum("lab,lc->abc", t2.select(0, j), tb.Wovoo_ik);
-    abc -= einsum("lab,lc->abc", t2.select(0, k), tb.Wovoo_ji);
+    abc = einsum("lab,lc->abc", t2.select(0, i), Wovoo(j, k));
+    abc -= einsum("lab,lc->abc", t2.select(0, j), Wovoo(i, k));
+    abc -= einsum("lab,lc->abc", t2.select(0, k), Wovoo(j, i));
     t3 -= (abc - abc.swapaxes(0, 2) - abc.swapaxes(1, 2));
 
     Tensor denom({v, v, v});
@@ -46,40 +49,34 @@ double calc_pert_triples_spin(const Tensor& DEprqs, const Tensor& t1, const Tens
     Tensor F_virt = F_diag.slice(V);
     Tensor Fov    = FN.slice(O, V);
 
-    auto tb  = TriplesBufferSpin(t1, t2, o, v);
-    Tensor& x1 = tb.x1; Tensor& x2 = tb.x2; Tensor& t3 = tb.t3;
+    Tensor x1(t1.shape()), x2(t2.shape());
 
-    // Non-copying views
-    Tensor Wvvvo = DEprqs.slice(V, V, V, O);
-    Tensor Wovoo = DEprqs.slice(O, V, O, O);
+    // Each block copied once, contiguous, loop indices leading (see TriplesBlocks)
+    const TriplesBlocks W{
+        .vvvo = DEprqs.slice(V, V, V, O).permute(3, 0, 1, 2).copy(),
+        .ovoo = DEprqs.slice(O, V, O, O).permute(2, 3, 0, 1).copy(),
+        .oovv = DEprqs.slice(O, O, V, V).copy(),
+        .vovv = DEprqs.slice(V, O, V, V).permute(1, 0, 2, 3).copy(),
+        .ooov = DEprqs.slice(O, O, O, V).copy(),
+    };
 
-    Tensor Woovv = DEprqs.slice(O, O, V, V);
-    Tensor Wvovv = DEprqs.slice(V, O, V, V);
-    Tensor Wooov = DEprqs.slice(O, O, O, V);
-
-    // .assign() writes values into the buffer's already allocated storage in place
     for (int i = 0; i < o; ++i) {
-        tb.Wvvvo_i.assign(Wvvvo.select(3, i));
-
     for (int j = 0; j < o; ++j) {
-        tb.Wvvvo_j.assign(Wvvvo.select(3, j));
-        tb.Wovoo_ji.assign(Wovoo.select(2, j).select(2, i));
-
     for (int k = 0; k < o; ++k) {
-        tb.Wvvvo_k.assign(Wvvvo.select(3, k));
-        tb.Wovoo_jk.assign(Wovoo.select(2, j).select(2, k));
-        tb.Wovoo_ik.assign(Wovoo.select(2, i).select(2, k));
-
         timing::Scoped _t("  Build T3");
 
-        t3.assign(t3c_ijk_spin_einsum(t2, tb, o, v, F_occ, F_virt, i, j, k));
+        const Tensor t3 = (t3c_ijk_spin_einsum(t2, W, o, v, F_occ, F_virt, i, j, k));
 
         // x1/x2 slices are views, so += / -= accumulate straight into the buffers
-        x1.select(0, i) += 0.25 * einsum("abc,bc->a", t3, Woovv.select(0, j).select(0, k));
-        x2.select(0, i).select(0, j) += 0.25 * einsum("abc,c->ab", t3, Fov.select(0, k));
-        x2.select(0, i).select(0, j) += 0.25 * einsum("abc,dbc->ad", t3, Wvovv.select(1, k));
-        x2.select(0, i) -= 0.25 * einsum("mc,abc->mab", Wooov.select(0, j).select(0, k), t3);
+        x1.select(0, i) += einsum("abc,bc->a", t3, W.oovv.select(0, j).select(0, k));
+        x2.select(0, i).select(0, j) += einsum("abc,c->ab", t3, Fov.select(0, k));
+        x2.select(0, i).select(0, j) += einsum("abc,dbc->ad", t3, W.vovv.select(0, k)); // axis 0 instead of 1 with permute trick
+        x2.select(0, i) -= einsum("mc,abc->mab", W.ooov.select(0, j).select(0, k), t3);
     }}}
+
+    // The 0.25 of every x1/x2 contribution, scaled once
+    x1 *= 0.25;
+    x2 *= 0.25;
 
     x2 = x2 - x2.swapaxes(0, 1) - x2.swapaxes(2, 3) + x2.swapaxes(0, 1).swapaxes(2, 3);
 

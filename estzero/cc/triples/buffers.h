@@ -3,33 +3,17 @@
 
 #include "tensor.h"
 
-// Allocate all the Tensor buffers that is reused frequently throughout the entire loop at the beginning,
-// so no new allocation needed per loop. The W slices are packed only when their own index changes, so for
-// the outer indices (i,j) they are not refilled every innermost loop (see `triples_spin.cc`).
-struct TriplesBufferSpin {
-    Tensor x1, x2, t3,
-    Wvvvo_i, Wvvvo_j, Wvvvo_k,
-    Wovoo_jk, Wovoo_ik, Wovoo_ji;
+// The integral blocks (T) reads, each copied once before the i/j/k loops into a contiguous tensor with the loop
+// indices leading. See `triples_{spat,spin}.cc` for the permute + packing calls: the virtual indices (v: i,j,k) 
+// are permuted to the front (outermost), so every per (i,j,k) slice is then a contiguous view (select on the outer axes).
+// Cost more memory (pack all initially) but avoid much of the packing cost every loop.
+struct TriplesBlocks {
+    Tensor vvvo; // (3,i/j/k): permute to (3,0,1,2)
+    Tensor ovoo; // (2,i/j/k).(2,i/j/k): permute to (2,3,0,1)
 
-    TriplesBufferSpin(const Tensor& t1, const Tensor& t2, const int o, const int v)
-        : x1(t1.shape()), x2(t2.shape()), t3({v,v,v}),
-        Wvvvo_i({v,v,v}), Wvvvo_j({v,v,v}), Wvvvo_k({v,v,v}),
-        Wovoo_jk({o,v}), Wovoo_ik({o,v}), Wovoo_ji({o,v}) {}
+    // These are used once in accumulating into x2. The comments show their original slicing and packing trick
+    Tensor oovv; // (0,j): No permute
+    Tensor vovv; // (1,k): permute to (1,0,2,3)
+    Tensor ooov; // (0,j).(0,k): No permute
 };
-
-// Similar idea but for spatial (RHF), which needs additional permuted Wovoo tensors and t3 combinations.
-struct TriplesBufferSpat {
-    Tensor x1, x2, t3, t3_diff, t3_comb1,
-    Wvvvo_i, Wvvvo_j, Wvvvo_k,
-    Wovoo_jk, Wovoo_ik, Wovoo_ji,
-    Wovoo_kj, Wovoo_ki, Wovoo_ij;
-
-    TriplesBufferSpat(const Tensor& t1, const Tensor& t2, const int o, const int v)
-        : x1(t1.shape()), x2(t2.shape()),
-        t3({v,v,v}), t3_diff({v,v,v}), t3_comb1({v,v,v}),
-        Wvvvo_i({v,v,v}), Wvvvo_j({v,v,v}), Wvvvo_k({v,v,v}),
-        Wovoo_jk({o,v}), Wovoo_ik({o,v}), Wovoo_ji({o,v}),
-        Wovoo_kj({o,v}), Wovoo_ki({o,v}), Wovoo_ij({o,v}) {}
-};
-
 #endif
