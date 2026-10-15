@@ -2,6 +2,13 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.11.4] Changed preallocated buffers scheme of the triples to prepack W with virtual indices to be outer
+
+- Previously each W block slice was packed individually (i.e. Wovoo i,j; j,i; j,k... all separately), and the packing depends on the loop structure (i.e. the ones depend on k gets repacked every innermost loop). A lof of packing was redundant.
+- All five W blocks (two are needed for `t3_ijk` building, three for `x1/x2` accumulation) are now permuted and prepacked first. The permutation puts the virtual index needed to be slice upfront (outermost axes), so the sliced block is still contiguous. The permute + pack makes the underlying data similar to t2, which only slice from index 0, the outermost one.
+- The `*0.25` scaling in the spin triples was moved to the end, done once.
+- Performance improved for both, though significantly more for UHF: `indole/sto-3g` 3.854s -> 3.753s, `parabenzyne/sto-3g` 8.398s -> 7.262s.
+
 ## [v3.11.3] `try_gemm` writes a transposed output (C^T) directly into the result
 
 - When the requested output is (B's free labels, A's free labels), i.e. C^T, `try_gemm` now computes C^T = op(B)^T op(A)^T straight into the result: A and B (with their own `ld`s) swap places, both transpose flags flip, M and N swap, and `ldc` = M.
