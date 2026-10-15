@@ -4,7 +4,7 @@
 #include "tensor.h"
 
 // The integral blocks (T) reads, each copied once before the i/j/k loops into a contiguous tensor with the loop
-// indices leading. See `triples_{spat,spin}.cc` for the permute + packing calls: the virtual indices (v: i,j,k) 
+// indices leading. See `triples_{spat,spin}.cc` for the permute + packing calls: the occupied indices (v: i,j,k) 
 // are permuted to the front (outermost), so every per (i,j,k) slice is then a contiguous view (select on the outer axes).
 // Cost more memory (pack all initially) but avoid much of the packing cost every loop.
 struct TriplesBlocks {

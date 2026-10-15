@@ -2,10 +2,17 @@
 
 All version updates to this project will be documented in this file. The performance comparison between versions lives in `README.md`.
 
+## [v3.11.5] Moved `eps_abc` building for denominator outside of `ijk` loop
+
+- The denominator was rebuilt every time inside the `t3_ijk` builders, but part of it only depends on `abc`, which can be built separately first.
+- `virtual_denominator` now builds `eps_abc` before the `ijk` loop. `t3_ijk` builders use another helper, `divide_by_denominator`, to help broadcast `e_ijk` (a scalar per i,j,k) subtract by the `eps_abc`, which `t3` then divides by. The loop is rolled out with raw data pointers explicitly as they are all contiguous.
+- The first attempt actually slightly slow down the run (~0.3s on `parabenzyne/sto-3g`). The divide loop got compiled as `vdivsd`, probably due to LTO inlining it. `[[gnu::noinline]]` is enforced to avoid this, and now some gain is seen compared to v3.11.4
+- Small performance improvement: `indole/sto-3g` 3.753s -> 3.646s, `parabenzyne/sto-3g` 7.262s -> 7.006s.
+
 ## [v3.11.4] Changed preallocated buffers scheme of the triples to prepack W with virtual indices to be outer
 
 - Previously each W block slice was packed individually (i.e. Wovoo i,j; j,i; j,k... all separately), and the packing depends on the loop structure (i.e. the ones depend on k gets repacked every innermost loop). A lof of packing was redundant.
-- All five W blocks (two are needed for `t3_ijk` building, three for `x1/x2` accumulation) are now permuted and prepacked first. The permutation puts the virtual index needed to be slice upfront (outermost axes), so the sliced block is still contiguous. The permute + pack makes the underlying data similar to t2, which only slice from index 0, the outermost one.
+- All five W blocks (two are needed for `t3_ijk` building, three for `x1/x2` accumulation) are now permuted and prepacked first. The permutation puts the occupied index needed to be slice upfront (outermost axes), so the sliced block is still contiguous. The permute + pack makes the underlying data similar to t2, which only slice from index 0, the outermost one.
 - The `*0.25` scaling in the spin triples was moved to the end, done once.
 - Performance improved for both, though significantly more for UHF: `indole/sto-3g` 3.854s -> 3.753s, `parabenzyne/sto-3g` 8.398s -> 7.262s.
 
