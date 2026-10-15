@@ -26,7 +26,7 @@ RSS_RE       = re.compile(r"peak RSS:\s*(\d+(?:\.\d+)?)\s*MB")
 PHASE_RE     = re.compile(r"^\s*(.*?)\s+(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+(?:\.\d+)?)\s*$")
 CC_ITER_RE   = re.compile(r"^CC\S*\s+Iteration")
 CC_MO_KEY    = "MO Transformation (CC)"
-PTRIPLES_KEY = "Perbutative Triples"
+PTRIPLES_KEY = "Perturbative Triples"
 MP3_KEY      = "MP3 Energy Calculation"
 BUILD_T3_KEY = "Build T3"
 ONE_ELEC_KEY = "One-electron (S,T,V)"
@@ -194,7 +194,7 @@ def _print_ccsd_t(collected, logger: logging.Logger, compact_scf=False):
     # CCSD(T) only (matching every other table). The intermediate CCSD is checked against its
     # own Psi4 reference too, but only ever surfaces as an explicit WARNING line in the run log
     # if it disagrees.
-    # T3/it(ms) and T3_it come from the "Build T3" sub-phase inside "Perbutative Triples".
+    # T3/it(ms) and T3_it come from the "Build T3" sub-phase inside "Perturbative Triples".
     # The per-(i,j,k) connected-T3 batch build, called n_occ^3 times; PertT(s) is the whole
     # triples phase (T3 build + the x1/x2 accumulation einsums + the final energy contraction).
     hdr = (f"{'system':<20} {'ref':>3} {'nbf':>4} {'|dE|':>10} {'ok':>5}"
@@ -454,7 +454,7 @@ def main():
                 ccsd_only_s = (wall - ptriples_s) if not math.isnan(ptriples_s) else math.nan
                 mp3_s = phases.get(MP3_KEY, {}).get("seconds", math.nan)
 
-                # "Build T3": the per-(i,j,k) connected-T3 batch build inside "Perbutative
+                # "Build T3": the per-(i,j,k) connected-T3 batch build inside "Perturbative
                 # Triples" (calc_pert_triples' o^3 loop) -- called once per unique (i,j,k), so
                 # its "calls" IS the iteration count (o^3, spin or spat).
                 build_t3_phase  = phases.get(BUILD_T3_KEY, {})

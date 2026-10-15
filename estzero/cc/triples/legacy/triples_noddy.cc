@@ -12,7 +12,7 @@
 // https://github.com/psi4/psi4numpy/blob/master/Coupled-Cluster/Spin_Orbitals/CCSD/CCSD_T.py
 double calc_pert_triples_noddy(const Tensor& Iprqs, const Tensor& t1, const Tensor&t2,
                         const Tensor& FN, const int nbf, const int n_occ, Sli O, Sli V) {
-    timing::Scoped _t("Perbutative Triples");
+    timing::Scoped _t("Perturbative Triples");
 
     // Disconnected triples
     Tensor tmp = einsum("ia,jkbc->ijkabc", t1, Iprqs.slice(O, O, V, V));

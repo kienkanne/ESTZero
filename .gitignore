@@ -21,6 +21,7 @@ artifacts/
 # Build artifacts
 
 build/
+build-debug/
 thirdparty/
 
 # Psi4 outputs

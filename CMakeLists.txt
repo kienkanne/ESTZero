@@ -7,6 +7,13 @@ project(ESTZero LANGUAGES CXX CUDA)
 
 find_package(CUDAToolkit REQUIRED)
 
+# Release (adds -DNDEBUG) is the benchmark build; -O3 -g -march=native come from target_compile_options
+# below either way. Debug keeps Eigen's bounds-check assertions on: use it for a separate dev build dir
+# (cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug). Asserts cost JK ~14% on benzene/def2-svp.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -15,7 +22,9 @@ find_package(Eigen3 REQUIRED)
 
 set(CUTENSOR_ROOT "/localscratch/kbui/CPP/libcutensor")
 
-set(LIBINT_ROOT "/localscratch/kbui/CPP/libint_install")
+# libint_install_O3 is libint2 built as Release with -march=native. The old libint_install was configured
+# with an empty CMAKE_BUILD_TYPE (= no -O flag at all); override with -DLIBINT_ROOT=... to A/B against it.
+set(LIBINT_ROOT "/localscratch/kbui/CPP/libint_install_O3" CACHE PATH "libint2 install prefix")
 
 set(OPENBLAS_ROOT "/localscratch/kbui/CPP/OpenBLAS")
 find_path(OPENBLAS_INCLUDE_DIR cblas.h
